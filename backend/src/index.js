@@ -15,14 +15,33 @@ const startServer = async () => {
     logger.info('Initializing database...');
     await initializeDatabase();
 
-    // Start server
-    const server = app.listen(config.port, () => {
-      logger.info(`Server is running on port ${config.port}`);
-      logger.info(`Environment: ${config.nodeEnv}`);
-      logger.info(`API Base URL: ${config.apiBaseUrl}`);
-    });
+    // Start server with automatic port fallback if the desired port is in use
+    const startListening = (port, attemptsLeft = 5) => {
+      return new Promise((resolve, reject) => {
+        const server = app.listen(port, () => {
+          logger.info(`Server is running on port ${port}`);
+          logger.info(`Environment: ${config.nodeEnv}`);
+          logger.info(`API Base URL: ${config.apiBaseUrl}`);
+          resolve(server);
+        });
 
-    // Schedule background jobs
+        server.on('error', (err) => {
+          if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+            logger.warn(`Port ${port} is in use, trying port ${port + 1}...`);
+            // give a short delay before retrying
+            setTimeout(() => {
+              startListening(port + 1, attemptsLeft - 1).then(resolve).catch(reject);
+            }, 300);
+            return;
+          }
+          reject(err);
+        });
+      });
+    };
+
+    const server = await startListening(config.port);
+
+    // Schedule background jobs (only after server successfully starts)
     logger.info('Scheduling background jobs...');
 
     // Daily usage reset (runs at midnight every day)

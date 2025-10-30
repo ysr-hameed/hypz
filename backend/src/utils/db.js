@@ -3,12 +3,19 @@ const { Pool } = pkg;
 import { config } from '../config/env.js';
 import logger from './logger.js';
 
+// Fail fast when database URL is not provided
+if (!config.databaseUrl) {
+  logger.error('DATABASE_URL is not set. Please set the DATABASE_URL environment variable to your Postgres connection string.');
+  process.exit(1);
+}
+
 const pool = new Pool({
   connectionString: config.databaseUrl,
   ssl: config.nodeEnv === 'production' ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  // increase slightly to avoid very short timeouts in slow environments
+  connectionTimeoutMillis: 10000,
 });
 
 // Test connection
