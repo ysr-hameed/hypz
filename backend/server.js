@@ -23,8 +23,7 @@ dotenv.config();
 // Create Fastify instance
 const fastify = Fastify({
   logger: {
-    level: process.env.NODE_ENV === 'production' ? 'error' : 'info',
-    prettyPrint: process.env.NODE_ENV !== 'production'
+    level: process.env.NODE_ENV === 'production' ? 'error' : 'info'
   },
   trustProxy: true,
   bodyLimit: 10485760, // 10MB
