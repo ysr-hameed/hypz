@@ -42,6 +42,8 @@ function App() {
               <Route path="/billing" element={<Billing />} />
               <Route path="/usage" element={<Usage />} />
               <Route path="/api-keys" element={<ApiKeys />} />
+              <Route path="/documentation" element={<Documentation />} />
+              <Route path="/team" element={<Team />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin" element={<AdminDashboard />} />
             </Route>
