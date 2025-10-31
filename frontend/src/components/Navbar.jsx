@@ -1,0 +1,105 @@
+import { Link } from 'react-router-dom';
+import { Sun, Moon, Menu, X } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { useState } from 'react';
+
+const Navbar = () => {
+  const { theme, toggleTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2 group">
+            <span className="text-2xl">⚡</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+              Hypz
+            </span>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
+            <a href="#features" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
+              Pricing
+            </a>
+            <Link to="/docs" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
+              Docs
+            </Link>
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
+              GitHub
+            </a>
+          </div>
+
+          {/* Actions */}
+          <div className="hidden md:flex items-center space-x-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              aria-label="Toggle theme"
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <Link
+              to="/login"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400 transition"
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition shadow-lg shadow-primary-500/50"
+            >
+              Sign Up
+            </Link>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+          <div className="px-4 py-4 space-y-3">
+            <a href="#features" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
+              Features
+            </a>
+            <a href="#pricing" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
+              Pricing
+            </a>
+            <Link to="/docs" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
+              Docs
+            </Link>
+            <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-2">
+              <Link
+                to="/login"
+                className="block w-full text-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="block w-full text-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+};
+
+export default Navbar;
