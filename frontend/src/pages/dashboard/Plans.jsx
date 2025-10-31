@@ -1,190 +1,158 @@
-import { Check, Zap, TrendingUp, Bell, CreditCard } from 'lucide-react';
+import { Check, Zap, Sparkles } from 'lucide-react';
 
 const Plans = () => {
+  const plans = [
+    {
+      name: 'Free Plan',
+      icon: <Sparkles className="w-6 h-6" />,
+      price: '₹0',
+      period: 'forever',
+      description: 'Perfect for testing and small projects',
+      features: [
+        '500 MB Storage',
+        '1 GB Bandwidth',
+        '10,000 API Calls/month',
+        'Basic Support',
+        '+500 MB Bonus on signup'
+      ],
+      current: true
+    },
+    {
+      name: 'Pay-As-You-Go',
+      icon: <Zap className="w-6 h-6" />,
+      price: 'Usage Based',
+      period: 'billed monthly',
+      description: 'Only pay for what you use',
+      features: [
+        '₹5 per GB Storage',
+        '₹10 per GB Bandwidth',
+        '₹0.02 per 100 API Calls',
+        'Priority Support',
+        'No monthly commitment'
+      ],
+      current: false
+    }
+  ];
+
   return (
-    <div className="space-y-8 animate-slideIn max-w-6xl mx-auto">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Choose Your Plan</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">Start free, scale as you grow</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Plans & Pricing</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Choose the plan that fits your needs or upgrade anytime
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Free Plan */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 border-2 border-gray-200 dark:border-gray-800 hover:border-primary-500 dark:hover:border-primary-500 transition">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🧪 Free Plan</h2>
-            <span className="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 text-sm font-semibold rounded-full">
-              ACTIVE
-            </span>
-          </div>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">Perfect for students, developers, or teams testing Hypz APIs before going live.</p>
-          
-          <div className="mb-8">
-            <span className="text-5xl font-bold text-gray-900 dark:text-white">₹0</span>
-            <span className="text-gray-600 dark:text-gray-400 ml-2">forever</span>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">💾 500 MB Storage</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Permanent file storage</p>
+      {/* Current Usage */}
+      <div className="bg-gradient-to-br from-primary-50 to-purple-50 dark:from-primary-900/20 dark:to-purple-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Current Plan: Free</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-8">
+                <span className="text-gray-600 dark:text-gray-400">Storage Used:</span>
+                <span className="font-mono font-medium text-gray-900 dark:text-white">175 MB / 500 MB</span>
               </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">🌐 1 GB Bandwidth / month</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Monthly download quota</p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gradient-to-r from-primary-600 to-purple-600 h-2 rounded-full" style={{ width: '35%' }}></div>
               </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">⚙️ 10,000 API Calls / month</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Upload, list, delete, and access APIs</p>
+              <div className="flex items-center justify-between gap-8 mt-4">
+                <span className="text-gray-600 dark:text-gray-400">Bandwidth Used:</span>
+                <span className="font-mono font-medium text-gray-900 dark:text-white">420 MB / 1 GB</span>
               </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">📅 Lifetime Validity</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">For testing only - May slow after 30 days inactive</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">💸 No Card Required</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Start immediately</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <Zap size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-green-700 dark:text-green-400">🎁 Launch Bonus</p>
-                <p className="text-sm text-green-600 dark:text-green-400">+500 MB extra storage for first 30 days!</p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-gradient-to-r from-primary-600 to-purple-600 h-2 rounded-full" style={{ width: '42%' }}></div>
               </div>
             </div>
           </div>
-
-          <button className="w-full py-3 px-4 bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg font-medium cursor-not-allowed">
-            Current Plan
-          </button>
-        </div>
-
-        {/* Pay-As-You-Go Plan */}
-        <div className="bg-gradient-to-br from-primary-600 to-purple-600 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-4 right-4">
-            <span className="px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-sm font-semibold rounded-full">
-              ⭐ POPULAR
-            </span>
-          </div>
-          
-          <h2 className="text-2xl font-bold text-white mb-2">💰 Pay-As-You-Go Plan</h2>
-          <p className="text-white/90 mb-6">No monthly commitment — just top-up your wallet and pay for actual usage.</p>
-          
-          <div className="mb-8">
-            <span className="text-5xl font-bold text-white">Usage Based</span>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">💾 ₹5 / GB / month</p>
-                <p className="text-sm text-white/80">Storage - Billed daily, charged monthly</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">🌐 ₹10 / GB</p>
-                <p className="text-sm text-white/80">Bandwidth - Pay for file delivery/download</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">⚙️ ₹0.02 / 100 calls</p>
-                <p className="text-sm text-white/80">API Calls - First 10,000 free every month</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">�� ₹10 Minimum Bill</p>
-                <p className="text-sm text-white/80">Only when usage exceeds free tier</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">🔄 30-Day Billing Cycle</p>
-                <p className="text-sm text-white/80">Auto-deduct from Razorpay wallet or card</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3 p-3 bg-white/10 backdrop-blur-sm rounded-lg">
-              <Bell size={20} className="text-white flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-white">🔔 Usage Alerts</p>
-                <p className="text-sm text-white/90">Email/SMS at 80% usage - Prevent surprise billing</p>
-              </div>
-            </div>
-          </div>
-
-          <button className="w-full py-3 px-4 bg-white hover:bg-gray-100 text-primary-600 rounded-lg font-medium transition shadow-xl">
-            Upgrade Now
-          </button>
+          <Sparkles className="w-12 h-12 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
-      {/* Features Comparison */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 border border-gray-200 dark:border-gray-800">
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Feature Comparison</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800">
-                <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Feature</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900 dark:text-white">Free Plan</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900 dark:text-white">Pay-As-You-Go</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Storage</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">500 MB</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">Unlimited</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bandwidth</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">1 GB/month</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">Unlimited</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">API Calls</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">10,000/month</td>
-                <td className="py-3 px-4 text-center text-gray-600 dark:text-gray-400">Unlimited</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">CDN</td>
-                <td className="py-3 px-4 text-center"><Check className="mx-auto text-green-500" size={20} /></td>
-                <td className="py-3 px-4 text-center"><Check className="mx-auto text-green-500" size={20} /></td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">SSL/TLS</td>
-                <td className="py-3 px-4 text-center"><Check className="mx-auto text-green-500" size={20} /></td>
-                <td className="py-3 px-4 text-center"><Check className="mx-auto text-green-500" size={20} /></td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Priority Support</td>
-                <td className="py-3 px-4 text-center text-gray-400">-</td>
-                <td className="py-3 px-4 text-center"><Check className="mx-auto text-green-500" size={20} /></td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Plans Grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {plans.map((plan, index) => (
+          <div
+            key={index}
+            className={`relative bg-white dark:bg-gray-900 rounded-xl border-2 p-8 transition hover:shadow-xl ${
+              plan.current
+                ? 'border-primary-500 dark:border-primary-500 shadow-lg'
+                : 'border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700'
+            }`}
+          >
+            {plan.current && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-primary-600 to-purple-600 text-white text-xs font-semibold rounded-full">
+                Current Plan
+              </div>
+            )}
+
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-purple-100 dark:from-primary-900/30 dark:to-purple-900/30 rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-400">
+                    {plan.icon}
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{plan.name}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-gray-900 dark:text-white">{plan.price}</span>
+                <span className="text-gray-600 dark:text-gray-400">/{plan.period}</span>
+              </div>
+            </div>
+
+            <ul className="space-y-3 mb-8">
+              {plan.features.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            {plan.current ? (
+              <button
+                disabled
+                className="w-full py-3 px-4 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 rounded-lg font-medium cursor-not-allowed"
+              >
+                Current Plan
+              </button>
+            ) : (
+              <button className="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition shadow-lg shadow-primary-500/50">
+                Upgrade to Pay-As-You-Go
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* FAQ Section */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Frequently Asked Questions</h2>
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Can I switch between plans?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Yes! You can upgrade to Pay-As-You-Go anytime. Changes take effect immediately.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">What happens if I exceed free tier limits?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Your services will be temporarily paused until you upgrade or the next billing cycle begins.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">How does Pay-As-You-Go billing work?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              You're only charged for actual usage. Bills are calculated at the end of each month based on your storage, bandwidth, and API calls.
+            </p>
+          </div>
         </div>
       </div>
     </div>

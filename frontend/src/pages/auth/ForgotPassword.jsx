@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft } from 'lucide-react';
+import { Mail, ArrowLeft, Zap } from 'lucide-react';
 
 const ForgotPassword = () => {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 animate-slideIn">
       <div className="text-center mb-8">
         <div className="flex items-center justify-center space-x-2 mb-4">
-          <span className="text-3xl">⚡</span>
+          <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <Zap className="w-6 h-6 text-white" fill="white" />
+          </div>
           <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
             Hypz
           </span>

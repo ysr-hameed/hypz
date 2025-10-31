@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Github, Twitter, Linkedin, Mail } from 'lucide-react';
+import { Github, Twitter, Linkedin, Mail, Zap, Heart } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -9,7 +9,9 @@ const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <span className="text-2xl">⚡</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" fill="white" />
+              </div>
               <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
                 Hypz
               </span>
@@ -71,8 +73,10 @@ const Footer = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             © {new Date().getFullYear()} Hypz. All rights reserved.
           </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Built with ❤️ for developers
+          <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center space-x-1">
+            <span>Built with</span>
+            <Heart className="w-4 h-4 text-red-500" fill="currentColor" />
+            <span>for developers</span>
           </p>
         </div>
       </div>
