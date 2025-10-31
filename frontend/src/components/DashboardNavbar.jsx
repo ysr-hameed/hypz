@@ -3,15 +3,36 @@ import { Bell, Search, Sun, Moon, User, Settings, LogOut, Menu } from 'lucide-re
 import { useTheme } from '../context/ThemeContext';
 import { useState } from 'react';
 
-const DashboardNavbar = () => {
+const DashboardNavbar = ({ setMobileMenuOpen }) => {
   const { theme, toggleTheme } = useTheme();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
     <nav className="sticky top-0 z-30 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-      <div className="h-full px-4 md:px-6 lg:px-8 flex items-center justify-between">
+      <div className="h-full px-4 md:px-6 flex items-center justify-between">
+        {/* Mobile Menu Button & Logo */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            aria-label="Open menu"
+          >
+            <Menu size={24} className="text-gray-700 dark:text-gray-300" />
+          </button>
+
+          {/* Mobile Logo */}
+          <div className="flex items-center space-x-2 lg:hidden">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm font-bold">H</span>
+            </div>
+            <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+              Hypz
+            </span>
+          </div>
+        </div>
+
         {/* Search */}
-        <div className="flex-1 max-w-2xl">
+        <div className="flex-1 max-w-2xl mx-4 hidden md:block">
           <div className="relative">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -23,7 +44,7 @@ const DashboardNavbar = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-2 ml-4">
+        <div className="flex items-center space-x-1 md:space-x-2">
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -48,7 +69,6 @@ const DashboardNavbar = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
                 JD
               </div>
-              <span className="hidden md:block text-sm font-medium">John Doe</span>
             </button>
 
             {showUserMenu && (

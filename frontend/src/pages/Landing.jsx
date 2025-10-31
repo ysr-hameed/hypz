@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Globe, Code, Check, Star } from 'lucide-react';
+import { PLANS_DATA } from '../config/plans';
 
 const Landing = () => {
+  const freePlan = PLANS_DATA.plans.free;
+  const paygPlan = PLANS_DATA.plans.payg;
+  
   const features = [
     { icon: Zap, title: 'Lightning Fast', description: 'Upload and deliver files at blazing speeds with our global CDN' },
     { icon: Shield, title: 'Secure & Reliable', description: 'Enterprise-grade security with 99.99% uptime SLA' },
@@ -104,25 +108,25 @@ const Landing = () => {
             {/* Free Plan */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl border-2 border-gray-200 dark:border-gray-700">
               <div className="mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Free Plan</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">For testing & development</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{freePlan.name}</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Perfect to get started</p>
               </div>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">₹0</span>
+                <span className="text-4xl font-bold text-gray-900 dark:text-white">$0</span>
                 <span className="text-gray-600 dark:text-gray-400 ml-2">forever</span>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>500 MB</strong> storage</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>{freePlan.features.storage.amount}{freePlan.features.storage.unit}</strong> storage</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>1 GB</strong> bandwidth/month</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>{freePlan.features.bandwidth.amount}{freePlan.features.bandwidth.unit}</strong> bandwidth/month</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>10,000</strong> API calls/month</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400"><strong>{(freePlan.features.apiCalls.amount / 1000).toFixed(0)}K</strong> API calls/month</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
@@ -130,7 +134,7 @@ const Landing = () => {
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">+500 MB bonus first 30 days</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{freePlan.features.buckets.amount} storage buckets</span>
                 </li>
               </ul>
               <Link
@@ -149,39 +153,42 @@ const Landing = () => {
                 </span>
               </div>
               <div className="mb-6">
-                <h3 className="text-2xl font-bold text-white mb-2">Pay-As-You-Go</h3>
-                <p className="text-white/80 text-sm">Scale as you grow</p>
+                <h3 className="text-2xl font-bold text-white mb-2">{paygPlan.name}</h3>
+                <p className="text-white/80 text-sm">Scale without limits</p>
               </div>
               <div className="mb-6">
-                <span className="text-4xl font-bold text-white">Usage Based</span>
+                <span className="text-4xl font-bold text-white">Pay as you use</span>
+                <p className="text-white/80 text-sm mt-2">
+                  {paygPlan.baseIncludes.storage.amount}GB storage + {paygPlan.baseIncludes.bandwidth.amount}GB bandwidth free
+                </p>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/90"><strong>₹5/GB/month</strong> storage</span>
+                  <span className="text-sm text-white/90"><strong>${paygPlan.pricing.storage.usd}/GB/month</strong> storage</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/90"><strong>₹10/GB</strong> bandwidth</span>
+                  <span className="text-sm text-white/90"><strong>${paygPlan.pricing.bandwidth.usd}/GB</strong> bandwidth</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/90"><strong>₹0.02/100</strong> API calls</span>
+                  <span className="text-sm text-white/90"><strong>${paygPlan.pricing.apiCalls.usd}/1M</strong> API calls</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/90">First 10,000 API calls free</span>
+                  <span className="text-sm text-white/90">Unlimited everything</span>
                 </li>
                 <li className="flex items-start space-x-3">
                   <Check size={20} className="text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/90">Email/SMS alerts at 80% usage</span>
+                  <span className="text-sm text-white/90">Priority support</span>
                 </li>
               </ul>
               <Link
-                to="/register"
+                to="/plans"
                 className="block w-full text-center px-6 py-3 text-primary-600 bg-white hover:bg-gray-100 font-medium rounded-lg transition shadow-xl"
               >
-                Get Started
+                View Full Pricing
               </Link>
             </div>
           </div>
