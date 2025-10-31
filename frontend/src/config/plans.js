@@ -241,7 +241,7 @@ export const mockUserData = {
   name: 'Demo User',
   region: 'india',
   currentPlan: {
-    planId: 'free_india',
+    planId: 'pro_global',
     startDate: '2025-10-01',
     renewalDate: '2025-11-01',
     renewalType: 'manual',
