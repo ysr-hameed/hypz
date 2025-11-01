@@ -10,6 +10,7 @@ import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import VerifyEmail from './pages/auth/VerifyEmail';
 import Dashboard from './pages/dashboard/Dashboard';
 import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
@@ -21,6 +22,15 @@ import Usage from './pages/dashboard/Usage';
 import Documentation from './pages/dashboard/Documentation';
 import Team from './pages/dashboard/Team';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import Terms from './pages/legal/Terms';
+import Privacy from './pages/legal/Privacy';
+import Security from './pages/legal/Security';
+import Compliance from './pages/legal/Compliance';
+import About from './pages/company/About';
+import Blog from './pages/company/Blog';
+import Careers from './pages/company/Careers';
+import Contact from './pages/company/Contact';
+import Api from './pages/Api';
 
 function App() {
   return (
@@ -43,6 +53,24 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+            </Route>
+
+            {/* Legal Routes */}
+            <Route element={<LandingLayout />}>
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/security" element={<Security />} />
+              <Route path="/compliance" element={<Compliance />} />
+            </Route>
+
+            {/* Company Routes */}
+            <Route element={<LandingLayout />}>
+              <Route path="/about" element={<About />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/api" element={<Api />} />
             </Route>
 
             {/* Protected Dashboard Routes */}

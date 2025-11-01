@@ -1,0 +1,158 @@
+import express from 'express';
+import morgan from 'morgan';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import config from './config/config.js';
+import pool from './config/database.js';
+import {
+  corsOptions,
+  helmetConfig,
+  compressionConfig,
+  apiLimiter,
+  errorHandler,
+  notFound,
+  requestLogger,
+  sanitizeData
+} from './middleware/security.js';
+
+// Routes
+import authRoutes from './routes/authRoutes.js';
+import bucketRoutes from './routes/bucketRoutes.js';
+import fileRoutes from './routes/fileRoutes.js';
+import apiKeyRoutes from './routes/apiKeyRoutes.js';
+import usageRoutes from './routes/usageRoutes.js';
+import planRoutes from './routes/planRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize Express app
+const app = express();
+
+// Trust proxy (important for rate limiting and IP detection)
+app.set('trust proxy', 1);
+
+// Security middleware
+app.use(helmetConfig);
+app.use(cors(corsOptions));
+app.use(...sanitizeData);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Compression
+app.use(compressionConfig);
+
+// Logging
+if (config.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Custom request logger
+app.use(requestLogger);
+
+// Static files (for uploaded files)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    environment: config.NODE_ENV
+  });
+});
+
+// API version endpoint
+app.get(`/api/${config.API_VERSION}`, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Hypz Storage API',
+    version: config.API_VERSION,
+    documentation: `${config.FRONTEND_URL}/docs`
+  });
+});
+
+// Apply rate limiting to API routes
+app.use(`/api/${config.API_VERSION}`, apiLimiter);
+
+// API Routes
+app.use(`/api/${config.API_VERSION}/auth`, authRoutes);
+app.use(`/api/${config.API_VERSION}/buckets`, bucketRoutes);
+app.use(`/api/${config.API_VERSION}/files`, fileRoutes);
+app.use(`/api/${config.API_VERSION}/api-keys`, apiKeyRoutes);
+app.use(`/api/${config.API_VERSION}/usage`, usageRoutes);
+app.use(`/api/${config.API_VERSION}/plans`, planRoutes);
+app.use(`/api/${config.API_VERSION}/payments`, paymentRoutes);
+
+// 404 handler
+app.use(notFound);
+
+// Global error handler
+app.use(errorHandler);
+
+// Start server
+const PORT = config.PORT;
+
+const startServer = async () => {
+  try {
+    // Test database connection
+    await pool.query('SELECT NOW()');
+    console.log('✅ Database connection established');
+
+    // Start listening
+    app.listen(PORT, () => {
+      console.log('');
+      console.log('🚀 ═══════════════════════════════════════════════════════════');
+      console.log(`🚀 Hypz Storage API Server Running`);
+      console.log('🚀 ═══════════════════════════════════════════════════════════');
+      console.log(`🌍 Environment: ${config.NODE_ENV}`);
+      console.log(`🔗 Server URL: http://localhost:${PORT}`);
+      console.log(`📡 API Version: ${config.API_VERSION}`);
+      console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+      console.log(`📚 API Endpoint: http://localhost:${PORT}/api/${config.API_VERSION}`);
+      console.log('🚀 ═══════════════════════════════════════════════════════════');
+      console.log('');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Unhandled Promise Rejection:', err);
+  // Close server & exit process
+  process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('👋 SIGTERM received. Shutting down gracefully...');
+  await pool.end();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('👋 SIGINT received. Shutting down gracefully...');
+  await pool.end();
+  process.exit(0);
+});
+
+// Start the server
+startServer();
+
+export default app;

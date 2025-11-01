@@ -1,15 +1,25 @@
-import { useState } from 'react';
-import { X, Check, CreditCard, Calendar } from 'lucide-react';
-import { CURRENCIES, formatPrice } from '../config/plans';
+import { useState, useEffect } from 'react';
+import { X, Check, CreditCard, Calendar, Loader2 } from 'lucide-react';
+import { paymentAPI } from '../services/api';
 
-const PaymentModal = ({ plan, currency, onClose }) => {
-  const [paymentMethod, setPaymentMethod] = useState('auto');
-  const [billingCycle, setBillingCycle] = useState('monthly');
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+const PaymentModal = ({ plan, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [country, setCountry] = useState('US');
+  const [paymentMethod, setPaymentMethod] = useState('card');
 
-  const currencyData = CURRENCIES.find(c => c.code === currency);
-  const provider = currencyData?.provider;
+  // Detect user's country
+  useEffect(() => {
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(data => {
+        setCountry(data.country_code || 'US');
+      })
+      .catch(() => setCountry('US'));
+  }, []);
+
+  const isIndia = country === 'IN';
+  const currency = isIndia ? 'INR' : 'USD';
+  const price = isIndia ? plan.price_inr : plan.price_usd;
 
   const handleApplyCoupon = () => {
     // Simulate coupon validation

@@ -1,13 +1,57 @@
-import { Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Zap } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
+import { authAPI } from '../../services/api';
 
 const Login = () => {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleOAuthLogin = (provider) => {
     // OAuth login logic will be implemented in backend
     console.log(`Login with ${provider}`);
+    setError('OAuth login coming soon!');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // Real API call to login
+      const response = await authAPI.login({ email, password });
+      
+      const { token, refreshToken, user } = response.data;
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        // Redirect to verification page if email not verified
+        navigate('/verify-email', { 
+          state: { email: user.email },
+          replace: true 
+        });
+        return;
+      }
+
+      // Store tokens and user data
+      localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('userEmail', user.email);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Navigate to dashboard
+      navigate('/dashboard', { replace: true });
+      
+    } catch (err) {
+      setError(err.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,7 +120,14 @@ const Login = () => {
         </div>
       </div>
 
-      <form className="space-y-5">
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {error && (
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+        
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Email Address
@@ -85,8 +136,12 @@ const Login = () => {
             <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="john@example.com"
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+              required
+              disabled={loading}
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition disabled:opacity-50"
             />
           </div>
         </div>
@@ -99,13 +154,18 @@ const Login = () => {
             <Lock size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+              required
+              disabled={loading}
+              className="w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition disabled:opacity-50"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              disabled={loading}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -114,7 +174,7 @@ const Login = () => {
 
         <div className="flex items-center justify-between text-sm">
           <label className="flex items-center">
-            <input type="checkbox" className="rounded text-primary-600 focus:ring-primary-500" />
+            <input type="checkbox" className="rounded text-primary-600 focus:ring-primary-500" disabled={loading} />
             <span className="ml-2 text-gray-600 dark:text-gray-400">Remember me</span>
           </label>
           <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-700">
@@ -124,9 +184,17 @@ const Login = () => {
 
         <button
           type="submit"
-          className="w-full py-3 px-4 text-white bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg font-medium transition shadow-lg shadow-primary-500/50"
+          disabled={loading}
+          className="w-full py-3 px-4 text-white bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg font-medium transition shadow-lg shadow-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          Sign In
+          {loading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>Signing In...</span>
+            </>
+          ) : (
+            'Sign In'
+          )}
         </button>
       </form>
 

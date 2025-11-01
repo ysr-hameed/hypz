@@ -1,19 +1,101 @@
-import { Database, TrendingUp, Zap, HardDrive, Globe, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Database, TrendingUp, Zap, HardDrive, Globe, Activity, Loader2 } from 'lucide-react';
+import { bucketAPI, usageAPI, plansAPI } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-  const stats = [
-    { icon: HardDrive, label: 'Storage Used', value: '175 MB', total: '500 MB', percent: 35, color: 'text-blue-500' },
-    { icon: Globe, label: 'Bandwidth', value: '320 MB', total: '1 GB', percent: 32, color: 'text-green-500' },
-    { icon: Zap, label: 'API Calls', value: '3,245', total: '10,000', percent: 32, color: 'text-purple-500' },
-    { icon: Activity, label: 'Active Buckets', value: '8', total: 'Unlimited', percent: 100, color: 'text-orange-500' },
-  ];
+  const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [buckets, setBuckets] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const recentActivity = [
-    { action: 'File uploaded', file: 'avatar.png', bucket: 'my-images', time: '2 minutes ago' },
-    { action: 'Bucket created', file: 'backup-files', bucket: '-', time: '1 hour ago' },
-    { action: 'File deleted', file: 'old-data.json', bucket: 'my-data', time: '3 hours ago' },
-    { action: 'API key generated', file: 'prod-key-001', bucket: '-', time: '1 day ago' },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch usage data
+        const usageResponse = await usageAPI.getCurrent();
+        const usage = usageResponse.data;
+
+        // Fetch current plan
+        const planResponse = await plansAPI.getUserPlan();
+        setCurrentPlan(planResponse.data);
+
+        // Fetch buckets count
+        const bucketsResponse = await bucketAPI.getAll();
+        setBuckets(bucketsResponse.data || []);
+
+        // Calculate stats
+        const storageUsed = usage.usage?.storage || 0;
+        const bandwidthUsed = usage.usage?.bandwidth || 0;
+        const apiCallsUsed = usage.usage?.apiCalls || 0;
+        
+        const planData = planResponse.data?.plan;
+        const storageLimit = (planData?.storage_gb || 1) * 1024 * 1024 * 1024; // Convert to bytes
+        const bandwidthLimit = (planData?.bandwidth_gb || 3) * 1024 * 1024 * 1024;
+        const apiCallsLimit = planData?.api_calls || 50000;
+
+        setStats([
+          {
+            icon: HardDrive,
+            label: 'Storage Used',
+            value: formatBytes(storageUsed),
+            total: formatBytes(storageLimit),
+            percent: Math.min((storageUsed / storageLimit) * 100, 100),
+            color: 'text-blue-500'
+          },
+          {
+            icon: Globe,
+            label: 'Bandwidth',
+            value: formatBytes(bandwidthUsed),
+            total: formatBytes(bandwidthLimit),
+            percent: Math.min((bandwidthUsed / bandwidthLimit) * 100, 100),
+            color: 'text-green-500'
+          },
+          {
+            icon: Zap,
+            label: 'API Calls',
+            value: apiCallsUsed.toLocaleString(),
+            total: apiCallsLimit.toLocaleString(),
+            percent: Math.min((apiCallsUsed / apiCallsLimit) * 100, 100),
+            color: 'text-purple-500'
+          },
+          {
+            icon: Activity,
+            label: 'Active Buckets',
+            value: bucketsResponse.data?.length || 0,
+            total: 'Unlimited',
+            percent: 100,
+            color: 'text-orange-500'
+          }
+        ]);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-slideIn">
@@ -45,47 +127,56 @@ const Dashboard = () => {
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center space-x-2 mb-2">
-              <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 text-xs font-semibold rounded-full">
-                FREE PLAN
-              </span>
-              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-semibold rounded-full">
-                +500 MB BONUS
+              <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 text-xs font-semibold rounded-full uppercase">
+                {currentPlan?.plan?.type || 'FREE'} PLAN
               </span>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">You're on the Free Plan</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              {currentPlan?.plan?.name || 'Free Plan'}
+            </h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-              Perfect for testing! Get 500 MB storage + 1 GB bandwidth monthly.<br />
-              <span className="font-semibold">Bonus:</span> Extra 500 MB for first 30 days
+              {currentPlan?.plan?.type === 'free' 
+                ? `${currentPlan?.plan?.storage_gb}GB Storage • ${currentPlan?.plan?.bandwidth_gb}GB Bandwidth • ${(currentPlan?.plan?.api_calls || 0).toLocaleString()} API Calls`
+                : 'Pay only for what you use with no base fees'}
             </p>
-            <button className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition shadow-lg shadow-primary-500/50">
-              Upgrade to Pay-As-You-Go
+            <button 
+              onClick={() => navigate('/dashboard/plans')}
+              className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition shadow-lg shadow-primary-500/50">
+              {currentPlan?.plan?.type === 'free' ? 'Upgrade to Pay-As-You-Go' : 'View Plan Details'}
             </button>
           </div>
           <TrendingUp className="w-12 h-12 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
-        </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-800">
-          {recentActivity.map((activity, index) => (
-            <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.action}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    <span className="font-mono">{activity.file}</span>
-                    {activity.bucket !== '-' && <span> in <span className="font-mono">{activity.bucket}</span></span>}
-                  </p>
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-500">{activity.time}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <button
+          onClick={() => navigate('/dashboard/buckets')}
+          className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
+        >
+          <Database className="w-10 h-10 text-blue-500 mb-3 group-hover:scale-110 transition" />
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Create Bucket</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Start storing your files</p>
+        </button>
+
+        <button
+          onClick={() => navigate('/dashboard/api-keys')}
+          className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
+        >
+          <Zap className="w-10 h-10 text-purple-500 mb-3 group-hover:scale-110 transition" />
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Generate API Key</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Connect your application</p>
+        </button>
+
+        <button
+          onClick={() => navigate('/dashboard/documentation')}
+          className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
+        >
+          <Activity className="w-10 h-10 text-green-500 mb-3 group-hover:scale-110 transition" />
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">View Documentation</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Learn how to integrate</p>
+        </button>
       </div>
     </div>
   );
