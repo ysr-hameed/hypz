@@ -416,7 +416,7 @@ const createTables = async () => {
         'Scale without limits. You pay only for what you use, billed automatically or manually as per your choice.',
         0, 0, 2, 0, 10,
         true, true, 30, true,
-        0.03, 0.05, 0.002, 0.03,
+        0.015, 0.05, 0.0002, 0.03,
         'manual', true, false,
         '{
           "write_operations": "Free (uploads, deletes, creates)",
