@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState([]);
   const [currentPlan, setCurrentPlan] = useState(null);
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,10 +27,10 @@ const Dashboard = () => {
         const bucketsResponse = await bucketAPI.getAll();
         setBuckets(bucketsResponse.data || []);
 
-        // Calculate stats
-        const storageUsed = usage.usage?.storage || 0;
-        const bandwidthUsed = usage.usage?.bandwidth || 0;
-        const apiCallsUsed = usage.usage?.apiCalls || 0;
+        // Calculate stats - usage.month contains current usage
+        const storageUsed = usage.month?.storage_bytes || 0;
+        const bandwidthUsed = usage.month?.bandwidth_bytes || 0;
+        const apiCallsUsed = usage.month?.api_calls || 0;
         
         const planData = planResponse.data?.plan;
         const storageLimit = (planData?.storage_gb || 1) * 1024 * 1024 * 1024; // Convert to bytes

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, ArrowLeft, Shield, CheckCircle, AlertCircle, Zap } from 'lucide-react';
+import axios from 'axios';
+import config from '../../config/env';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
@@ -27,31 +29,26 @@ const VerifyEmail = () => {
     }
   }, [countdown, resendDisabled]);
 
-  // Auto-send OTP on component mount
+  // Auto-send OTP on component mount (only once)
   useEffect(() => {
     if (email) {
       handleSendOtp();
     } else {
       navigate('/login');
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   const handleSendOtp = async () => {
     setSendingOtp(true);
     setError('');
     
     try {
-      // API call to send OTP
-      // await api.post('/auth/send-verification-otp', { email });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('OTP sent to:', email);
+      await axios.post(`${config.API_URL}/auth/otp/send`, { email });
       setResendDisabled(true);
       setCountdown(60);
     } catch (err) {
-      setError('Failed to send OTP. Please try again.');
+      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setSendingOtp(false);
     }
@@ -111,28 +108,20 @@ const VerifyEmail = () => {
     setError('');
 
     try {
-      // API call to verify OTP
-      // const response = await api.post('/auth/verify-email', { email, otp: otpCode });
+      await axios.post(`${config.API_URL}/auth/otp/verify`, { 
+        email, 
+        otp: otpCode 
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock verification (in production, check response from backend)
-      if (otpCode === '123456') {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate('/dashboard', { 
-            replace: true,
-            state: { message: 'Email verified successfully!' }
-          });
-        }, 2000);
-      } else {
-        setError('Invalid OTP. Please try again.');
-        setOtp(['', '', '', '', '', '']);
-        inputRefs.current[0]?.focus();
-      }
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/login', { 
+          replace: true,
+          state: { message: 'Email verified successfully! Please login.' }
+        });
+      }, 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Verification failed. Please try again.');
+      setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {

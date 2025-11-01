@@ -18,6 +18,10 @@ import {
 
 // Routes
 import authRoutes from './routes/authRoutes.js';
+import twoFactorRoutes from './routes/twoFactorRoutes.js';
+import oauthRoutes from './routes/oauthRoutes.js';
+import configRoutes from './routes/configRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import bucketRoutes from './routes/bucketRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
 import apiKeyRoutes from './routes/apiKeyRoutes.js';
@@ -83,7 +87,11 @@ app.get(`/api/${config.API_VERSION}`, (req, res) => {
 app.use(`/api/${config.API_VERSION}`, apiLimiter);
 
 // API Routes
+app.use(`/api/${config.API_VERSION}/config`, configRoutes);
 app.use(`/api/${config.API_VERSION}/auth`, authRoutes);
+app.use(`/api/${config.API_VERSION}/auth`, twoFactorRoutes);
+app.use(`/api/${config.API_VERSION}/oauth`, oauthRoutes);
+app.use(`/api/${config.API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${config.API_VERSION}/buckets`, bucketRoutes);
 app.use(`/api/${config.API_VERSION}/files`, fileRoutes);
 app.use(`/api/${config.API_VERSION}/api-keys`, apiKeyRoutes);

@@ -1,11 +1,25 @@
 import { useState, useEffect } from 'react';
 import { X, Check, CreditCard, Loader2 } from 'lucide-react';
-import { paymentAPI, plansAPI } from '../services/api';
+import { paymentAPI, plansAPI, configAPI } from '../services/api';
 
 const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [country, setCountry] = useState('US');
   const [error, setError] = useState(null);
+  const [config, setConfig] = useState(null);
+
+  // Fetch backend config
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await configAPI.getPublicConfig();
+        setConfig(response.data);
+      } catch (err) {
+        console.error('Failed to fetch config:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   // Detect user's country for payment gateway selection
   useEffect(() => {
@@ -44,7 +58,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
 
       script.onload = () => {
         const options = {
-          key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+          key: config?.payment?.razorpay?.keyId,
           amount: amount,
           currency: 'INR',
           name: 'Hypz Storage',

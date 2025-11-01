@@ -17,6 +17,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const trusted = localStorage.getItem('trustedDeviceToken');
+    if (trusted) {
+      config.headers['x-trusted-device'] = trusted;
+    }
     return config;
   },
   (error) => {
@@ -60,6 +64,10 @@ api.interceptors.response.use(
 );
 
 // API Service functions
+export const configAPI = {
+  getPublicConfig: () => api.get('/config/public')
+};
+
 export const authAPI = {
   register: (data) => api.post(apiConfig.endpoints.register, data),
   login: (data) => api.post(apiConfig.endpoints.login, data),
@@ -68,7 +76,10 @@ export const authAPI = {
   forgotPassword: (email) => api.post(apiConfig.endpoints.forgotPassword, { email }),
   resetPassword: (token, password) => api.post(apiConfig.endpoints.resetPassword, { token, password }),
   getCurrentUser: () => api.get(apiConfig.endpoints.getCurrentUser),
-  logout: (refreshToken) => api.post(apiConfig.endpoints.logout, { refreshToken })
+  logout: (refreshToken) => api.post(apiConfig.endpoints.logout, { refreshToken }),
+  googleOAuth: (code) => api.post('/oauth/google', { code }),
+  githubOAuth: (code) => api.post('/oauth/github', { code }),
+  getOAuthUrls: () => api.get('/oauth/urls')
 };
 
 export const bucketAPI = {
@@ -125,6 +136,37 @@ export const paymentAPI = {
   verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
   createLemonSqueezyCheckout: (data) => api.post('/payments/lemonsqueezy/create', data),
   getPaymentHistory: (params) => api.get('/payments/history', { params })
+};
+
+export const twoFactorAPI = {
+  sendOTP: (email) => api.post('/auth/otp/send', { email }),
+  verifyOTP: (email, otp) => api.post('/auth/otp/verify', { email, otp }),
+  send2FACode: (email) => api.post('/auth/2fa/send-code', { email }),
+  verify2FALogin: (email, code, useBackupCode = false) => api.post('/auth/2fa/verify-login', { email, code, useBackupCode }),
+  setup2FA: () => api.post('/auth/2fa/setup'),
+  enable2FA: (token) => api.post('/auth/2fa/enable', { token }),
+  disable2FA: (password) => api.post('/auth/2fa/disable', { password }),
+  get2FAStatus: () => api.get('/auth/2fa/status')
+  ,
+  getTrustedDevices: () => api.get('/auth/2fa/trusted'),
+  revokeTrustedDevice: (id) => api.delete(`/auth/2fa/trusted/${id}`)
+};
+
+export const adminAPI = {
+  // Settings
+  getSettings: () => api.get('/admin/settings'),
+  getSetting: (key) => api.get(`/admin/settings/${key}`),
+  updateSetting: (key, value) => api.put(`/admin/settings/${key}`, { value }),
+  
+  // Users
+  getUsers: (params) => api.get('/admin/users', { params }),
+  updateUserStatus: (userId, isActive) => api.patch(`/admin/users/${userId}/status`, { isActive }),
+  
+  // Stats
+  getSystemStats: () => api.get('/admin/stats'),
+  
+  // Logs
+  getActivityLogs: (params) => api.get('/admin/logs', { params })
 };
 
 export default api;

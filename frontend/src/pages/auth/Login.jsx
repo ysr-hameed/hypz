@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { authAPI } from '../../services/api';
+import TwoFactorVerify from '../../components/TwoFactorVerify';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -10,11 +11,24 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [show2FA, setShow2FA] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
-  const handleOAuthLogin = (provider) => {
-    // OAuth login logic will be implemented in backend
-    console.log(`Login with ${provider}`);
-    setError('OAuth login coming soon!');
+  const handleOAuthLogin = async (provider) => {
+    try {
+      const response = await authAPI.getOAuthUrls();
+      const url = response[provider];
+      
+      if (!url) {
+        setError(`${provider} authentication is not configured`);
+        return;
+      }
+      
+      // Redirect to OAuth provider
+      window.location.href = url;
+    } catch (err) {
+      setError(`Failed to initiate ${provider} login`);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -26,10 +40,20 @@ const Login = () => {
       // Real API call to login
       const response = await authAPI.login({ email, password });
       
-      const { token, refreshToken, user } = response.data;
+      const data = response.data;
+
+      // Check if 2FA is required
+      if (data.requiresTwoFactor) {
+        setShow2FA(true);
+        setUserEmail(data.email || email);
+        setLoading(false);
+        return;
+      }
+
+      const { token, refreshToken, user } = data;
 
       // Check if email is verified
-      if (!user.emailVerified) {
+      if (user && !user.emailVerified) {
         // Redirect to verification page if email not verified
         navigate('/verify-email', { 
           state: { email: user.email },
@@ -40,7 +64,9 @@ const Login = () => {
 
       // Store tokens and user data
       localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       localStorage.setItem('userEmail', user.email);
       localStorage.setItem('user', JSON.stringify(user));
       
@@ -54,10 +80,29 @@ const Login = () => {
     }
   };
 
+  const handle2FASuccess = () => {
+    // This will be called after successful 2FA verification
+    // Navigation is handled in TwoFactorVerify component
+  };
+
+  // If 2FA is required, show 2FA verification component
+  if (show2FA) {
+    return (
+      <TwoFactorVerify 
+        email={userEmail}
+        onBack={() => {
+          setShow2FA(false);
+          setPassword('');
+        }}
+        onSuccess={handle2FASuccess}
+      />
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 sm:p-8 animate-slideIn max-w-md w-full">
       <div className="text-center mb-8">
-        <div className="flex items-center justify-center space-x-2 mb-4">
+        <div className="flex items-center justify-center space-x-2 mb-4">`
           <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-purple-600 rounded-lg flex items-center justify-center">
             <Zap className="w-6 h-6 text-white" fill="white" />
           </div>
@@ -94,20 +139,6 @@ const Login = () => {
             <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd"/>
           </svg>
           <span className="text-white">Continue with GitHub</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleOAuthLogin('microsoft')}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-lg font-medium transition"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 23 23">
-            <path fill="#f35325" d="M1 1h10v10H1z"/>
-            <path fill="#81bc06" d="M12 1h10v10H12z"/>
-            <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-            <path fill="#ffba08" d="M12 12h10v10H12z"/>
-          </svg>
-          <span className="text-gray-700 dark:text-gray-300">Continue with Microsoft</span>
         </button>
       </div>
 

@@ -172,3 +172,92 @@ export const sendWelcomeEmail = async (email, firstName) => {
   
   return sendEmail(email, 'Welcome to Hypz! 🎉', html);
 };
+
+// Send OTP verification email
+export const sendOTPEmail = async (email, otp, firstName) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .otp-box { background: white; border: 2px dashed #667eea; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }
+        .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #667eea; font-family: 'Courier New', monospace; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🔐 Your Verification Code</h1>
+        </div>
+        <div class="content">
+          <h2>Hi ${firstName || 'there'}!</h2>
+          <p>Use the following One-Time Password (OTP) to verify your email address:</p>
+          <div class="otp-box">
+            <div class="otp-code">${otp}</div>
+          </div>
+          <p style="text-align: center; color: #666; font-size: 14px;">This code will expire in <strong>10 minutes</strong></p>
+          <div class="warning">
+            <strong>⚠️ Security Notice:</strong> Never share this code with anyone. Hypz staff will never ask for your OTP.
+          </div>
+          <p>If you didn't request this code, please ignore this email or contact our support team if you have concerns.</p>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Hypz Storage. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail(email, `Your Hypz verification code: ${otp}`, html);
+};
+
+// Send 2FA code email
+export const send2FAEmail = async (email, otp, firstName) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .otp-box { background: white; border: 2px dashed #667eea; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }
+        .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #667eea; font-family: 'Courier New', monospace; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🔒 Login Verification</h1>
+        </div>
+        <div class="content">
+          <h2>Hi ${firstName}!</h2>
+          <p>Someone is trying to log in to your Hypz account. Enter this code to continue:</p>
+          <div class="otp-box">
+            <div class="otp-code">${otp}</div>
+          </div>
+          <p style="text-align: center; color: #666; font-size: 14px;">This code will expire in <strong>5 minutes</strong></p>
+          <div class="warning">
+            <strong>⚠️ Security Alert:</strong> If you didn't try to log in, please secure your account immediately by changing your password.
+          </div>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Hypz Storage. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail(email, `Your Hypz 2FA code: ${otp}`, html);
+};

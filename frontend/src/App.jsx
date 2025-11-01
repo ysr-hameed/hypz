@@ -5,12 +5,13 @@ import LandingLayout from './layouts/LandingLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import AuthLayout from './layouts/AuthLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import EnvIndicator from './components/EnvIndicator';
 import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import VerifyEmail from './pages/auth/VerifyEmail';
+import GoogleCallback from './pages/auth/GoogleCallback';
+import GithubCallback from './pages/auth/GithubCallback';
 import Dashboard from './pages/dashboard/Dashboard';
 import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
@@ -37,7 +38,6 @@ function App() {
     <ThemeProvider>
       <PlanProvider>
         <Router>
-          <EnvIndicator />
           <Routes>
             {/* Public Routes */}
             <Route element={<LandingLayout />}>
@@ -54,6 +54,8 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/auth/callback/google" element={<GoogleCallback />} />
+              <Route path="/auth/callback/github" element={<GithubCallback />} />
             </Route>
 
             {/* Legal Routes */}

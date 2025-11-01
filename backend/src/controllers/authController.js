@@ -9,8 +9,8 @@ import {
   successResponse,
   errorResponse
 } from '../utils/helpers.js';
+import bcrypt from 'bcryptjs';
 import {
-  sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail
 } from '../utils/email.js';
@@ -30,28 +30,16 @@ export const register = asyncHandler(async (req, res) => {
   // Hash password
   const hashedPassword = await hashPassword(password);
 
-  // Generate verification token
-  const verificationToken = generateRandomToken();
-  const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  // Create user
+  // Create user (no email verification token needed with OTP system)
   const result = await query(
     `INSERT INTO users (
-      email, password, first_name, last_name, 
-      email_verification_token, email_verification_expires
-    ) VALUES ($1, $2, $3, $4, $5, $6) 
+      email, password, first_name, last_name
+    ) VALUES ($1, $2, $3, $4) 
     RETURNING id, email, first_name, last_name, created_at`,
-    [email, hashedPassword, firstName, lastName, verificationToken, verificationExpires]
+    [email, hashedPassword, firstName, lastName]
   );
 
   const user = result.rows[0];
-
-  // Send verification email
-  try {
-    await sendVerificationEmail(email, verificationToken, firstName);
-  } catch (error) {
-    console.error('Failed to send verification email:', error);
-  }
 
   // Generate tokens
   const token = generateToken(user.id);
@@ -73,17 +61,17 @@ export const register = asyncHandler(async (req, res) => {
     },
     token,
     refreshToken
-  }, 'Registration successful. Please check your email to verify your account.', 201);
+  }, 'Registration successful. Please verify your email with OTP.', 201);
 });
 
-// Login user
+// Login user - Check for admin forced 2FA
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Get user
+  // Get user with 2FA status
   const result = await query(
     `SELECT id, email, password, first_name, last_name, email_verified, 
-     plan_id, role, is_active 
+     plan_id, role, is_active, two_factor_enabled 
      FROM users WHERE email = $1`,
     [email]
   );
@@ -106,6 +94,81 @@ export const login = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Invalid email or password', 401);
   }
 
+  // Check for admin forced 2FA setting
+  const adminSettingsResult = await query(
+    `SELECT value FROM admin_settings WHERE key = 'force_2fa'`
+  );
+  
+  const force2FA = adminSettingsResult.rows.length > 0 && 
+                   adminSettingsResult.rows[0].value?.enabled === true;
+
+  // Check trusted device header - if present and valid skip 2FA
+  const trustedDeviceToken = req.headers['x-trusted-device'] || req.body.trustedDeviceToken;
+  if (trustedDeviceToken) {
+    try {
+      const devicesRes = await query(
+        `SELECT id, device_token_hash, expires_at, revoked FROM trusted_devices WHERE user_id = $1 AND revoked = false`,
+        [user.id]
+      );
+
+      for (const d of devicesRes.rows) {
+        if (d.expires_at && new Date() > new Date(d.expires_at)) continue;
+        if (await bcrypt.compare(trustedDeviceToken, d.device_token_hash)) {
+          // Trusted device matched; continue to issue tokens
+          const token = generateToken(user.id);
+          const refreshToken = generateRefreshToken(user.id);
+
+          // Store refresh token
+          await query(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+            [user.id, refreshToken, new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)]
+          );
+
+          // Update last login
+          const clientIp = req.ip || req.connection.remoteAddress;
+          await query(
+            'UPDATE users SET last_login = CURRENT_TIMESTAMP, last_login_ip = $1 WHERE id = $2',
+            [clientIp, user.id]
+          );
+
+          // Log activity
+          await query(
+            `INSERT INTO activity_logs (user_id, action, ip_address, user_agent) 
+             VALUES ($1, $2, $3, $4)`,
+            [user.id, 'login_trusted_device', req.ip, req.headers['user-agent']]
+          );
+
+          return successResponse(res, {
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              emailVerified: user.email_verified,
+              planId: user.plan_id,
+              role: user.role,
+              twoFactorEnabled: user.two_factor_enabled
+            },
+            token,
+            refreshToken
+          }, 'Login successful (trusted device)');
+        }
+      }
+    } catch (err) {
+      console.error('Trusted device check failed:', err);
+      // proceed to normal 2FA flow if anything fails
+    }
+  }
+
+  // Require 2FA if either user enabled it OR admin forced it
+  if (user.two_factor_enabled || force2FA) {
+    return successResponse(res, {
+      requiresTwoFactor: true,
+      email: user.email,
+      forced: force2FA && !user.two_factor_enabled
+    }, '2FA verification required');
+  }
+
   // Generate tokens
   const token = generateToken(user.id);
   const refreshToken = generateRefreshToken(user.id);
@@ -114,6 +177,13 @@ export const login = asyncHandler(async (req, res) => {
   await query(
     'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
     [user.id, refreshToken, new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)]
+  );
+
+  // Update last login
+  const clientIp = req.ip || req.connection.remoteAddress;
+  await query(
+    'UPDATE users SET last_login = CURRENT_TIMESTAMP, last_login_ip = $1 WHERE id = $2',
+    [clientIp, user.id]
   );
 
   // Log activity
@@ -131,100 +201,12 @@ export const login = asyncHandler(async (req, res) => {
       lastName: user.last_name,
       emailVerified: user.email_verified,
       planId: user.plan_id,
-      role: user.role
+      role: user.role,
+      twoFactorEnabled: user.two_factor_enabled
     },
     token,
     refreshToken
   }, 'Login successful');
-});
-
-// Verify email
-export const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.body;
-
-  // Find user with this token
-  const result = await query(
-    `SELECT id, email, first_name, email_verification_expires 
-     FROM users 
-     WHERE email_verification_token = $1 
-     AND email_verified = false`,
-    [token]
-  );
-
-  if (result.rows.length === 0) {
-    return errorResponse(res, 'Invalid or expired verification token', 400);
-  }
-
-  const user = result.rows[0];
-
-  // Check if token expired
-  if (new Date() > new Date(user.email_verification_expires)) {
-    return errorResponse(res, 'Verification token has expired. Please request a new one.', 400);
-  }
-
-  // Update user as verified
-  await query(
-    `UPDATE users 
-     SET email_verified = true, 
-         email_verification_token = NULL, 
-         email_verification_expires = NULL,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1`,
-    [user.id]
-  );
-
-  // Send welcome email
-  try {
-    await sendWelcomeEmail(user.email, user.first_name);
-  } catch (error) {
-    console.error('Failed to send welcome email:', error);
-  }
-
-  // Log activity
-  await query(
-    `INSERT INTO activity_logs (user_id, action) VALUES ($1, $2)`,
-    [user.id, 'email_verified']
-  );
-
-  successResponse(res, null, 'Email verified successfully');
-});
-
-// Resend verification email
-export const resendVerification = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-
-  const result = await query(
-    'SELECT id, email, first_name, email_verified FROM users WHERE email = $1',
-    [email]
-  );
-
-  if (result.rows.length === 0) {
-    return errorResponse(res, 'User not found', 404);
-  }
-
-  const user = result.rows[0];
-
-  if (user.email_verified) {
-    return errorResponse(res, 'Email already verified', 400);
-  }
-
-  // Generate new token
-  const verificationToken = generateRandomToken();
-  const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-  await query(
-    `UPDATE users 
-     SET email_verification_token = $1, 
-         email_verification_expires = $2,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $3`,
-    [verificationToken, verificationExpires, user.id]
-  );
-
-  // Send verification email
-  await sendVerificationEmail(user.email, verificationToken, user.first_name);
-
-  successResponse(res, null, 'Verification email sent successfully');
 });
 
 // Forgot password
