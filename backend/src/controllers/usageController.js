@@ -25,7 +25,7 @@ export const getCurrentUsage = asyncHandler(async (req, res) => {
        SUM(download_calls) as download_calls,
        SUM(delete_calls) as delete_calls
      FROM usage_records
-     WHERE user_id = $1 AND date >= $2 || '-01'`,
+     WHERE user_id = $1 AND date >= ($2 || '-01')::date`,
     [userId, currentMonth]
   );
 

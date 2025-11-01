@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Bell, Shield, Mail, Key, QrCode, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { twoFactorAPI, authAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { apiCache } from '../../utils/apiCache';
 
 const Settings = () => {
   const [user, setUser] = useState(null);
@@ -19,8 +20,13 @@ const Settings = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const hasFetched = useRef(false);
 
   useEffect(() => {
+    // Prevent double fetch in React StrictMode
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     fetchUserData();
     fetch2FAStatus();
     fetchTrustedDevices();
@@ -28,7 +34,11 @@ const Settings = () => {
 
   const fetchUserData = async () => {
     try {
-      const response = await authAPI.getCurrentUser();
+      const response = await apiCache.wrapRequest(
+        'user:current',
+        () => authAPI.getCurrentUser(),
+        60000 // 60 second cache
+      );
       setUser(response.data);
       setFirstName(response.data.firstName || '');
       setLastName(response.data.lastName || '');
@@ -42,7 +52,11 @@ const Settings = () => {
 
   const fetch2FAStatus = async () => {
     try {
-      const response = await twoFactorAPI.get2FAStatus();
+      const response = await apiCache.wrapRequest(
+        '2fa:status',
+        () => twoFactorAPI.get2FAStatus(),
+        30000 // 30 second cache
+      );
       setTwoFactorStatus(response.data);
     } catch (error) {
       console.error('Failed to get 2FA status:', error);
@@ -51,7 +65,11 @@ const Settings = () => {
 
   const fetchTrustedDevices = async () => {
     try {
-      const res = await twoFactorAPI.getTrustedDevices();
+      const res = await apiCache.wrapRequest(
+        '2fa:trusted-devices',
+        () => twoFactorAPI.getTrustedDevices(),
+        30000 // 30 second cache
+      );
       setTrustedDevices(res.data.devices || []);
     } catch (error) {
       console.error('Failed to fetch trusted devices:', error);
@@ -81,10 +99,21 @@ const Settings = () => {
       setBackupCodes(response.data.backupCodes);
       setShow2FASetup(false);
       setVerificationToken('');
+      
+      // Invalidate cache and refetch
+      apiCache.clear('2fa:status');
       await fetch2FAStatus();
+      
       toast.success('2FA enabled successfully! Save your backup codes.');
     } catch (error) {
-      toast.error(error.message || 'Invalid verification code');
+      // Check if it's already enabled (400 error)
+      if (error.message && error.message.includes('already enabled')) {
+        apiCache.clear('2fa:status');
+        await fetch2FAStatus();
+        toast.info('2FA is already enabled');
+      } else {
+        toast.error(error.message || 'Invalid verification code');
+      }
     }
   };
 

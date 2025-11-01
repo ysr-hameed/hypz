@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Database, TrendingUp, Zap, HardDrive, Globe, Activity, Loader2 } from 'lucide-react';
 import { bucketAPI, usageAPI, plansAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+import { apiCache } from '../../utils/apiCache';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -9,22 +10,39 @@ const Dashboard = () => {
   const [currentPlan, setCurrentPlan] = useState(null);
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
+    // Prevent double fetch in React StrictMode
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
 
-        // Fetch usage data
-        const usageResponse = await usageAPI.getCurrent();
+        // Fetch usage data with cache
+        const usageResponse = await apiCache.wrapRequest(
+          'usage:current',
+          () => usageAPI.getCurrent(),
+          30000 // 30 second cache
+        );
         const usage = usageResponse.data;
 
-        // Fetch current plan
-        const planResponse = await plansAPI.getUserPlan();
+        // Fetch current plan with cache
+        const planResponse = await apiCache.wrapRequest(
+          'plan:current',
+          () => plansAPI.getUserPlan(),
+          60000 // 60 second cache
+        );
         setCurrentPlan(planResponse.data);
 
-        // Fetch buckets count
-        const bucketsResponse = await bucketAPI.getAll();
+        // Fetch buckets count with cache
+        const bucketsResponse = await apiCache.wrapRequest(
+          'buckets:all',
+          () => bucketAPI.getAll(),
+          30000 // 30 second cache
+        );
         setBuckets(bucketsResponse.data || []);
 
         // Calculate stats - usage.month contains current usage

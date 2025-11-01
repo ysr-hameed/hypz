@@ -34,8 +34,40 @@ const Plans = () => {
     fetchPlans();
   }, []);
 
-  const freePlan = plans.find(p => p.type === 'free');
-  const paygPlan = plans.find(p => p.type === 'payg');
+  const freePlan = plans.find(p => p.type === 'free' || p.type === 'fixed' || p.id === 'free_global');
+  const paygPlan = plans.find(p => p.type === 'payg' || p.id === 'payg_global');
+
+  // Helper function to convert features object to array of strings
+  const formatFeatures = (plan) => {
+    if (!plan) return [];
+    
+    const features = [];
+    
+    if (plan.storage_gb) {
+      features.push(`${plan.storage_gb} GB Storage`);
+    }
+    if (plan.bandwidth_gb) {
+      features.push(`${plan.bandwidth_gb} GB Bandwidth/month`);
+    }
+    if (plan.api_calls) {
+      features.push(`${plan.api_calls.toLocaleString()} API Calls/month`);
+    }
+    if (plan.custom_domain) {
+      features.push('Custom Domain Support');
+    }
+    if (plan.analytics && plan.analytics !== 'none') {
+      features.push(`${plan.analytics.charAt(0).toUpperCase() + plan.analytics.slice(1)} Analytics`);
+    }
+    if (plan.team_members) {
+      features.push(`${plan.team_members} Team Member${plan.team_members > 1 ? 's' : ''}`);
+    }
+    if (plan.type === 'payg') {
+      features.push('Pay only for what you use');
+      features.push('No fixed limits');
+    }
+    
+    return features;
+  };
 
   const handleSubscribe = (plan) => {
     setSelectedPlan(plan);
@@ -121,7 +153,7 @@ const Plans = () => {
                 </div>
 
                 <div className="space-y-3 mb-8">
-                  {freePlan.features && Array.isArray(freePlan.features) && freePlan.features.map((feature, index) => (
+                  {formatFeatures(freePlan).map((feature, index) => (
                     <div key={index} className="flex items-start gap-3 py-2">
                       <div className="p-1.5 rounded-lg flex-shrink-0 bg-green-100 dark:bg-green-900/30">
                         <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -170,7 +202,7 @@ const Plans = () => {
                 </div>
 
                 <div className="space-y-3 mb-8">
-                  {paygPlan.features && Array.isArray(paygPlan.features) && paygPlan.features.map((feature, index) => (
+                  {formatFeatures(paygPlan).map((feature, index) => (
                     <div key={index} className="flex items-start gap-3 py-2">
                       <div className="p-1.5 rounded-lg flex-shrink-0 bg-white/20">
                         <Check className="w-4 h-4 text-white" />

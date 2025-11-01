@@ -78,6 +78,7 @@ function App() {
             {/* Protected Dashboard Routes */}
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard/plans" element={<Plans />} />
               <Route path="/buckets" element={<Buckets />} />
               <Route path="/buckets/:bucketId" element={<BucketDetails />} />
               <Route path="/billing" element={<Billing />} />
