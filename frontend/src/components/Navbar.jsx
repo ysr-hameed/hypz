@@ -26,7 +26,7 @@ const Navbar = () => {
             <a href="#features" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
               Features
             </a>
-            <Link to="/plans" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
+            <Link to="/pricing" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
               Pricing
             </Link>
             <Link to="/docs" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition">
@@ -77,7 +77,7 @@ const Navbar = () => {
             <a href="#features" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
               Features
             </a>
-            <Link to="/plans" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
+            <Link to="/pricing" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">
               Pricing
             </Link>
             <Link to="/docs" className="block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 py-2">

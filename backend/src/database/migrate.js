@@ -285,53 +285,204 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at);
     `);
 
-    // Plans table
+    // Drop old plans table and create new plans table with updated schema
+    await query('DROP TABLE IF EXISTS plans CASCADE');
+    console.log('✅ Dropped old plans table');
+
     await query(`
       CREATE TABLE IF NOT EXISTS plans (
         id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
-        type VARCHAR(20) NOT NULL,
-        popular BOOLEAN DEFAULT FALSE,
-        storage_gb INTEGER NOT NULL,
-        bandwidth_gb INTEGER NOT NULL,
-        api_calls INTEGER NOT NULL,
-        api_upload VARCHAR(20) DEFAULT 'unlimited',
-        api_download_limit INTEGER,
-        analytics VARCHAR(20) DEFAULT 'none',
-        custom_domain BOOLEAN DEFAULT FALSE,
+        type VARCHAR(20) NOT NULL, -- 'free', 'pro', 'payg'
+        price_usd DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        price_inr DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        billing_cycle VARCHAR(50),
+        description TEXT,
+        popular BOOLEAN DEFAULT false,
+        
+        -- Storage & Bandwidth
+        storage_gb INTEGER DEFAULT 0, -- 0 means unlimited for PAYG
+        bandwidth_gb INTEGER DEFAULT 0, -- 0 means pay per use
+        free_bandwidth_multiplier INTEGER DEFAULT 2, -- 2x of storage
+        
+        -- API Limits
+        api_calls INTEGER DEFAULT 0, -- 0 means unlimited
+        
+        -- Team & Collaboration
         team_members INTEGER DEFAULT 1,
-        auto_upgrade BOOLEAN DEFAULT FALSE,
-        renewal VARCHAR(20) DEFAULT 'manual',
-        price_usd DECIMAL(10, 2) DEFAULT 0,
-        price_inr DECIMAL(10, 2) DEFAULT 0,
-        after_limit VARCHAR(50),
-        features JSONB DEFAULT '{}'::jsonb,
-        limits JSONB DEFAULT '{}'::jsonb,
-        pricing JSONB DEFAULT '{}'::jsonb,
-        lemonsqueezy_variant_id VARCHAR(100),
-        razorpay_plan_id VARCHAR(100),
+        
+        -- Features (JSONB for flexibility)
+        features JSONB DEFAULT '{}',
+        
+        -- Custom Domain
+        custom_domain BOOLEAN DEFAULT false,
+        
+        -- Versioning & Backup
+        versioning BOOLEAN DEFAULT false,
+        backup_retention_days INTEGER DEFAULT 0,
+        
+        -- CDN
+        cdn_enabled BOOLEAN DEFAULT false,
+        
+        -- PAYG Pricing (NULL for non-PAYG plans)
+        payg_storage_rate DECIMAL(10, 4), -- per GB/month
+        payg_bandwidth_rate DECIMAL(10, 4), -- per GB
+        payg_meta_ops_rate DECIMAL(10, 4), -- per 10k requests
+        payg_access_ops_rate DECIMAL(10, 4), -- per 1k requests
+        
+        -- Payment Settings
+        payment_mode VARCHAR(20) DEFAULT 'manual', -- 'auto' or 'manual'
+        credit_card_required BOOLEAN DEFAULT false,
+        
+        -- Metadata
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+      )
     `);
+    console.log('✅ Created new plans table');
 
-    // Insert default plans
+    // Insert Free plan
     await query(`
-      INSERT INTO plans (id, name, type, popular, storage_gb, bandwidth_gb, api_calls, 
-        api_upload, analytics, custom_domain, team_members, price_usd, price_inr, 
-        after_limit, features, limits)
-      VALUES 
-      ('free_global', 'Free', 'fixed', false, 1, 3, 50000, 'unlimited', 'none', false, 1, 
-        0, 0, 'stop_or_upgrade',
-        '{"storage": {"amount": 1, "unit": "GB"}, "bandwidth": {"amount": 3, "unit": "GB/month"}, "apiCalls": {"amount": 50000, "unit": "calls/month"}}'::jsonb,
-        '{"afterLimit": "stop_or_upgrade", "autoUpgrade": false}'::jsonb),
-      
-      ('payg_global', 'Pay As You Go', 'payg', true, 0, 0, 0, 'unlimited', 'advanced', true, 5,
-        0, 0, 'pay_as_you_use',
-        '{"storage": {"flexible": true}, "bandwidth": {"flexible": true}, "apiCalls": {"flexible": true}}'::jsonb,
-        '{"afterLimit": "pay_as_you_use", "autoUpgrade": true}'::jsonb)
-      ON CONFLICT (id) DO NOTHING;
+      INSERT INTO plans (
+        id, name, type, price_usd, price_inr, billing_cycle, description,
+        storage_gb, bandwidth_gb, api_calls, team_members,
+        custom_domain, versioning, backup_retention_days, cdn_enabled,
+        credit_card_required, popular,
+        features
+      ) VALUES (
+        'free_forever',
+        'Free Forever',
+        'free',
+        0, 0,
+        'Forever (no expiry)',
+        'Perfect for testing and small projects. No card needed, no hidden fees.',
+        1, 3, 50000, 1,
+        false, false, 0, false,
+        false, false,
+        '{
+          "support": "Community support",
+          "uploads": "Free",
+          "downloads": "Within 3 GB/month limit",
+          "exceed_behavior": "Uploads and downloads temporarily paused until next reset or upgrade"
+        }'::jsonb
+      )
     `);
+    console.log('✅ Inserted Free plan');
+
+    // Insert Pro plan
+    await query(`
+      INSERT INTO plans (
+        id, name, type, price_usd, price_inr, billing_cycle, description,
+        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, team_members,
+        custom_domain, versioning, backup_retention_days, cdn_enabled,
+        credit_card_required, popular,
+        features
+      ) VALUES (
+        'pro_monthly',
+        'Pro',
+        'pro',
+        5, 399,
+        'Monthly',
+        'For creators, students, and developers who want more space, faster access, and advanced team collaboration.',
+        100, 200, 2, 2000000, 5,
+        true, true, 30, true,
+        true, true,
+        '{
+          "priority_support": "Email + Chat (24/7)",
+          "uploads": "Unlimited",
+          "downloads": "After free bandwidth, standard pay-as-you-go rates apply",
+          "signed_urls": true,
+          "free_bandwidth_policy": "2× of stored data each month included"
+        }'::jsonb
+      )
+    `);
+    console.log('✅ Inserted Pro plan');
+
+    // Insert PAYG plan
+    await query(`
+      INSERT INTO plans (
+        id, name, type, price_usd, price_inr, billing_cycle, description,
+        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, team_members,
+        custom_domain, versioning, backup_retention_days, cdn_enabled,
+        payg_storage_rate, payg_bandwidth_rate, payg_meta_ops_rate, payg_access_ops_rate,
+        payment_mode, credit_card_required, popular,
+        features
+      ) VALUES (
+        'payg_usage',
+        'Pay-As-You-Go',
+        'payg',
+        0, 0,
+        'Monthly (auto or manual)',
+        'Scale without limits. You pay only for what you use, billed automatically or manually as per your choice.',
+        0, 0, 2, 0, 10,
+        true, true, 30, true,
+        0.03, 0.05, 0.002, 0.03,
+        'manual', true, false,
+        '{
+          "write_operations": "Free (uploads, deletes, creates)",
+          "uploads": "Always free",
+          "private_public_buckets": true,
+          "encryption": "AES-256 server-side",
+          "free_bandwidth_policy": "2× of storage each month is free egress",
+          "billing_auto": "Charges automatically deducted from linked payment card",
+          "billing_manual": "User receives notifications 5 days before and on last day",
+          "minimum_bill": "No minimum — pay only for actual usage"
+        }'::jsonb
+      )
+    `);
+    console.log('✅ Inserted PAYG plan');
+
+    // Add backup_files table for 30-day retention
+    await query(`
+      CREATE TABLE IF NOT EXISTS backup_files (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID REFERENCES buckets(id) ON DELETE CASCADE,
+        original_file_id UUID,
+        file_name VARCHAR(255) NOT NULL,
+        file_path TEXT NOT NULL,
+        size BIGINT NOT NULL,
+        mime_type VARCHAR(100),
+        b2_file_id VARCHAR(255),
+        b2_version_id VARCHAR(255),
+        deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        restored BOOLEAN DEFAULT false,
+        restored_at TIMESTAMP,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Created backup_files table');
+
+    // Create index for quick lookups
+    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_user ON backup_files(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_expires ON backup_files(expires_at)');
+    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_deleted ON backup_files(deleted_at)');
+
+    // Add custom_domains table
+    await query(`
+      CREATE TABLE IF NOT EXISTS custom_domains (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID REFERENCES buckets(id) ON DELETE CASCADE,
+        domain VARCHAR(255) NOT NULL UNIQUE,
+        verified BOOLEAN DEFAULT false,
+        verification_token VARCHAR(100),
+        verification_type VARCHAR(20) DEFAULT 'TXT', -- TXT, CNAME
+        ssl_enabled BOOLEAN DEFAULT false,
+        ssl_certificate TEXT,
+        status VARCHAR(20) DEFAULT 'pending', -- pending, active, failed
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        verified_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✅ Created custom_domains table');
+
+    // Create index for domains
+    await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_user ON custom_domains(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_bucket ON custom_domains(bucket_id)');
 
     console.log('✅ All tables created successfully!');
   } catch (error) {

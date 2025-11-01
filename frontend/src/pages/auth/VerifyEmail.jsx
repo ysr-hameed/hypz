@@ -18,6 +18,7 @@ const VerifyEmail = () => {
   const [sendingOtp, setSendingOtp] = useState(false);
   
   const inputRefs = useRef([]);
+  const hasSentOtp = useRef(false); // Prevent duplicate OTP sending
 
   // Countdown timer for resend button
   useEffect(() => {
@@ -31,7 +32,11 @@ const VerifyEmail = () => {
 
   // Auto-send OTP on component mount (only once)
   useEffect(() => {
+    // Prevent duplicate sends in React StrictMode
+    if (hasSentOtp.current) return;
+    
     if (email) {
+      hasSentOtp.current = true;
       handleSendOtp();
     } else {
       navigate('/login');

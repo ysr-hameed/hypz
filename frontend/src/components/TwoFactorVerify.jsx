@@ -17,10 +17,16 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   
   const inputRefs = useRef([]);
   const navigate = useNavigate();
+  const hasSentCode = useRef(false); // Prevent duplicate 2FA code sending
 
-  // Auto-send 2FA code on mount
+  // Auto-send 2FA code on mount (only once)
   useEffect(() => {
+    // Prevent duplicate sends in React StrictMode
+    if (hasSentCode.current) return;
+    
+    hasSentCode.current = true;
     handleSend2FACode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSend2FACode = async () => {

@@ -185,7 +185,7 @@ const Landing = () => {
                 </li>
               </ul>
               <Link
-                to="/plans"
+                to="/pricing"
                 className="block w-full text-center px-6 py-3 text-primary-600 bg-white hover:bg-gray-100 font-medium rounded-lg transition shadow-xl"
               >
                 View Full Pricing

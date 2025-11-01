@@ -34,10 +34,11 @@ const Plans = () => {
     fetchPlans();
   }, []);
 
-  const freePlan = plans.find(p => p.type === 'free' || p.type === 'fixed' || p.id === 'free_global');
-  const paygPlan = plans.find(p => p.type === 'payg' || p.id === 'payg_global');
+  const freePlan = plans.find(p => p.type === 'free' || p.id === 'free_forever');
+  const proPlan = plans.find(p => p.type === 'pro' || p.id === 'pro_monthly');
+  const paygPlan = plans.find(p => p.type === 'payg' || p.id === 'payg_usage');
 
-  // Helper function to convert features object to array of strings
+  // Helper function to convert plan data to array of feature strings
   const formatFeatures = (plan) => {
     if (!plan) return [];
     
@@ -45,25 +46,51 @@ const Plans = () => {
     
     if (plan.storage_gb) {
       features.push(`${plan.storage_gb} GB Storage`);
+    } else if (plan.payg_storage_rate) {
+      features.push(`$${plan.payg_storage_rate}/GB Storage`);
     }
+    
     if (plan.bandwidth_gb) {
       features.push(`${plan.bandwidth_gb} GB Bandwidth/month`);
+    } else if (plan.payg_bandwidth_rate) {
+      features.push(`$${plan.payg_bandwidth_rate}/GB Bandwidth`);
     }
+    
     if (plan.api_calls) {
       features.push(`${plan.api_calls.toLocaleString()} API Calls/month`);
     }
+    
+    if (plan.backup_retention_days > 0) {
+      features.push(`${plan.backup_retention_days}-Day Auto Backup`);
+    }
+    
     if (plan.custom_domain) {
       features.push('Custom Domain Support');
     }
-    if (plan.analytics && plan.analytics !== 'none') {
-      features.push(`${plan.analytics.charAt(0).toUpperCase() + plan.analytics.slice(1)} Analytics`);
+    
+    if (plan.versioning) {
+      features.push('File Versioning');
     }
+    
+    if (plan.cdn_enabled) {
+      features.push('Global CDN');
+    }
+    
     if (plan.team_members) {
       features.push(`${plan.team_members} Team Member${plan.team_members > 1 ? 's' : ''}`);
     }
-    if (plan.type === 'payg') {
-      features.push('Pay only for what you use');
-      features.push('No fixed limits');
+    
+    // Add JSONB features
+    if (plan.features) {
+      if (plan.features.priority_support) {
+        features.push(plan.features.priority_support);
+      }
+      if (plan.features.support) {
+        features.push(plan.features.support);
+      }
+      if (plan.features.signed_urls) {
+        features.push('Signed URLs');
+      }
     }
     
     return features;
@@ -120,12 +147,12 @@ const Plans = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 pb-20">
-        {!freePlan || !paygPlan ? (
+        {!freePlan || !proPlan || !paygPlan ? (
           <div className="text-center py-12">
             <p className="text-gray-600 dark:text-gray-400">No plans available at the moment.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
@@ -173,6 +200,7 @@ const Plans = () => {
               </div>
             </div>
 
+            {/* Pro Plan */}
             <div className="relative bg-gradient-to-br from-primary-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl border-2 border-primary-400 overflow-hidden">
               <div className="absolute -top-1 -right-1">
                 <div className="bg-yellow-400 text-gray-900 px-6 py-2 rounded-bl-2xl font-bold text-sm flex items-center gap-1 shadow-lg">
@@ -183,26 +211,26 @@ const Plans = () => {
 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-3xl font-bold text-white">{paygPlan.name}</h3>
+                  <h3 className="text-3xl font-bold text-white">{proPlan.name}</h3>
                   <Zap className="w-6 h-6 text-yellow-400 fill-current" />
                 </div>
                 
                 <p className="text-white/90 mb-6">
-                  Scale infinitely, pay only for what you use
+                  {proPlan.description}
                 </p>
 
                 <div className="mb-8">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-5xl font-bold text-white">$0</span>
-                    <span className="text-white/70">+ usage</span>
+                    <span className="text-5xl font-bold text-white">${proPlan.price_usd}</span>
+                    <span className="text-white/70">/month</span>
                   </div>
                   <p className="text-sm text-white/80 font-medium mt-2">
-                    Free tier included • No monthly fees
+                    100 GB Storage • 30-Day Backup • Priority Support
                   </p>
                 </div>
 
                 <div className="space-y-3 mb-8">
-                  {formatFeatures(paygPlan).map((feature, index) => (
+                  {formatFeatures(proPlan).map((feature, index) => (
                     <div key={index} className="flex items-start gap-3 py-2">
                       <div className="p-1.5 rounded-lg flex-shrink-0 bg-white/20">
                         <Check className="w-4 h-4 text-white" />
@@ -213,9 +241,52 @@ const Plans = () => {
                 </div>
 
                 <button
+                  onClick={() => handleSubscribe(proPlan)}
+                  disabled={currentPlan?.id === proPlan.id}
+                  className="w-full py-3 px-6 bg-white text-primary-600 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {currentPlan?.id === proPlan.id ? 'Current Plan' : 'Upgrade to Pro'}
+                </button>
+              </div>
+            </div>
+
+            {/* PAYG Plan */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{paygPlan.name}</h3>
+                  <Zap className="w-6 h-6 text-primary-600" />
+                </div>
+                
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  {paygPlan.description}
+                </p>
+
+                <div className="mb-8">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold text-gray-900 dark:text-white">$0</span>
+                    <span className="text-gray-500 dark:text-gray-400">+ usage</span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mt-2">
+                    Pay only for what you use • No minimums
+                  </p>
+                </div>
+
+                <div className="space-y-3 mb-8">
+                  {formatFeatures(paygPlan).map((feature, index) => (
+                    <div key={index} className="flex items-start gap-3 py-2">
+                      <div className="p-1.5 rounded-lg flex-shrink-0 bg-primary-100 dark:bg-primary-900/30">
+                        <Check className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                      </div>
+                      <span className="text-sm text-gray-900 dark:text-white font-medium">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
                   onClick={() => handleSubscribe(paygPlan)}
                   disabled={currentPlan?.id === paygPlan.id}
-                  className="w-full py-3 px-6 bg-white text-primary-600 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 px-6 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {currentPlan?.id === paygPlan.id ? 'Current Plan' : 'Start Pay-As-You-Go'}
                 </button>

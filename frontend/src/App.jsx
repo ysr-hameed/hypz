@@ -16,6 +16,7 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
 import Plans from './pages/dashboard/Plans';
+import Pricing from './pages/Pricing';
 import Billing from './pages/dashboard/Billing';
 import Settings from './pages/dashboard/Settings';
 import ApiKeys from './pages/dashboard/ApiKeys';
@@ -42,8 +43,7 @@ function App() {
             {/* Public Routes */}
             <Route element={<LandingLayout />}>
               <Route path="/" element={<Landing />} />
-              <Route path="/plans" element={<Plans />} />
-              <Route path="/pricing" element={<Plans />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route path="/documentation" element={<Documentation />} />
               <Route path="/docs" element={<Documentation />} />
             </Route>
