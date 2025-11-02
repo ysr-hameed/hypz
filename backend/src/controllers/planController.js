@@ -31,16 +31,44 @@ export const getPlan = asyncHandler(async (req, res) => {
 export const getUserPlan = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
-  const result = await query(
+  // First, check if user has a plan assigned
+  let result = await query(
     `SELECT u.plan_id, u.plan_start_date, p.* 
      FROM users u
-     JOIN plans p ON u.plan_id = p.id
+     LEFT JOIN plans p ON u.plan_id = p.id
      WHERE u.id = $1`,
     [userId]
   );
 
-  if (result.rows.length === 0) {
-    return errorResponse(res, 'User plan not found', 404);
+  // If user doesn't have a plan, assign free plan
+  if (result.rows.length === 0 || !result.rows[0].plan_id) {
+    // Get free plan
+    const freePlanResult = await query(
+      `SELECT * FROM plans WHERE type = 'free' OR id = 'free_forever' LIMIT 1`
+    );
+
+    if (freePlanResult.rows.length > 0) {
+      const freePlan = freePlanResult.rows[0];
+      
+      // Assign free plan to user
+      await query(
+        `UPDATE users 
+         SET plan_id = $1, plan_start_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [freePlan.id, userId]
+      );
+
+      // Re-fetch user plan
+      result = await query(
+        `SELECT u.plan_id, u.plan_start_date, p.* 
+         FROM users u
+         JOIN plans p ON u.plan_id = p.id
+         WHERE u.id = $1`,
+        [userId]
+      );
+    } else {
+      return errorResponse(res, 'No plans available', 500);
+    }
   }
 
   // Get current usage
