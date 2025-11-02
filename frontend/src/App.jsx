@@ -27,6 +27,7 @@ import Usage from './pages/dashboard/Usage';
 import Documentation from './pages/dashboard/Documentation';
 import Team from './pages/dashboard/Team';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminNotifications from './pages/admin/AdminNotifications';
 import Terms from './pages/legal/Terms';
 import Privacy from './pages/legal/Privacy';
 import Security from './pages/legal/Security';
@@ -111,6 +112,7 @@ function AppContent() {
 
             {/* Admin Panel (Separate full-page layout, no sidebar) */}
             <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/notifications" element={<ProtectedRoute><AdminNotifications /></ProtectedRoute>} />
           </Routes>
         </Router>
       );

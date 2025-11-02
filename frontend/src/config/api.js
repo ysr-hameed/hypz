@@ -37,7 +37,13 @@ const config = {
     // Usage
     currentUsage: '/usage/current',
     usageHistory: '/usage/history',
-    usageAnalytics: '/usage/analytics'
+    usageAnalytics: '/usage/analytics',
+
+    // User Profile
+    userProfile: '/user/profile',
+    changePassword: '/user/change-password',
+    notificationPreferences: '/user/notifications',
+    deleteAccount: '/user/account'
   },
 
   // Request timeout (ms)

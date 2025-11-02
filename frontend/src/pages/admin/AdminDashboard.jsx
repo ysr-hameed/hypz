@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import {
   Users,
@@ -22,11 +23,13 @@ import {
   Download,
   RefreshCw,
   Eye,
-  Lock
+  Lock,
+  Bell
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -93,6 +96,13 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate('/admin/notifications')}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition"
+              >
+                <Bell className="w-4 h-4" />
+                Manage Notifications
+              </button>
               <button className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 <RefreshCw className="w-5 h-5" />
               </button>

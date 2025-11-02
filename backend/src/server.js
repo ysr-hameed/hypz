@@ -28,6 +28,8 @@ import apiKeyRoutes from './routes/apiKeyRoutes.js';
 import usageRoutes from './routes/usageRoutes.js';
 import planRoutes from './routes/planRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,6 +100,8 @@ app.use(`/api/${config.API_VERSION}/api-keys`, apiKeyRoutes);
 app.use(`/api/${config.API_VERSION}/usage`, usageRoutes);
 app.use(`/api/${config.API_VERSION}/plans`, planRoutes);
 app.use(`/api/${config.API_VERSION}/payments`, paymentRoutes);
+app.use(`/api/${config.API_VERSION}/user`, userRoutes);
+app.use(`/api/${config.API_VERSION}/notifications`, notificationRoutes);
 
 // 404 handler
 app.use(notFound);

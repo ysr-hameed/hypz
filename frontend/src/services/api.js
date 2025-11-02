@@ -152,6 +152,28 @@ export const twoFactorAPI = {
   revokeTrustedDevice: (id) => api.delete(`/auth/2fa/trusted/${id}`)
 };
 
+export const userAPI = {
+  getProfile: () => api.get('/user/profile'),
+  updateProfile: (data) => api.put('/user/profile', data),
+  changePassword: (data) => api.put('/user/change-password', data),
+  getNotificationPreferences: () => api.get('/user/notifications'),
+  updateNotificationPreferences: (data) => api.put('/user/notifications', data),
+  deleteAccount: (data) => api.delete('/user/account', { data })
+};
+
+export const notificationAPI = {
+  getNotifications: (params) => api.get('/notifications', { params }),
+  markAsRead: (notificationId) => api.put(`/notifications/${notificationId}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+  deleteNotification: (notificationId) => api.delete(`/notifications/${notificationId}`),
+  // Admin endpoints
+  createNotification: (data) => api.post('/notifications', data),
+  sendBulkNotification: (data) => api.post('/notifications/bulk', data),
+  getAllNotifications: (params) => api.get('/notifications/admin/all', { params }),
+  getStats: () => api.get('/notifications/admin/stats'),
+  deleteNotificationAdmin: (notificationId) => api.delete(`/notifications/admin/${notificationId}`)
+};
+
 export const adminAPI = {
   // Settings
   getSettings: () => api.get('/admin/settings'),

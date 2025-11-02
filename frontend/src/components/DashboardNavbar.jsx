@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Search, Sun, Moon, User, Settings, LogOut, Menu } from 'lucide-react';
+import { Search, Sun, Moon, Settings, LogOut, Menu } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
+import NotificationDropdown from './NotificationDropdown';
 import { useState } from 'react';
 
 const DashboardNavbar = ({ setMobileMenuOpen }) => {
@@ -64,10 +65,7 @@ const DashboardNavbar = ({ setMobileMenuOpen }) => {
           </button>
 
           {/* Notifications */}
-          <button className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <NotificationDropdown />
 
           {/* User Menu */}
           <div className="relative">

@@ -59,7 +59,8 @@ export const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'x-trusted-device'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 };
 
 // Helmet security configuration

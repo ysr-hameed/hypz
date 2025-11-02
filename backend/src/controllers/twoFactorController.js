@@ -242,7 +242,7 @@ export const verify2FALogin = asyncHandler(async (req, res) => {
   );
 
   // Update last login
-  const clientIp = req.ip || req.connection.remoteAddress;
+  const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0] || 'Unknown';
   await query(
     'UPDATE users SET last_login = CURRENT_TIMESTAMP, last_login_ip = $1 WHERE id = $2',
     [clientIp, user.id]
@@ -258,11 +258,15 @@ export const verify2FALogin = asyncHandler(async (req, res) => {
       deviceTokenPlain = generateRandomToken();
       const deviceTokenHash = await bcrypt.hash(deviceTokenPlain, 10);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      
+      // Get user agent and IP
+      const userAgent = req.headers['user-agent'] || 'Unknown';
+      const ipAddress = clientIp;
 
       await query(
         `INSERT INTO trusted_devices (user_id, device_name, device_token_hash, ip_address, user_agent, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [user.id, deviceName || null, deviceTokenHash, req.ip, req.headers['user-agent'], expiresAt]
+        [user.id, deviceName || null, deviceTokenHash, ipAddress, userAgent, expiresAt]
       );
     } catch (err) {
       console.error('Failed to create trusted device:', err);

@@ -285,6 +285,53 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at);
     `);
 
+    // Notification preferences table
+    await query(`
+      CREATE TABLE IF NOT EXISTS notification_preferences (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        email_notifications BOOLEAN DEFAULT TRUE,
+        usage_alerts BOOLEAN DEFAULT TRUE,
+        billing_reminders BOOLEAN DEFAULT TRUE,
+        security_updates BOOLEAN DEFAULT TRUE,
+        marketing_emails BOOLEAN DEFAULT FALSE,
+        product_updates BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_preferences(user_id);
+    `);
+
+    // Notifications table - for in-app notifications and announcements
+    await query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        link VARCHAR(500),
+        icon VARCHAR(50),
+        priority VARCHAR(20) DEFAULT 'normal',
+        is_read BOOLEAN DEFAULT FALSE,
+        is_global BOOLEAN DEFAULT FALSE,
+        metadata JSONB,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        read_at TIMESTAMP
+      );
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+      CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+      CREATE INDEX IF NOT EXISTS idx_notifications_global ON notifications(is_global);
+    `);
+
     // Drop old plans table and create new plans table with updated schema
     await query('DROP TABLE IF EXISTS plans CASCADE');
     console.log('✅ Dropped old plans table');
