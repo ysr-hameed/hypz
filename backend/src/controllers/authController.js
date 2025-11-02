@@ -314,8 +314,8 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
   successResponse(res, {
     id: user.id,
     email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
+    firstName: user.first_name || '',
+    lastName: user.last_name || '',
     emailVerified: user.email_verified,
     planId: user.plan_id,
     avatarUrl: user.avatar_url,

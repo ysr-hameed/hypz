@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BookOpenIcon, 
   CodeBracketIcon, 
@@ -25,11 +25,22 @@ import {
   ArrowDownTrayIcon,
   FolderIcon
 } from '@heroicons/react/24/outline';
+import { SkeletonDocumentation } from '../../components/SkeletonLoaders';
 
 const Documentation = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [activeSection, setActiveSection] = useState('quickstart');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return <SkeletonDocumentation />;
+  }
 
   const languages = [
     { id: 'javascript', name: 'JavaScript', icon: CodeBracketIcon, color: 'text-yellow-600' },
@@ -606,9 +617,9 @@ curl -X PATCH "https://api.hypz.io/v1/files/file_1a2b3c4d" \\
   ];
 
   return (
-    <div className="flex gap-6 p-6">
+    <div className="flex gap-6 p-6 content-wrapper content-loaded">
       {/* Sidebar Navigation */}
-      <div className="hidden lg:block w-64 flex-shrink-0">
+      <div className="hidden lg:block w-64 flex-shrink-0 animate-slideIn">
         <div className="sticky top-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
           <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-4">
             Navigation

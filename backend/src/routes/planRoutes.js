@@ -6,11 +6,12 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getPlans);
-router.get('/:planId', getPlan);
 
-// Protected routes
-router.use(authenticate);
-router.get('/user/current', getUserPlan);
-router.put('/user/update', updateUserPlan);
+// Protected routes (must come before /:planId to avoid conflict)
+router.get('/user/current', authenticate, getUserPlan);
+router.put('/user/update', authenticate, updateUserPlan);
+
+// Public route for specific plan (must come after /user/* routes)
+router.get('/:planId', getPlan);
 
 export default router;

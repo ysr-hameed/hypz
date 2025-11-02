@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { User, Bell, Shield, Mail, Key, QrCode, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { twoFactorAPI, authAPI } from '../../services/api';
+import { useUser } from '../../context/UserContext';
 import { toast } from 'react-hot-toast';
 import { apiCache } from '../../utils/apiCache';
+import { SkeletonSettings } from '../../components/SkeletonLoaders';
 
 const Settings = () => {
-  const [user, setUser] = useState(null);
+  const { user: contextUser, updateUser, fetchUser } = useUser();
   const [loading, setLoading] = useState(true);
   const [twoFactorStatus, setTwoFactorStatus] = useState(null);
   const [qrCode, setQrCode] = useState(null);
@@ -23,32 +25,30 @@ const Settings = () => {
   const hasFetched = useRef(false);
 
   useEffect(() => {
+    // Initialize from context user
+    if (contextUser) {
+      // Use firstName/lastName from API, or parse from name field as fallback
+      if (contextUser.firstName || contextUser.lastName) {
+        setFirstName(contextUser.firstName || '');
+        setLastName(contextUser.lastName || '');
+      } else if (contextUser.name) {
+        const nameParts = contextUser.name.split(' ');
+        setFirstName(nameParts[0] || '');
+        setLastName(nameParts.slice(1).join(' ') || '');
+      }
+      setEmail(contextUser.email || '');
+      setLoading(false);
+    }
+  }, [contextUser]);
+
+  useEffect(() => {
     // Prevent double fetch in React StrictMode
     if (hasFetched.current) return;
     hasFetched.current = true;
 
-    fetchUserData();
     fetch2FAStatus();
     fetchTrustedDevices();
   }, []);
-
-  const fetchUserData = async () => {
-    try {
-      const response = await apiCache.wrapRequest(
-        'user:current',
-        () => authAPI.getCurrentUser(),
-        60000 // 60 second cache
-      );
-      setUser(response.data);
-      setFirstName(response.data.firstName || '');
-      setLastName(response.data.lastName || '');
-      setEmail(response.data.email || '');
-    } catch (error) {
-      toast.error('Failed to load user data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetch2FAStatus = async () => {
     try {
@@ -138,7 +138,16 @@ const Settings = () => {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
-      // TODO: Implement profile update API
+      // Update context user immediately for better UX
+      const updatedName = `${firstName} ${lastName}`.trim();
+      updateUser({ name: updatedName, email });
+      
+      // TODO: Implement profile update API call
+      // await authAPI.updateProfile({ firstName, lastName, email });
+      
+      // Force refresh user data from server after update
+      await fetchUser(true);
+      
       toast.success('Profile updated successfully');
     } catch (error) {
       toast.error('Failed to update profile');
@@ -165,22 +174,18 @@ const Settings = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    );
+    return <SkeletonSettings />;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6 content-wrapper content-loaded">
+      <div className="animate-slideIn">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your account preferences and security</p>
       </div>
 
       {/* Profile Section */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 animate-slideIn">
         <div className="flex items-center gap-3 mb-6">
           <User className="w-5 h-5 text-primary-600 dark:text-primary-400" />
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile</h2>

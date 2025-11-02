@@ -1,11 +1,20 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Search, Sun, Moon, User, Settings, LogOut, Menu } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useUser } from '../context/UserContext';
 import { useState } from 'react';
 
 const DashboardNavbar = ({ setMobileMenuOpen }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout, getUserInitials } = useUser();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+    navigate('/login');
+  };
 
   return (
     <nav className="sticky top-0 z-30 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
@@ -67,12 +76,33 @@ const DashboardNavbar = ({ setMobileMenuOpen }) => {
               className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
             >
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                JD
+                {getUserInitials()}
               </div>
+              {user && (
+                <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {user.firstName && user.lastName 
+                    ? `${user.firstName} ${user.lastName}`
+                    : user.firstName || user.lastName || user.name || user.email?.split('@')[0]
+                  }
+                </span>
+              )}
             </button>
 
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+                {user && (
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}`
+                        : user.firstName || user.lastName || user.name || 'User'
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {user.email}
+                    </p>
+                  </div>
+                )}
                 <Link
                   to="/settings"
                   className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -83,7 +113,7 @@ const DashboardNavbar = ({ setMobileMenuOpen }) => {
                 </Link>
                 <button
                   className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => setShowUserMenu(false)}
+                  onClick={handleLogout}
                 >
                   <LogOut size={16} />
                   <span>Logout</span>

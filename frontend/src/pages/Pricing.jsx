@@ -2,23 +2,30 @@ import { useState, useEffect } from 'react';
 import { Check, Loader2, Star, Sparkles, Zap, TrendingDown, Shield, Rocket, ArrowRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { plansAPI } from '../services/api';
+import { apiCache } from '../utils/apiCache';
+import { useUser } from '../context/UserContext';
 
 const Pricing = () => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const { isAuthenticated } = useUser();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    setIsAuthenticated(!!token);
-
     const fetchPlans = async () => {
       try {
         setLoading(true);
-        const response = await plansAPI.getAll();
+        
+        // Use cache wrapper with 10 minute TTL (600000ms) for plans
+        // Plans rarely change, so we can cache them longer
+        const response = await apiCache.wrapRequest(
+          'pricing-plans',
+          () => plansAPI.getAll(),
+          600000 // 10 minutes cache
+        );
+        
         setPlans(response.data || []);
       } catch (err) {
         setError(err.message || 'Failed to load plans');

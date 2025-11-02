@@ -3,6 +3,7 @@ import { Database, TrendingUp, Zap, HardDrive, Globe, Activity, Loader2 } from '
 import { bucketAPI, usageAPI, plansAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import { apiCache } from '../../utils/apiCache';
+import { SkeletonDashboard } from '../../components/SkeletonLoaders';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -10,6 +11,11 @@ const Dashboard = () => {
   const [currentPlan, setCurrentPlan] = useState(null);
   const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingStages, setLoadingStages] = useState({
+    usage: true,
+    plan: true,
+    buckets: true
+  });
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -22,28 +28,34 @@ const Dashboard = () => {
         setLoading(true);
 
         // Fetch usage data with cache
+        setLoadingStages(prev => ({ ...prev, usage: true }));
         const usageResponse = await apiCache.wrapRequest(
           'usage:current',
           () => usageAPI.getCurrent(),
           30000 // 30 second cache
         );
         const usage = usageResponse.data;
+        setLoadingStages(prev => ({ ...prev, usage: false }));
 
         // Fetch current plan with cache
+        setLoadingStages(prev => ({ ...prev, plan: true }));
         const planResponse = await apiCache.wrapRequest(
           'plan:current',
           () => plansAPI.getUserPlan(),
           60000 // 60 second cache
         );
         setCurrentPlan(planResponse.data);
+        setLoadingStages(prev => ({ ...prev, plan: false }));
 
         // Fetch buckets count with cache
+        setLoadingStages(prev => ({ ...prev, buckets: true }));
         const bucketsResponse = await apiCache.wrapRequest(
           'buckets:all',
           () => bucketAPI.getAll(),
           30000 // 30 second cache
         );
         setBuckets(bucketsResponse.data || []);
+        setLoadingStages(prev => ({ ...prev, buckets: false }));
 
         // Calculate stats - usage.month contains current usage
         const storageUsed = usage.month?.storage_bytes || 0;
@@ -109,21 +121,25 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Overview of your storage usage and activity</p>
+        </div>
+        <SkeletonDashboard />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-slideIn">
-      <div>
+    <div className="space-y-6 content-wrapper content-loaded">
+      <div className="animate-slideIn">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">Overview of your storage usage and activity</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-slideIn">
         {stats.map((stat, index) => (
           <div key={index} className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-4">

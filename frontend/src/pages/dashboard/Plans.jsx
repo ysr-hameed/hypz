@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Check, Loader2, Star, Sparkles, Zap } from 'lucide-react';
 import { plansAPI } from '../../services/api';
 import PaymentModal from '../../components/PaymentModalNew';
+import { SkeletonPlans } from '../../components/SkeletonLoaders';
 
 const Plans = () => {
   const [plans, setPlans] = useState([]);
@@ -27,7 +28,7 @@ const Plans = () => {
       } catch (err) {
         setError(err.message || 'Failed to load plans');
       } finally {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 400);
       }
     };
 
@@ -108,14 +109,7 @@ const Plans = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading plans...</p>
-        </div>
-      </div>
-    );
+    return <SkeletonPlans />;
   }
 
   if (error) {
@@ -129,8 +123,8 @@ const Plans = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="bg-gradient-to-br from-primary-600 via-purple-600 to-pink-600 text-white py-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 content-wrapper content-loaded">
+      <div className="bg-gradient-to-br from-primary-600 via-purple-600 to-pink-600 text-white py-20 animate-slideIn">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             Simple, Transparent Pricing

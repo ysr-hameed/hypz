@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlan } from '../../context/PlanContext';
 import { formatStorage, formatBandwidth, formatApiCalls } from '../../config/plans';
 import { 
@@ -12,12 +12,22 @@ import {
   BanknotesIcon
 } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
+import { SkeletonBilling } from '../../components/SkeletonLoaders';
 
 const Billing = () => {
   const { userData, planDetails, updateRenewalSettings } = usePlan();
   const [autoRenew, setAutoRenew] = useState(userData?.currentPlan?.renewalType === 'auto');
   const [autoUpgrade, setAutoUpgrade] = useState(userData?.currentPlan?.autoUpgrade || false);
   const [showInvoices, setShowInvoices] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Mock payment methods
   const [paymentMethods, setPaymentMethods] = useState([
@@ -49,6 +59,10 @@ const Billing = () => {
     updateRenewalSettings(newRenewalType, autoUpgrade);
   };
 
+  if (loading) {
+    return <SkeletonBilling />;
+  }
+
   const handleAutoUpgradeToggle = () => {
     setAutoUpgrade(!autoUpgrade);
     updateRenewalSettings(autoRenew ? 'auto' : 'manual', !autoUpgrade);
@@ -59,9 +73,9 @@ const Billing = () => {
   const currentPrice = planDetails?.[priceKey] || 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 content-wrapper content-loaded">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center animate-slideIn">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Billing & Payments</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">

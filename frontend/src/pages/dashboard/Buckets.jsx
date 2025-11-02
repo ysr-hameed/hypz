@@ -1,10 +1,20 @@
 import { Link } from 'react-router-dom';
 import { Database, Plus, Search, MoreVertical, Lock, Globe, Calendar, HardDrive } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { SkeletonBuckets } from '../../components/SkeletonLoaders';
 
 const Buckets = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const buckets = [
     { name: 'my-images', files: 1243, size: '45.2 MB', visibility: 'Private', created: '2024-01-15' },
@@ -19,10 +29,14 @@ const Buckets = () => {
     bucket.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (loading) {
+    return <SkeletonBuckets />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 content-wrapper content-loaded">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 animate-slideIn">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Buckets</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your storage buckets</p>

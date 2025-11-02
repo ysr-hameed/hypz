@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlan } from '../../context/PlanContext';
 import { UserPlus, Trash2, Shield } from 'lucide-react';
+import { SkeletonTeam } from '../../components/SkeletonLoaders';
 
 const Team = () => {
   const { userData, planDetails, canAddTeamMember, addTeamMember, removeTeamMember } = usePlan();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const teamMembers = userData?.teamMembers || [];
   const maxMembers = planDetails?.teamMembers || 1;
@@ -28,9 +35,13 @@ const Team = () => {
     }
   };
 
+  if (loading) {
+    return <SkeletonTeam />;
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-start">
+    <div className="p-6 space-y-6 content-wrapper content-loaded">
+      <div className="flex justify-between items-start animate-slideIn">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Team Members</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage your team</p>
@@ -42,7 +53,7 @@ const Team = () => {
       </div>
 
       {!canAddTeamMember() && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 animate-slideIn">
           <p className="text-yellow-900 dark:text-yellow-200">
             Team limit reached. Upgrade to add more members.
           </p>

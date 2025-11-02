@@ -1,9 +1,19 @@
 import { Key, Plus, Copy, Trash2, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { SkeletonList } from '../../components/SkeletonLoaders';
 
 const ApiKeys = () => {
   const [showModal, setShowModal] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   const keys = [
     { id: 1, name: 'Production API', key: 'sk_live_51H7xQ2Kd...', created: '2024-03-15', lastUsed: '2 hours ago' },
@@ -14,9 +24,24 @@ const ApiKeys = () => {
     setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">API Keys</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your API keys for programmatic access</p>
+          </div>
+          <div className="h-10 w-40 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+        </div>
+        <SkeletonList items={3} />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 content-wrapper content-loaded">
+      <div className="flex items-center justify-between animate-slideIn">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">API Keys</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your API keys for programmatic access</p>

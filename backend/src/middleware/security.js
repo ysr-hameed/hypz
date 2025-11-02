@@ -156,3 +156,4 @@ export const sanitizeData = [
   mongoSanitize(), // Prevent NoSQL injection
   xss() // Prevent XSS attacks
 ];
+

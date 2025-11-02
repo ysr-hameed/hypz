@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { usePlan } from '../../context/PlanContext';
 import { formatStorage, formatBandwidth, formatApiCalls } from '../../config/plans';
+import { SkeletonStats, SkeletonChart } from '../../components/SkeletonLoaders';
 import { 
   ChartBarIcon, 
   ServerIcon, 
@@ -13,6 +15,15 @@ import { Link } from 'react-router-dom';
 
 const Usage = () => {
   const { userData, planDetails, getStorageUsage, getBandwidthUsage, getApiCallsUsage } = usePlan();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   const storageUsage = getStorageUsage();
   const bandwidthUsage = getBandwidthUsage();
@@ -159,10 +170,28 @@ const Usage = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usage Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Monitor your resource consumption and trends
+          </p>
+        </div>
+        <SkeletonStats count={3} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonChart />
+          <SkeletonChart />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 content-wrapper content-loaded">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start animate-slideIn">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usage Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">

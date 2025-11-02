@@ -21,7 +21,8 @@ class APICache {
   set(key, data, ttl = 30000) { // Default 30 seconds TTL
     this.cache.set(key, {
       data,
-      expiry: Date.now() + ttl
+      expiry: Date.now() + ttl,
+      createdAt: Date.now()
     });
   }
 
@@ -72,6 +73,28 @@ class APICache {
         this.cache.delete(key);
       }
     });
+  }
+
+  // Get cache info for debugging
+  getInfo(key) {
+    if (key) {
+      const item = this.cache.get(key);
+      if (!item) return null;
+      return {
+        key,
+        expiresIn: item.expiry - Date.now(),
+        age: Date.now() - item.createdAt,
+        size: JSON.stringify(item.data).length
+      };
+    }
+    
+    // Return all cache info
+    return Array.from(this.cache.keys()).map(k => this.getInfo(k));
+  }
+
+  // Get cache size
+  get size() {
+    return this.cache.size;
   }
 }
 

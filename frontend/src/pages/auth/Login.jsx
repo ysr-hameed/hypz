@@ -2,10 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { authAPI } from '../../services/api';
+import { useUser } from '../../context/UserContext';
 import TwoFactorVerify from '../../components/TwoFactorVerify';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { fetchUser } = useUser();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,6 +71,9 @@ const Login = () => {
       }
       localStorage.setItem('userEmail', user.email);
       localStorage.setItem('user', JSON.stringify(user));
+      
+      // Fetch user data to populate context
+      await fetchUser(true); // Force refresh to get latest user data
       
       // Navigate to dashboard
       navigate('/dashboard', { replace: true });
