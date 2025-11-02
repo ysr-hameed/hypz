@@ -1,374 +1,535 @@
 import { useState, useEffect } from 'react';
-import { usePlan } from '../../context/PlanContext';
-import { formatStorage, formatBandwidth, formatApiCalls } from '../../config/plans';
-import { SkeletonStats, SkeletonChart } from '../../components/SkeletonLoaders';
 import { 
-  ChartBarIcon, 
-  ServerIcon, 
-  ArrowsRightLeftIcon, 
-  CodeBracketIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ArrowTrendingUpIcon
-} from '@heroicons/react/24/outline';
-import { Link } from 'react-router-dom';
+  HardDrive, 
+  Globe, 
+  Zap, 
+  TrendingUp, 
+  TrendingDown,
+  Calendar,
+  Download,
+  Upload,
+  Database,
+  Activity,
+  BarChart3,
+  PieChart,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  ArrowUp,
+  ArrowDown,
+  Minus
+} from 'lucide-react';
+import { usageAPI, plansAPI } from '../../services/api';
+import { toast } from 'react-hot-toast';
 
 const Usage = () => {
-  const { userData, planDetails, getStorageUsage, getBandwidthUsage, getApiCallsUsage } = usePlan();
   const [loading, setLoading] = useState(true);
-
+  const [timeframe, setTimeframe] = useState('30'); // 7, 30, 90 days
+  const [currentUsage, setCurrentUsage] = useState(null);
+  const [planData, setPlanData] = useState(null);
+  const [historicalData, setHistoricalData] = useState([]);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
+    fetchUsageData();
+  }, [timeframe]);
+
+  const fetchUsageData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch current usage
+      const usageResponse = await usageAPI.getCurrent();
+      console.log('Usage Response:', usageResponse);
+      setCurrentUsage(usageResponse.data);
+      
+      // Fetch plan data
+      const planResponse = await plansAPI.getUserPlan();
+      console.log('Plan Response:', planResponse);
+      setPlanData(planResponse.data);
+      
+      // Check if advanced analytics is enabled based on plan
+      const planName = planResponse.data?.plan?.name?.toLowerCase() || '';
+      setAnalyticsEnabled(planName.includes('pro') || planName.includes('pay'));
+      
+      // Fetch historical data
+      const historyResponse = await usageAPI.getHistory(parseInt(timeframe));
+      console.log('History Response:', historyResponse);
+      setHistoricalData(historyResponse.data?.history || []);
+      
+    } catch (error) {
+      console.error('Error fetching usage data:', error);
+      toast.error('Failed to load usage data');
+      // Set fallback data to prevent undefined errors
+      setCurrentUsage({
+        storage: { current: 0, previous: 0 },
+        bandwidth: { current: 0, previous: 0, upload: 0, download: 0 },
+        api_calls: { current: 0, previous: 0, upload: 0, download: 0, delete: 0, list: 0 },
+        files: { total: 0, uploaded_today: 0, downloaded_today: 0 },
+        performance: { avg_response_time: 0 }
+      });
+      setPlanData({
+        plan: { name: 'Free', storage_gb: 1, bandwidth_gb: 3, api_calls: 50000 }
+      });
+    } finally {
       setLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  };
 
-  const storageUsage = getStorageUsage();
-  const bandwidthUsage = getBandwidthUsage();
-  const apiCallsUsage = getApiCallsUsage();
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
 
-  const getUsageColor = (percentage) => {
-    if (percentage >= 90) return { bg: 'bg-red-500', text: 'text-red-600', border: 'border-red-200' };
-    if (percentage >= 75) return { bg: 'bg-yellow-500', text: 'text-yellow-600', border: 'border-yellow-200' };
-    return { bg: 'bg-green-500', text: 'text-green-600', border: 'border-green-200' };
+  const calculatePercentage = (used, limit) => {
+    if (!limit || limit === 0) return 0;
+    return Math.min((used / limit) * 100, 100);
   };
 
   const getUsageStatus = (percentage) => {
-    if (percentage >= 90) return { icon: ExclamationTriangleIcon, text: 'Critical', color: 'text-red-600' };
-    if (percentage >= 75) return { icon: ExclamationTriangleIcon, text: 'Warning', color: 'text-yellow-600' };
-    return { icon: CheckCircleIcon, text: 'Healthy', color: 'text-green-600' };
+    if (percentage >= 90) return { color: 'red', icon: AlertCircle, text: 'Critical' };
+    if (percentage >= 75) return { color: 'yellow', icon: AlertCircle, text: 'Warning' };
+    return { color: 'green', icon: CheckCircle, text: 'Healthy' };
   };
 
-  // Mock usage trends data
-  const usageTrends = {
-    storage: [
-      { date: '10-25', value: 0.3 },
-      { date: '10-26', value: 0.35 },
-      { date: '10-27', value: 0.4 },
-      { date: '10-28', value: 0.42 },
-      { date: '10-29', value: 0.45 },
-      { date: '10-30', value: 0.48 },
-      { date: '10-31', value: 0.5 }
-    ],
-    bandwidth: [
-      { date: '10-25', value: 1.5 },
-      { date: '10-26', value: 1.8 },
-      { date: '10-27', value: 1.9 },
-      { date: '10-28', value: 2.0 },
-      { date: '10-29', value: 2.1 },
-      { date: '10-30', value: 2.2 },
-      { date: '10-31', value: 2.3 }
-    ],
-    apiCalls: [
-      { date: '10-25', value: 8000 },
-      { date: '10-26', value: 9500 },
-      { date: '10-27', value: 10200 },
-      { date: '10-28', value: 11000 },
-      { date: '10-29', value: 11500 },
-      { date: '10-30', value: 12000 },
-      { date: '10-31', value: 12500 }
-    ]
+  const getTrendIcon = (current, previous) => {
+    if (!previous || current === previous) return <Minus size={16} className="text-gray-500" />;
+    if (current > previous) return <ArrowUp size={16} className="text-red-500" />;
+    return <ArrowDown size={16} className="text-green-500" />;
   };
 
-  const UsageCard = ({ title, icon: Icon, used, limit, unit, color, type }) => {
-    const percentage = limit === 'unlimited' || limit === 0 ? 0 : (used / limit) * 100;
-    const colors = getUsageColor(percentage);
-    const status = getUsageStatus(percentage);
-    const StatusIcon = status.icon;
-
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-2 border-gray-200 dark:border-gray-700">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center">
-            <div className={`p-3 rounded-lg ${color} bg-opacity-10 mr-3`}>
-              <Icon className={`h-6 w-6 ${color.replace('bg-', 'text-')}`} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Current Period</p>
-            </div>
-          </div>
-          <div className="flex items-center">
-            <StatusIcon className={`h-5 w-5 ${status.color} mr-1`} />
-            <span className={`text-sm font-medium ${status.color}`}>{status.text}</span>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex justify-between items-baseline">
-            <span className="text-3xl font-bold text-gray-900 dark:text-white">
-              {used.toFixed(2)} {unit}
-            </span>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              of {limit === 'unlimited' ? '∞' : `${limit} ${unit}`}
-            </span>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="relative">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-              <div
-                className={`h-3 ${colors.bg} transition-all duration-500 relative overflow-hidden`}
-                style={{ width: `${Math.min(percentage, 100)}%` }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
-              </div>
-            </div>
-            <p className="text-right text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {percentage.toFixed(1)}% used
-            </p>
-          </div>
-
-          {/* Mini Trend Chart */}
-          {planDetails?.analytics === 'advanced' && (
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-600 dark:text-gray-400">7-Day Trend</span>
-                <span className="text-xs text-green-600 dark:text-green-400 flex items-center">
-                  <ArrowTrendingUpIcon className="h-3 w-3 mr-1" />
-                  +{((used / usageTrends[type][0].value - 1) * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-end justify-between h-12 space-x-1">
-                {usageTrends[type].map((point, idx) => {
-                  const maxValue = Math.max(...usageTrends[type].map(p => p.value));
-                  const height = (point.value / maxValue) * 100;
-                  return (
-                    <div key={idx} className="flex-1 flex flex-col items-center">
-                      <div
-                        className={`w-full ${colors.bg} bg-opacity-60 rounded-t transition-all hover:bg-opacity-100`}
-                        style={{ height: `${height}%` }}
-                        title={`${point.date}: ${point.value} ${unit}`}
-                      ></div>
-                      <span className="text-[8px] text-gray-500 mt-1">{point.date.split('-')[1]}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Alert Message */}
-          {percentage >= 75 && (
-            <div className={`p-3 rounded-lg border ${colors.border} bg-opacity-10 ${colors.bg}`}>
-              <p className={`text-sm ${colors.text} font-medium`}>
-                {percentage >= 90
-                  ? `⚠️ ${planDetails?.afterLimit === 'stop_or_upgrade' ? 'Service will stop' : 'Auto-billing enabled'} when limit reached`
-                  : `⚡ You're using ${percentage.toFixed(0)}% of your ${title.toLowerCase()}`}
-              </p>
-              {percentage >= 90 && planDetails?.afterLimit === 'stop_or_upgrade' && (
-                <Link to="/plans" className="text-sm underline mt-1 inline-block">
-                  Upgrade Now
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const getTrendPercentage = (current, previous) => {
+    if (!previous || previous === 0) return 0;
+    return Math.round(((current - previous) / previous) * 100);
   };
+
+  // Calculate metrics
+  const storageUsed = currentUsage?.storage?.current || 0;
+  const storageLimit = (planData?.plan?.storage_gb || 1) * 1024 * 1024 * 1024;
+  const storagePercentage = calculatePercentage(storageUsed, storageLimit);
+  const storageStatus = getUsageStatus(storagePercentage);
+
+  const bandwidthUsed = currentUsage?.bandwidth?.current || 0;
+  const bandwidthLimit = (planData?.plan?.bandwidth_gb || 3) * 1024 * 1024 * 1024;
+  const bandwidthPercentage = calculatePercentage(bandwidthUsed, bandwidthLimit);
+  const bandwidthStatus = getUsageStatus(bandwidthPercentage);
+
+  const apiCallsUsed = currentUsage?.api_calls?.current || 0;
+  const apiCallsLimit = planData?.plan?.api_calls || 50000;
+  const apiCallsPercentage = calculatePercentage(apiCallsUsed, apiCallsLimit);
+  const apiCallsStatus = getUsageStatus(apiCallsPercentage);
+
+  // Previous period data for trends
+  const storagePrevious = currentUsage?.storage?.previous || 0;
+  const bandwidthPrevious = currentUsage?.bandwidth?.previous || 0;
+  const apiCallsPrevious = currentUsage?.api_calls?.previous || 0;
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usage Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Monitor your resource consumption and trends
-          </p>
-        </div>
-        <SkeletonStats count={3} />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SkeletonChart />
-          <SkeletonChart />
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 content-wrapper content-loaded">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start animate-slideIn">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usage Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Usage & Analytics</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Monitor your resource consumption and trends
+            Monitor your resource usage and performance metrics
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Current Plan</p>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">{planDetails?.name}</p>
-          <Link to="/plans" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-            Upgrade Plan
-          </Link>
+        
+        {/* Timeframe Selector */}
+        <div className="flex gap-2">
+          {['7', '30', '90'].map((days) => (
+            <button
+              key={days}
+              onClick={() => setTimeframe(days)}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                timeframe === days
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {days} Days
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Analytics Badge */}
-      {planDetails?.analytics === 'none' && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <ChartBarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-3" />
+      {/* Current Plan Info */}
+      <div className="bg-gradient-to-r from-primary-600 to-purple-600 rounded-xl p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">{planData?.plan?.name || 'Free Plan'}</h2>
+            <p className="text-white/80 mt-1">
+              Current billing period: {new Date().toLocaleDateString()} - {new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString()}
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.href = '/dashboard/plans'}
+            className="px-4 py-2 bg-white text-primary-600 rounded-lg font-medium hover:bg-gray-100 transition"
+          >
+            Upgrade Plan
+          </button>
+        </div>
+      </div>
+
+      {/* Main Usage Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Storage Usage */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                <HardDrive className="text-blue-600 dark:text-blue-400" size={24} />
+              </div>
               <div>
-                <h3 className="font-semibold text-purple-900 dark:text-purple-200">
-                  Upgrade for Advanced Analytics
-                </h3>
-                <p className="text-sm text-purple-700 dark:text-purple-300">
-                  Get detailed usage trends, predictions, and insights with paid plans
-                </p>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Storage</h3>
+                <p className="text-xs text-gray-500">Total space used</p>
               </div>
             </div>
-            <Link
-              to="/plans"
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium whitespace-nowrap"
-            >
-              View Plans
-            </Link>
+            <storageStatus.icon className={`text-${storageStatus.color}-500`} size={20} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatBytes(storageUsed)}
+              </span>
+              <span className="text-sm text-gray-500">
+                of {formatBytes(storageLimit)}
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className={`bg-${storageStatus.color}-500 h-2 rounded-full transition-all duration-300`}
+                style={{ width: `${storagePercentage}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className={`text-${storageStatus.color}-600 dark:text-${storageStatus.color}-400 font-medium`}>
+                {storagePercentage.toFixed(1)}% used
+              </span>
+              <div className="flex items-center gap-1">
+                {getTrendIcon(storageUsed, storagePrevious)}
+                <span className="text-gray-600 dark:text-gray-400">
+                  {getTrendPercentage(storageUsed, storagePrevious)}% vs last period
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Usage Cards */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <UsageCard
-          title="Storage"
-          icon={ServerIcon}
-          used={storageUsage.used}
-          limit={storageUsage.limit}
-          unit="GB"
-          color="bg-blue-500"
-          type="storage"
-        />
-        <UsageCard
-          title="Bandwidth"
-          icon={ArrowsRightLeftIcon}
-          used={bandwidthUsage.used}
-          limit={bandwidthUsage.limit}
-          unit="GB"
-          color="bg-purple-500"
-          type="bandwidth"
-        />
-        <UsageCard
-          title="API Calls"
-          icon={CodeBracketIcon}
-          used={apiCallsUsage.used}
-          limit={apiCallsUsage.limit}
-          unit="calls"
-          color="bg-green-500"
-          type="apiCalls"
-        />
+        {/* Bandwidth Usage */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                <Globe className="text-green-600 dark:text-green-400" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Bandwidth</h3>
+                <p className="text-xs text-gray-500">Data transferred</p>
+              </div>
+            </div>
+            <bandwidthStatus.icon className={`text-${bandwidthStatus.color}-500`} size={20} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatBytes(bandwidthUsed)}
+              </span>
+              <span className="text-sm text-gray-500">
+                of {formatBytes(bandwidthLimit)}
+              </span>
+            </div>
+
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className={`bg-${bandwidthStatus.color}-500 h-2 rounded-full transition-all duration-300`}
+                style={{ width: `${bandwidthPercentage}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className={`text-${bandwidthStatus.color}-600 dark:text-${bandwidthStatus.color}-400 font-medium`}>
+                {bandwidthPercentage.toFixed(1)}% used
+              </span>
+              <div className="flex items-center gap-1">
+                {getTrendIcon(bandwidthUsed, bandwidthPrevious)}
+                <span className="text-gray-600 dark:text-gray-400">
+                  {getTrendPercentage(bandwidthUsed, bandwidthPrevious)}% vs last period
+                </span>
+              </div>
+            </div>
+
+            {/* Bandwidth Breakdown */}
+            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between text-xs">
+                <div className="flex items-center gap-1">
+                  <Upload size={12} className="text-blue-500" />
+                  <span className="text-gray-600 dark:text-gray-400">Upload: {formatBytes(currentUsage?.bandwidth?.upload || 0)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Download size={12} className="text-green-500" />
+                  <span className="text-gray-600 dark:text-gray-400">Download: {formatBytes(currentUsage?.bandwidth?.download || 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* API Calls Usage */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                <Zap className="text-purple-600 dark:text-purple-400" size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">API Calls</h3>
+                <p className="text-xs text-gray-500">Requests made</p>
+              </div>
+            </div>
+            <apiCallsStatus.icon className={`text-${apiCallsStatus.color}-500`} size={20} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {apiCallsUsed.toLocaleString()}
+              </span>
+              <span className="text-sm text-gray-500">
+                of {apiCallsLimit === -1 ? 'Unlimited' : apiCallsLimit.toLocaleString()}
+              </span>
+            </div>
+
+            {apiCallsLimit !== -1 && (
+              <>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`bg-${apiCallsStatus.color}-500 h-2 rounded-full transition-all duration-300`}
+                    style={{ width: `${apiCallsPercentage}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className={`text-${apiCallsStatus.color}-600 dark:text-${apiCallsStatus.color}-400 font-medium`}>
+                    {apiCallsPercentage.toFixed(1)}% used
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {getTrendIcon(apiCallsUsed, apiCallsPrevious)}
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {getTrendPercentage(apiCallsUsed, apiCallsPrevious)}% vs last period
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* API Calls Breakdown */}
+            <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-gray-500">Upload:</span>
+                <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                  {(currentUsage?.api_calls?.upload || 0).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Download:</span>
+                <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                  {(currentUsage?.api_calls?.download || 0).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Delete:</span>
+                <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                  {(currentUsage?.api_calls?.delete || 0).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">List:</span>
+                <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                  {(currentUsage?.api_calls?.list || 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Usage Details Table */}
-      {planDetails?.analytics === 'advanced' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
-            <ChartBarIcon className="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" />
-            Detailed Usage Breakdown
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Resource</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Used</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Limit</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">% Used</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">Storage</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{storageUsage.used.toFixed(2)} GB</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{storageUsage.limit} GB</td>
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white text-right">{storageUsage.percentage.toFixed(1)}%</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      storageUsage.percentage >= 90 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      storageUsage.percentage >= 75 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {storageUsage.percentage >= 90 ? 'Critical' : storageUsage.percentage >= 75 ? 'Warning' : 'Healthy'}
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">Bandwidth</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{bandwidthUsage.used.toFixed(2)} GB</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{bandwidthUsage.limit} GB</td>
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white text-right">{bandwidthUsage.percentage.toFixed(1)}%</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      bandwidthUsage.percentage >= 90 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      bandwidthUsage.percentage >= 75 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {bandwidthUsage.percentage >= 90 ? 'Critical' : bandwidthUsage.percentage >= 75 ? 'Warning' : 'Healthy'}
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">API Calls</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{formatApiCalls(apiCallsUsage.used)}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">{formatApiCalls(apiCallsUsage.limit)}</td>
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white text-right">{apiCallsUsage.percentage.toFixed(1)}%</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      apiCallsUsage.percentage >= 90 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      apiCallsUsage.percentage >= 75 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {apiCallsUsage.percentage >= 90 ? 'Critical' : apiCallsUsage.percentage >= 75 ? 'Warning' : 'Healthy'}
-                    </span>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">API Uploads</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">-</td>
-                  <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400 text-right">Unlimited</td>
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white text-right">-</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Unlimited
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      {/* Advanced Analytics Section */}
+      {analyticsEnabled ? (
+        <>
+          {/* Historical Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Storage Trend Chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Storage Trend</h3>
+                <BarChart3 className="text-gray-400" size={20} />
+              </div>
+              <div className="h-64 flex items-end justify-between gap-2">
+                {historicalData.slice(0, 7).map((day, index) => {
+                  const height = ((day.storage_bytes || 0) / storageLimit) * 100;
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-t-lg relative" style={{ height: '200px' }}>
+                        <div
+                          className="absolute bottom-0 w-full bg-blue-500 rounded-t-lg transition-all"
+                          style={{ height: `${height}%` }}
+                          title={formatBytes(day.storage_bytes || 0)}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bandwidth Trend Chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bandwidth Trend</h3>
+                <Activity className="text-gray-400" size={20} />
+              </div>
+              <div className="h-64 flex items-end justify-between gap-2">
+                {historicalData.slice(0, 7).map((day, index) => {
+                  const height = ((day.bandwidth_bytes || 0) / bandwidthLimit) * 100;
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-t-lg relative" style={{ height: '200px' }}>
+                        <div
+                          className="absolute bottom-0 w-full bg-green-500 rounded-t-lg transition-all"
+                          style={{ height: `${Math.min(height, 100)}%` }}
+                          title={formatBytes(day.bandwidth_bytes || 0)}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex items-center gap-3">
+                <Database className="text-blue-500" size={20} />
+                <div>
+                  <p className="text-xs text-gray-500">Total Files</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {(currentUsage?.files?.total || 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex items-center gap-3">
+                <Upload className="text-green-500" size={20} />
+                <div>
+                  <p className="text-xs text-gray-500">Uploads Today</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {(currentUsage?.files?.uploaded_today || 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex items-center gap-3">
+                <Download className="text-purple-500" size={20} />
+                <div>
+                  <p className="text-xs text-gray-500">Downloads Today</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {(currentUsage?.files?.downloaded_today || 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+              <div className="flex items-center gap-3">
+                <Clock className="text-orange-500" size={20} />
+                <div>
+                  <p className="text-xs text-gray-500">Avg Response Time</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {(currentUsage?.performance?.avg_response_time || 0)}ms
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        // Basic Analytics Locked Message
+        <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
+          <div className="max-w-md mx-auto">
+            <BarChart3 className="mx-auto text-gray-400 mb-4" size={48} />
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Advanced Analytics Available
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Upgrade to Pro or Pay-as-you-go plan to unlock detailed usage trends, historical charts, and performance metrics.
+            </p>
+            <button
+              onClick={() => window.location.href = '/dashboard/plans'}
+              className="px-6 py-3 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition"
+            >
+              Upgrade Now
+            </button>
           </div>
         </div>
       )}
 
-      {/* Recommendations */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
-        <h2 className="text-xl font-bold text-blue-900 dark:text-blue-200 mb-4">💡 Recommendations</h2>
-        <ul className="space-y-2">
-          {storageUsage.percentage > 75 && (
-            <li className="text-sm text-blue-800 dark:text-blue-300">
-              • Your storage is at {storageUsage.percentage.toFixed(0)}%. Consider upgrading to avoid service interruption.
-            </li>
-          )}
-          {bandwidthUsage.percentage > 75 && (
-            <li className="text-sm text-blue-800 dark:text-blue-300">
-              • High bandwidth usage detected. Upgrade for more bandwidth or optimize your content delivery.
-            </li>
-          )}
-          {apiCallsUsage.percentage > 75 && (
-            <li className="text-sm text-blue-800 dark:text-blue-300">
-              • API calls are high. Consider caching frequently accessed data or upgrading your plan.
-            </li>
-          )}
-          {storageUsage.percentage < 50 && bandwidthUsage.percentage < 50 && apiCallsUsage.percentage < 50 && (
-            <li className="text-sm text-blue-800 dark:text-blue-300">
-              ✅ Great! Your usage is healthy. You're making efficient use of your resources.
-            </li>
-          )}
-        </ul>
+      {/* Plan Features */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Your Plan Includes</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { label: 'Storage', value: `${planData?.plan?.storage_gb || 1} GB` },
+            { label: 'Bandwidth', value: `${planData?.plan?.bandwidth_gb || 3} GB` },
+            { label: 'API Calls', value: planData?.plan?.api_calls === -1 ? 'Unlimited' : (planData?.plan?.api_calls || 50000).toLocaleString() },
+            { label: 'Bandwidth per GB', value: '$0.0500/GB' },
+            { label: 'Free Egress', value: '2x Free Bandwidth' },
+            { label: 'Backup & Recovery', value: '30-Day Retention' },
+            { label: 'Custom Domain', value: planData?.plan?.features?.custom_domain ? 'Included' : 'Not Available' },
+            { label: 'File Versioning', value: planData?.plan?.features?.file_versioning ? 'Enabled' : 'Not Available' },
+            { label: 'Global CDN', value: planData?.plan?.features?.cdn ? 'Enabled' : 'Not Available' },
+            { label: 'Team Members', value: `Up to ${planData?.plan?.features?.team_members || 1}` },
+            { label: 'REST API Access', value: 'Full Access' },
+            { label: 'Bucket Types', value: 'Public & Private' },
+            { label: 'Encryption', value: 'AES-256' },
+            { label: 'CORS Configuration', value: planData?.plan?.features?.cors ? 'Enabled' : 'Basic' },
+          ].map((item, index) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <CheckCircle className="text-green-500 flex-shrink-0" size={16} />
+              <span className="text-gray-600 dark:text-gray-400">{item.label}:</span>
+              <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

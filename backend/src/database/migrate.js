@@ -134,10 +134,13 @@ const createTables = async () => {
         date DATE NOT NULL,
         storage_bytes BIGINT DEFAULT 0,
         bandwidth_bytes BIGINT DEFAULT 0,
+        upload_bytes BIGINT DEFAULT 0,
+        download_bytes BIGINT DEFAULT 0,
         api_calls INTEGER DEFAULT 0,
         upload_calls INTEGER DEFAULT 0,
         download_calls INTEGER DEFAULT 0,
         delete_calls INTEGER DEFAULT 0,
+        list_calls INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, date)
@@ -146,6 +149,10 @@ const createTables = async () => {
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_usage_user_date ON usage_records(user_id, date);
+    `);
+    
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id);
     `);
 
     // Payments/Subscriptions table

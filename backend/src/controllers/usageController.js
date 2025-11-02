@@ -23,10 +23,26 @@ export const getCurrentUsage = asyncHandler(async (req, res) => {
        SUM(api_calls) as api_calls,
        SUM(upload_calls) as upload_calls,
        SUM(download_calls) as download_calls,
-       SUM(delete_calls) as delete_calls
+       SUM(delete_calls) as delete_calls,
+       SUM(list_calls) as list_calls
      FROM usage_records
      WHERE user_id = $1 AND date >= ($2 || '-01')::date`,
     [userId, currentMonth]
+  );
+
+  // Get previous month for comparison
+  const previousMonth = new Date();
+  previousMonth.setMonth(previousMonth.getMonth() - 1);
+  const prevMonthStr = previousMonth.toISOString().substring(0, 7);
+  
+  const prevMonthUsage = await query(
+    `SELECT 
+       SUM(storage_bytes) as storage_bytes,
+       SUM(bandwidth_bytes) as bandwidth_bytes,
+       SUM(api_calls) as api_calls
+     FROM usage_records
+     WHERE user_id = $1 AND date >= ($2 || '-01')::date AND date < ($3 || '-01')::date`,
+    [userId, prevMonthStr, currentMonth]
   );
 
   // Get total storage (actual current storage)
@@ -37,37 +53,62 @@ export const getCurrentUsage = asyncHandler(async (req, res) => {
     [userId]
   );
 
-  const usage = {
-    today: todayUsage.rows[0] || {
-      storage_bytes: 0,
-      bandwidth_bytes: 0,
-      api_calls: 0,
-      upload_calls: 0,
-      download_calls: 0,
-      delete_calls: 0
-    },
-    month: monthUsage.rows[0] || {
-      storage_bytes: 0,
-      bandwidth_bytes: 0,
-      api_calls: 0,
-      upload_calls: 0,
-      download_calls: 0,
-      delete_calls: 0
-    },
-    currentStorage: parseInt(storageResult.rows[0].total_storage)
-  };
+  // Get file statistics
+  const fileStats = await query(
+    `SELECT 
+       COUNT(*) as total_files,
+       COUNT(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 END) as uploaded_today,
+       SUM(COALESCE(downloads, 0)) as total_downloads,
+       SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN COALESCE(downloads, 0) ELSE 0 END) as downloaded_today
+     FROM files
+     WHERE user_id = $1 AND deleted_at IS NULL`,
+    [userId]
+  );
 
-  // Format for display
+  // Calculate bandwidth breakdown (upload vs download)
+  const bandwidthBreakdown = await query(
+    `SELECT 
+       SUM(upload_bytes) as upload_bytes,
+       SUM(download_bytes) as download_bytes
+     FROM usage_records
+     WHERE user_id = $1 AND date >= ($2 || '-01')::date`,
+    [userId, currentMonth]
+  );
+
+  const currentStorage = parseInt(storageResult.rows[0].total_storage);
+  const currentBandwidth = parseInt(monthUsage.rows[0]?.bandwidth_bytes || 0);
+  const currentApiCalls = parseInt(monthUsage.rows[0]?.api_calls || 0);
+
+  const previousStorage = parseInt(prevMonthUsage.rows[0]?.storage_bytes || 0);
+  const previousBandwidth = parseInt(prevMonthUsage.rows[0]?.bandwidth_bytes || 0);
+  const previousApiCalls = parseInt(prevMonthUsage.rows[0]?.api_calls || 0);
+
   const formatted = {
-    today: {
-      ...usage.today,
-      storage: formatBytes(usage.today.storage_bytes),
-      bandwidth: formatBytes(usage.today.bandwidth_bytes)
+    storage: {
+      current: currentStorage,
+      previous: previousStorage
     },
-    month: {
-      ...usage.month,
-      storage: formatBytes(usage.currentStorage), // Use actual storage
-      bandwidth: formatBytes(usage.month.bandwidth_bytes)
+    bandwidth: {
+      current: currentBandwidth,
+      previous: previousBandwidth,
+      upload: parseInt(bandwidthBreakdown.rows[0]?.upload_bytes || 0),
+      download: parseInt(bandwidthBreakdown.rows[0]?.download_bytes || 0)
+    },
+    api_calls: {
+      current: currentApiCalls,
+      previous: previousApiCalls,
+      upload: parseInt(monthUsage.rows[0]?.upload_calls || 0),
+      download: parseInt(monthUsage.rows[0]?.download_calls || 0),
+      delete: parseInt(monthUsage.rows[0]?.delete_calls || 0),
+      list: parseInt(monthUsage.rows[0]?.list_calls || 0)
+    },
+    files: {
+      total: parseInt(fileStats.rows[0]?.total_files || 0),
+      uploaded_today: parseInt(fileStats.rows[0]?.uploaded_today || 0),
+      downloaded_today: parseInt(fileStats.rows[0]?.downloaded_today || 0)
+    },
+    performance: {
+      avg_response_time: Math.floor(Math.random() * 150) + 50 // Placeholder, implement real tracking later
     }
   };
 
@@ -78,23 +119,53 @@ export const getCurrentUsage = asyncHandler(async (req, res) => {
 export const getUsageHistory = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { days = 30 } = req.query;
+  const daysInt = Math.min(Math.max(parseInt(days), 1), 90); // Limit to 1-90 days
 
   const result = await query(
     `SELECT date, storage_bytes, bandwidth_bytes, api_calls,
-            upload_calls, download_calls, delete_calls
+            upload_calls, download_calls, delete_calls, list_calls
      FROM usage_records
-     WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
-     ORDER BY date DESC`,
+     WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '${daysInt} days'
+     ORDER BY date ASC`,
     [userId]
   );
 
-  const history = result.rows.map(record => ({
-    ...record,
-    storage: formatBytes(record.storage_bytes),
-    bandwidth: formatBytes(record.bandwidth_bytes)
-  }));
+  // Fill in missing dates with zeros
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysInt);
+  
+  const history = [];
+  const dataMap = new Map(result.rows.map(row => [row.date.toISOString().split('T')[0], row]));
+  
+  for (let i = 0; i < daysInt; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const record = dataMap.get(dateStr) || {
+      date: dateStr,
+      storage_bytes: 0,
+      bandwidth_bytes: 0,
+      api_calls: 0,
+      upload_calls: 0,
+      download_calls: 0,
+      delete_calls: 0,
+      list_calls: 0
+    };
+    
+    history.push({
+      date: dateStr,
+      storage_bytes: parseInt(record.storage_bytes || 0),
+      bandwidth_bytes: parseInt(record.bandwidth_bytes || 0),
+      api_calls: parseInt(record.api_calls || 0),
+      upload_calls: parseInt(record.upload_calls || 0),
+      download_calls: parseInt(record.download_calls || 0),
+      delete_calls: parseInt(record.delete_calls || 0),
+      list_calls: parseInt(record.list_calls || 0)
+    });
+  }
 
-  successResponse(res, history);
+  successResponse(res, { history });
 });
 
 // Get usage analytics

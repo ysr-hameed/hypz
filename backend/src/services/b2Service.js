@@ -34,7 +34,7 @@ const initializeB2 = async () => {
 };
 
 // Upload file to B2
-export const uploadToB2 = async (fileBuffer, fileName, mimeType) => {
+export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = false) => {
   try {
     if (!b2) {
       await initializeB2();
@@ -44,9 +44,17 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType) => {
       throw new Error('Backblaze B2 not initialized');
     }
 
+    // Select bucket based on visibility
+    const bucketId = isPublic ? config.B2_PUBLIC_BUCKET_ID : config.B2_PRIVATE_BUCKET_ID;
+    const bucketName = isPublic ? config.B2_PUBLIC_BUCKET_NAME : config.B2_PRIVATE_BUCKET_NAME;
+
+    if (!bucketId || !bucketName) {
+      throw new Error(`Backblaze B2 ${isPublic ? 'public' : 'private'} bucket not configured`);
+    }
+
     // Get upload URL
     const uploadUrlResponse = await b2.getUploadUrl({
-      bucketId: config.B2_BUCKET_ID
+      bucketId: bucketId
     });
 
     const uploadUrl = uploadUrlResponse.data.uploadUrl;
@@ -68,13 +76,15 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType) => {
     });
 
     // Generate download URL
-    const fileUrl = `${downloadUrl}/file/${config.B2_BUCKET_NAME}/${fileName}`;
+    const fileUrl = `${downloadUrl}/file/${bucketName}/${fileName}`;
 
     return {
       fileId: uploadResponse.data.fileId,
       fileName: uploadResponse.data.fileName,
       url: fileUrl,
-      size: uploadResponse.data.contentLength
+      size: uploadResponse.data.contentLength,
+      bucketId: bucketId,
+      bucketName: bucketName
     };
   } catch (error) {
     console.error('Error uploading to B2:', error);
@@ -83,7 +93,7 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType) => {
 };
 
 // Download file from B2
-export const downloadFromB2 = async (fileName) => {
+export const downloadFromB2 = async (fileName, bucketName) => {
   try {
     if (!b2) {
       await initializeB2();
@@ -93,8 +103,11 @@ export const downloadFromB2 = async (fileName) => {
       throw new Error('Backblaze B2 not initialized');
     }
 
+    // Use provided bucket name or default to private bucket
+    const targetBucket = bucketName || config.B2_PRIVATE_BUCKET_NAME;
+
     const response = await b2.downloadFileByName({
-      bucketName: config.B2_BUCKET_NAME,
+      bucketName: targetBucket,
       fileName: fileName
     });
 

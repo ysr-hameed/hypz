@@ -8,7 +8,8 @@ import {
   Settings,
   Zap,
   ShieldCheck,
-  X
+  X,
+  FolderOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { usageAPI, plansAPI } from '../services/api';
@@ -65,6 +66,7 @@ const Sidebar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
   const menuItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/file-manager', icon: FolderOpen, label: 'File Manager' },
     { to: '/buckets', icon: Database, label: 'Buckets' },
     { to: '/usage', icon: BarChart3, label: 'Usage' },
     { to: '/billing', icon: CreditCard, label: 'Billing' },

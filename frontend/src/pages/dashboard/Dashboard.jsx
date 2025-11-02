@@ -39,6 +39,7 @@ const Dashboard = () => {
 
         // Fetch current plan with cache
         setLoadingStages(prev => ({ ...prev, plan: true }));
+        let planData = null;
         try {
           const planResponse = await apiCache.wrapRequest(
             'plan:current',
@@ -46,17 +47,20 @@ const Dashboard = () => {
             60000 // 60 second cache
           );
           setCurrentPlan(planResponse.data);
+          planData = planResponse.data?.plan;
         } catch (planError) {
           console.warn('Plan fetch failed, using defaults:', planError);
           // Set default plan if fetch fails
-          setCurrentPlan({
+          const defaultPlan = {
             plan: {
               name: 'Free Plan',
               storage_gb: 1,
               bandwidth_gb: 3,
               api_calls: 50000
             }
-          });
+          };
+          setCurrentPlan(defaultPlan);
+          planData = defaultPlan.plan;
         }
         setLoadingStages(prev => ({ ...prev, plan: false }));
 
@@ -75,7 +79,6 @@ const Dashboard = () => {
         const bandwidthUsed = usage.month?.bandwidth_bytes || 0;
         const apiCallsUsed = usage.month?.api_calls || 0;
         
-        const planData = planResponse.data?.plan;
         const storageLimit = (planData?.storage_gb || 1) * 1024 * 1024 * 1024; // Convert to bytes
         const bandwidthLimit = (planData?.bandwidth_gb || 3) * 1024 * 1024 * 1024;
         const apiCallsLimit = planData?.api_calls || 50000;

@@ -33,13 +33,16 @@ export const uploadFile = asyncHandler(async (req, res) => {
 
   // Verify bucket ownership
   const bucket = await query(
-    'SELECT id, name FROM buckets WHERE id = $1 AND user_id = $2',
+    'SELECT id, name, visibility FROM buckets WHERE id = $1 AND user_id = $2',
     [bucketId, userId]
   );
 
   if (bucket.rows.length === 0) {
     return errorResponse(res, 'Bucket not found', 404);
   }
+
+  const bucketVisibility = bucket.rows[0].visibility;
+  const isPublicBucket = bucketVisibility === 'public';
 
   let fileUrl, cdnUrl, filePath, b2FileId;
 
@@ -48,9 +51,9 @@ export const uploadFile = asyncHandler(async (req, res) => {
     const uniqueFilename = generateUniqueFilename(req.file.originalname);
 
     if (isB2Available()) {
-      // Upload to Backblaze B2
+      // Upload to Backblaze B2 (public or private bucket based on bucket visibility)
       const b2Path = `${userId}/${bucketId}/${uniqueFilename}`;
-      const uploadResult = await uploadToB2(req.file.buffer, b2Path, req.file.mimetype);
+      const uploadResult = await uploadToB2(req.file.buffer, b2Path, req.file.mimetype, isPublicBucket);
       
       fileUrl = uploadResult.url;
       cdnUrl = uploadResult.url;
@@ -95,12 +98,15 @@ export const uploadFile = asyncHandler(async (req, res) => {
 
     // Update usage
     await query(
-      `INSERT INTO usage_records (user_id, date, storage_bytes, upload_calls)
-       VALUES ($1, CURRENT_DATE, $2, 1)
+      `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
+       VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
        ON CONFLICT (user_id, date)
        DO UPDATE SET 
          storage_bytes = usage_records.storage_bytes + $2,
+         upload_bytes = usage_records.upload_bytes + $2,
          upload_calls = usage_records.upload_calls + 1,
+         api_calls = usage_records.api_calls + 1,
+         bandwidth_bytes = usage_records.bandwidth_bytes + $2,
          updated_at = CURRENT_TIMESTAMP`,
       [userId, req.file.size]
     );
@@ -175,6 +181,18 @@ export const getFiles = asyncHandler(async (req, res) => {
   const countResult = await query(countQuery, countParams);
   const total = parseInt(countResult.rows[0].count);
 
+  // Track list API call
+  await query(
+    `INSERT INTO usage_records (user_id, date, list_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, 1, 1)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET 
+       list_calls = usage_records.list_calls + 1,
+       api_calls = usage_records.api_calls + 1,
+       updated_at = CURRENT_TIMESTAMP`,
+    [userId]
+  );
+
   successResponse(res, {
     files: result.rows.map(file => ({
       ...file,
@@ -238,12 +256,14 @@ export const downloadFile = asyncHandler(async (req, res) => {
 
   // Update bandwidth usage
   await query(
-    `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_calls)
-     VALUES ($1, CURRENT_DATE, $2, 1)
+    `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
      ON CONFLICT (user_id, date)
      DO UPDATE SET 
        bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+       download_bytes = usage_records.download_bytes + $2,
        download_calls = usage_records.download_calls + 1,
+       api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [userId, file.size]
   );
@@ -276,12 +296,13 @@ export const deleteFile = asyncHandler(async (req, res) => {
 
   // Update usage (reduce storage)
   await query(
-    `INSERT INTO usage_records (user_id, date, storage_bytes, delete_calls)
-     VALUES ($1, CURRENT_DATE, -$2, 1)
+    `INSERT INTO usage_records (user_id, date, storage_bytes, delete_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, -$2, 1, 1)
      ON CONFLICT (user_id, date)
      DO UPDATE SET 
        storage_bytes = usage_records.storage_bytes - $2,
        delete_calls = usage_records.delete_calls + 1,
+       api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [userId, file.size]
   );

@@ -18,6 +18,7 @@ import GithubCallback from './pages/auth/GithubCallback';
 import Dashboard from './pages/dashboard/Dashboard';
 import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
+import FileManager from './pages/dashboard/FileManager';
 import Plans from './pages/dashboard/Plans';
 import Pricing from './pages/Pricing';
 import Billing from './pages/dashboard/Billing';
@@ -100,6 +101,7 @@ function AppContent() {
             {/* Protected Dashboard Routes */}
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/file-manager" element={<FileManager />} />
               <Route path="/dashboard/plans" element={<Plans />} />
               <Route path="/buckets" element={<Buckets />} />
               <Route path="/buckets/:bucketId" element={<BucketDetails />} />
