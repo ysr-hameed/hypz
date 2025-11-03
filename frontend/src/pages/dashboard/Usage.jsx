@@ -42,21 +42,24 @@ const Usage = () => {
       // Fetch current usage
       const usageResponse = await usageAPI.getCurrent();
       console.log('Usage Response:', usageResponse);
-      setCurrentUsage(usageResponse.data);
+      // Backend returns: { success, message, data: {...} }
+      setCurrentUsage(usageResponse?.data || usageResponse);
       
       // Fetch plan data
       const planResponse = await plansAPI.getUserPlan();
       console.log('Plan Response:', planResponse);
-      setPlanData(planResponse.data);
+      // Backend returns: { success, message, data: {...} }
+      setPlanData(planResponse?.data || planResponse);
       
       // Check if advanced analytics is enabled based on plan
-      const planName = planResponse.data?.plan?.name?.toLowerCase() || '';
+      const planName = planResponse?.data?.plan?.name?.toLowerCase() || planResponse?.plan?.name?.toLowerCase() || '';
       setAnalyticsEnabled(planName.includes('pro') || planName.includes('pay'));
       
       // Fetch historical data
       const historyResponse = await usageAPI.getHistory(parseInt(timeframe));
       console.log('History Response:', historyResponse);
-      setHistoricalData(historyResponse.data?.history || []);
+      // Backend returns: { success, message, data: { history: [...] } }
+      setHistoricalData(historyResponse?.data?.history || historyResponse?.history || []);
       
     } catch (error) {
       console.error('Error fetching usage data:', error);

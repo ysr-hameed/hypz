@@ -138,7 +138,58 @@ export const verifyEmailOTP = asyncHandler(async (req, res) => {
   successResponse(res, null, 'Email verified successfully');
 });
 
-// Send 2FA code
+// Send 2FA code via email (fallback for lost phone)
+export const send2FAEmailFallback = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const result = await query(
+    'SELECT id, email, first_name, two_factor_enabled FROM users WHERE email = $1',
+    [email]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'User not found', 404);
+  }
+
+  const user = result.rows[0];
+
+  if (!user.two_factor_enabled) {
+    return errorResponse(res, '2FA is not enabled for this account', 400);
+  }
+
+  // Generate 6-digit code for email fallback
+  const code = generateOTP();
+  const codeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes for fallback
+
+  // Store code
+  await query(
+    `UPDATE users 
+     SET otp_code = $1, 
+         otp_expires = $2,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $3`,
+    [code, codeExpires, user.id]
+  );
+
+  // Send email with recovery code
+  try {
+    await send2FAEmail(user.email, code, user.first_name);
+  } catch (error) {
+    console.error('Failed to send email fallback code:', error);
+    return errorResponse(res, 'Failed to send verification code. Please try again.', 500);
+  }
+
+  // Log activity
+  await query(
+    `INSERT INTO activity_logs (user_id, action, details) 
+     VALUES ($1, $2, $3)`,
+    [user.id, '2fa_email_fallback_requested', JSON.stringify({ ip: req.ip })]
+  );
+
+  successResponse(res, null, 'Verification code sent to your email. Use this if you lost access to your authenticator app.');
+});
+
+// Legacy: Send 2FA code via email (deprecated - authenticator is primary now)
 export const send2FACode = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -184,11 +235,11 @@ export const send2FACode = asyncHandler(async (req, res) => {
 
 // Verify 2FA code during login
 export const verify2FALogin = asyncHandler(async (req, res) => {
-  const { email, code, useBackupCode, trustDevice, deviceName } = req.body;
+  const { email, code, useBackupCode, useEmailFallback, trustDevice, deviceName } = req.body;
 
   const result = await query(
     `SELECT id, email, first_name, last_name, otp_code, otp_expires, 
-     two_factor_enabled, two_factor_backup_codes, plan_id, role 
+     two_factor_enabled, two_factor_secret, two_factor_backup_codes, plan_id, role 
      FROM users 
      WHERE email = $1 AND two_factor_enabled = true`,
     [email]
@@ -201,9 +252,11 @@ export const verify2FALogin = asyncHandler(async (req, res) => {
   const user = result.rows[0];
 
   let isValid = false;
+  let verificationType = 'authenticator';
 
   if (useBackupCode) {
     // Verify backup code
+    verificationType = 'backup_code';
     if (user.two_factor_backup_codes && user.two_factor_backup_codes.length > 0) {
       isValid = verifyBackupCode(code, user.two_factor_backup_codes);
       
@@ -218,28 +271,40 @@ export const verify2FALogin = asyncHandler(async (req, res) => {
         );
       }
     }
-  } else {
-    // Verify OTP code
+  } else if (useEmailFallback) {
+    // Email fallback for lost phone
+    verificationType = 'email_fallback';
     if (!user.otp_code || !user.otp_expires) {
-      return errorResponse(res, 'No 2FA code found. Please request a new one.', 400);
+      return errorResponse(res, 'No email verification code found. Please request one.', 400);
     }
 
     if (new Date() > new Date(user.otp_expires)) {
-      return errorResponse(res, '2FA code has expired. Please request a new one.', 400);
+      return errorResponse(res, 'Email verification code has expired. Please request a new one.', 400);
     }
 
     isValid = user.otp_code === code;
+  } else {
+    // Primary method: Authenticator app (TOTP)
+    verificationType = 'authenticator';
+    if (!user.two_factor_secret) {
+      return errorResponse(res, '2FA secret not found. Please contact support.', 500);
+    }
+
+    // Verify TOTP token from authenticator app
+    isValid = verify2FAToken(code, user.two_factor_secret);
   }
 
   if (!isValid) {
-    return errorResponse(res, 'Invalid 2FA code', 401);
+    return errorResponse(res, 'Invalid verification code', 401);
   }
 
-  // Clear OTP
-  await query(
-    'UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE id = $1',
-    [user.id]
-  );
+  // Clear email OTP if used
+  if (useEmailFallback) {
+    await query(
+      'UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE id = $1',
+      [user.id]
+    );
+  }
 
   // Update last login
   const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0] || 'Unknown';

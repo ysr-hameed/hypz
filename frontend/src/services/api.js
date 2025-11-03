@@ -136,7 +136,7 @@ export const plansAPI = {
 export const paymentAPI = {
   createRazorpayOrder: (data) => api.post('/payments/razorpay/create', data),
   verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
-  createLemonSqueezyCheckout: (data) => api.post('/payments/lemonsqueezy/create', data),
+  createLemonSqueezyCheckout: (data) => api.post('/payments/lemonsqueezy/checkout', data),
   getPaymentHistory: (params) => api.get('/payments/history', { params })
 };
 

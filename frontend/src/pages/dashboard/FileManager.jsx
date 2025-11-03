@@ -76,8 +76,8 @@ const FileManager = () => {
     setLoading(true);
     try {
       const response = await bucketAPI.getAll({ search: searchQuery });
-      // Response interceptor already unwraps data
-      setBuckets(response.buckets || []);
+      // Backend returns: { success, message, data: { buckets: [], pagination: {} } }
+      setBuckets(response?.data?.buckets || []);
       setBreadcrumbs([{ name: 'All Buckets', path: null }]);
     } catch (error) {
       toast.error('Failed to load buckets');
@@ -92,13 +92,14 @@ const FileManager = () => {
     try {
       // Fetch bucket details
       const bucketResponse = await bucketAPI.getById(bucketId);
-      // Response interceptor already unwraps data
-      setCurrentBucket(bucketResponse);
+      // Backend returns: { success, message, data: bucketObject }
+      const bucket = bucketResponse?.data || bucketResponse;
+      setCurrentBucket(bucket);
 
       // Fetch files in bucket
       const filesResponse = await fileAPI.getAll(bucketId);
-      // Response interceptor already unwraps data
-      let fetchedFiles = filesResponse.files || [];
+      // Backend returns: { success, message, data: { files: [], pagination: {} } }
+      let fetchedFiles = filesResponse?.data?.files || [];
 
       // Apply filters
       if (filterType !== 'all') {
@@ -123,7 +124,7 @@ const FileManager = () => {
       // Update breadcrumbs
       setBreadcrumbs([
         { name: 'All Buckets', path: null },
-        { name: bucketResponse.name, path: bucketId }
+        { name: bucket.name, path: bucketId }
       ]);
     } catch (error) {
       toast.error('Failed to load bucket contents');

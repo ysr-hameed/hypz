@@ -294,13 +294,13 @@ export const deleteFile = asyncHandler(async (req, res) => {
     [fileId]
   );
 
-  // Update usage (reduce storage)
+  // Update usage (reduce storage) - using GREATEST to prevent negative values
   await query(
     `INSERT INTO usage_records (user_id, date, storage_bytes, delete_calls, api_calls)
-     VALUES ($1, CURRENT_DATE, -$2, 1, 1)
+     VALUES ($1, CURRENT_DATE, 0, 1, 1)
      ON CONFLICT (user_id, date)
      DO UPDATE SET 
-       storage_bytes = usage_records.storage_bytes - $2,
+       storage_bytes = GREATEST(usage_records.storage_bytes - $2, 0),
        delete_calls = usage_records.delete_calls + 1,
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,

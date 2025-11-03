@@ -28,9 +28,21 @@ const Pricing = () => {
           600000 // 10 minutes cache
         );
         
-        setPlans(response.data || []);
+        // Handle different response structures
+        let plansData = [];
+        if (Array.isArray(response)) {
+          plansData = response;
+        } else if (response && Array.isArray(response.data)) {
+          plansData = response.data;
+        } else if (response && response.rows) {
+          plansData = response.rows;
+        }
+        
+        setPlans(plansData);
       } catch (err) {
+        console.error('Failed to load plans:', err);
         setError(err.message || 'Failed to load plans');
+        setPlans([]); // Ensure plans is always an array
       } finally {
         setLoading(false);
       }
@@ -39,9 +51,9 @@ const Pricing = () => {
     fetchPlans();
   }, []);
 
-  const freePlan = plans.find(p => p.type === 'free' || p.id === 'free_forever');
-  const proPlan = plans.find(p => p.type === 'pro' || p.id === 'pro_monthly');
-  const paygPlan = plans.find(p => p.type === 'payg' || p.id === 'payg_usage');
+  const freePlan = Array.isArray(plans) ? plans.find(p => p.type === 'free' || p.id === 'free_forever') : null;
+  const proPlan = Array.isArray(plans) ? plans.find(p => p.type === 'pro' || p.id === 'pro_monthly') : null;
+  const paygPlan = Array.isArray(plans) ? plans.find(p => p.type === 'payg' || p.id === 'payg_usage') : null;
 
   const formatFeatures = (plan) => {
     if (!plan) return [];

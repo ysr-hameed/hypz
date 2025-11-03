@@ -7,6 +7,8 @@ export const createBucket = asyncHandler(async (req, res) => {
   const { name, visibility = 'private', description, region = 'us-east-1' } = req.body;
   const userId = req.user.id;
 
+  console.log('📦 Creating bucket:', { name, visibility, description, region, userId });
+
   // Generate slug
   const slug = slugify(name) + '-' + Date.now().toString(36);
 
@@ -17,6 +19,7 @@ export const createBucket = asyncHandler(async (req, res) => {
   );
 
   if (existing.rows.length > 0) {
+    console.log('❌ Bucket name already exists');
     return errorResponse(res, 'A bucket with this name already exists', 400);
   }
 
@@ -27,6 +30,8 @@ export const createBucket = asyncHandler(async (req, res) => {
      RETURNING *`,
     [userId, name, slug, visibility, description, region]
   );
+
+  console.log('✅ Bucket created:', result.rows[0]);
 
   // Log activity
   await query(

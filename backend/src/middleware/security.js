@@ -6,7 +6,7 @@ import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import config from '../config/config.js';
 
-// Rate limiting configuration
+// Smart rate limiter - only applies to API key usage, not JWT authenticated requests
 export const apiLimiter = rateLimit({
   windowMs: config.API_RATE_WINDOW * 60 * 1000, // 15 minutes by default
   max: config.API_RATE_LIMIT, // 100 requests per window
@@ -16,6 +16,22 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for JWT authenticated users (dashboard usage)
+  skip: (req) => {
+    // Check if request has JWT token (Bearer token)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return true; // Skip rate limiting for JWT users
+    }
+    
+    // Check if request has query token (for file access)
+    if (req.query.token) {
+      return true; // Skip rate limiting for authenticated file access
+    }
+    
+    // Only apply rate limit to API key requests
+    return false;
+  }
 });
 
 // Strict rate limiter for authentication routes

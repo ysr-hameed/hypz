@@ -71,8 +71,8 @@ const Dashboard = () => {
           () => bucketAPI.getAll(),
           30000 // 30 second cache
         );
-        // Response interceptor already unwraps data
-        setBuckets(bucketsResponse.buckets || []);
+        // Backend returns: { success, message, data: { buckets: [], pagination: {} } }
+        setBuckets(bucketsResponse?.data?.buckets || []);
         setLoadingStages(prev => ({ ...prev, buckets: false }));
 
         // Calculate stats - usage.month contains current usage

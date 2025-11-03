@@ -378,6 +378,7 @@ const Billing = () => {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Date</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Description</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Amount</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Gateway</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Status</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Invoice</th>
                 </tr>
@@ -389,15 +390,22 @@ const Billing = () => {
                       {formatDate(payment.created_at)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
-                      {payment.billing_reason || 'Subscription payment'}
+                      {payment.plan_name || payment.billing_reason || 'Subscription payment'}
                     </td>
                     <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                       {formatCurrency(payment.amount)}
                     </td>
                     <td className="py-3 px-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                        {payment.payment_gateway === 'lemonsqueezy' ? 'Lemon Squeezy' : payment.payment_gateway || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        payment.status === 'completed' 
+                        payment.status === 'completed' || payment.status === 'paid'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                          : payment.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
                           : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
                       }`}>
                         {payment.status}

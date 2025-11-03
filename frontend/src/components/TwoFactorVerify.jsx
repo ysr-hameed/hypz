@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { Shield, ArrowLeft, Loader2, CheckCircle2, Smartphone, Mail } from 'lucide-react';
 import axios from 'axios';
 import config from '../config/env';
 import { validate2FAToken } from '../utils/validation';
@@ -10,6 +10,7 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [useBackup, setUseBackup] = useState(false);
+  const [useEmailFallback, setUseEmailFallback] = useState(false);
   const [backupCode, setBackupCode] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
   const [trustDevice, setTrustDevice] = useState(false);
@@ -19,24 +20,22 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   const navigate = useNavigate();
   const hasSentCode = useRef(false); // Prevent duplicate 2FA code sending
 
-  // Auto-send 2FA code on mount (only once)
+  // Don't auto-send code anymore since we're using authenticator app
+  // Only send if user requests email fallback
   useEffect(() => {
-    // Prevent duplicate sends in React StrictMode
-    if (hasSentCode.current) return;
-    
-    hasSentCode.current = true;
-    handleSend2FACode();
+    // No automatic code sending for authenticator app
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSend2FACode = async () => {
+  const handleSendEmailFallback = async () => {
     setSendingCode(true);
     setError('');
     
     try {
-      await axios.post(`${config.API_URL}/auth/2fa/send-code`, { email });
+      await axios.post(`${config.API_URL}/auth/2fa/send-email-fallback`, { email });
+      setUseEmailFallback(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send 2FA code');
+      setError(err.response?.data?.message || 'Failed to send email verification code');
     } finally {
       setSendingCode(false);
     }
@@ -66,7 +65,8 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   };
 
   const handleVerify = async (codeValue = code.join('')) => {
-    if (!useBackup) {
+    if (!useBackup && !useEmailFallback) {
+      // Authenticator app code validation
       const validationErrors = validate2FAToken(codeValue);
       if (validationErrors.length > 0) {
         setError(validationErrors[0]);
@@ -82,6 +82,7 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
         email,
         code: useBackup ? backupCode : codeValue,
         useBackupCode: useBackup,
+        useEmailFallback: useEmailFallback,
         trustDevice: trustDevice,
         deviceName: deviceName || undefined
       });
@@ -133,7 +134,11 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-primary-600" />
+            {useEmailFallback ? (
+              <Mail className="w-8 h-8 text-primary-600" />
+            ) : (
+              <Shield className="w-8 h-8 text-primary-600" />
+            )}
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -142,7 +147,9 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {useBackup 
               ? 'Enter one of your backup codes'
-              : `Enter the 6-digit code sent to ${email}`
+              : useEmailFallback
+              ? `Enter the 6-digit code sent to ${email}`
+              : 'Enter the 6-digit code from your authenticator app'
             }
           </p>
         </div>
@@ -206,19 +213,47 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
               )}
             </button>
 
-            <div className="mt-6 text-center">
-              <button
-                onClick={handleSend2FACode}
-                disabled={sendingCode}
-                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm"
-              >
-                {sendingCode ? 'Sending...' : 'Resend code'}
-              </button>
-            </div>
+            {useEmailFallback && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={handleSendEmailFallback}
+                  disabled={sendingCode}
+                  className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm"
+                >
+                  {sendingCode ? 'Sending...' : 'Resend code'}
+                </button>
+              </div>
+            )}
 
-            <div className="mt-4 text-center">
+            <div className="mt-4 flex flex-col gap-2">
+              {!useEmailFallback && (
+                <button
+                  onClick={handleSendEmailFallback}
+                  disabled={sendingCode}
+                  type="button"
+                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm flex items-center justify-center gap-2"
+                >
+                  <Mail className="w-4 h-4" />
+                  {sendingCode ? 'Sending...' : 'Lost phone? Use email instead'}
+                </button>
+              )}
+              {useEmailFallback && (
+                <button
+                  onClick={() => {
+                    setUseEmailFallback(false);
+                    setCode(['', '', '', '', '', '']);
+                    setError('');
+                  }}
+                  type="button"
+                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm flex items-center justify-center gap-2"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  Use authenticator app
+                </button>
+              )}
               <button
                 onClick={() => setUseBackup(true)}
+                type="button"
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm"
               >
                 Use backup code instead

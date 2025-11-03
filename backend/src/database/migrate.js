@@ -463,6 +463,10 @@ const createTables = async () => {
         description TEXT,
         popular BOOLEAN DEFAULT false,
         
+        -- LemonSqueezy Integration
+        lemonsqueezy_variant_id VARCHAR(100),
+        lemonsqueezy_product_id VARCHAR(100),
+        
         -- Storage & Bandwidth
         storage_gb INTEGER DEFAULT 0, -- 0 means unlimited for PAYG
         bandwidth_gb INTEGER DEFAULT 0, -- 0 means pay per use

@@ -29,8 +29,15 @@ const Buckets = () => {
     try {
       setLoading(true);
       const response = await bucketAPI.getAll({ search: searchQuery });
-      // Response interceptor already unwraps data, so response.buckets not response.data.buckets
-      setBuckets(response.buckets || []);
+      console.log('📦 Fetch buckets response:', response);
+      
+      // Backend returns: { success, message, data: { buckets: [], pagination: {} } }
+      // Axios interceptor unwraps response.data
+      // So we get: { success, message, data: { buckets: [], pagination: {} } }
+      const bucketsData = response?.data?.buckets || [];
+      console.log('📦 Buckets data:', bucketsData);
+      
+      setBuckets(bucketsData);
     } catch (error) {
       console.error('Failed to fetch buckets:', error);
       toast.error('Failed to load buckets');
@@ -62,14 +69,18 @@ const Buckets = () => {
 
     try {
       setCreating(true);
-      await bucketAPI.create(bucketForm);
+      console.log('Creating bucket with data:', bucketForm);
+      const response = await bucketAPI.create(bucketForm);
+      console.log('Bucket created successfully:', response);
       toast.success('Bucket created successfully!');
       setShowCreateModal(false);
       setBucketForm({ name: '', visibility: 'private', description: '' });
       fetchBuckets();
     } catch (error) {
       console.error('Failed to create bucket:', error);
-      toast.error(error.response?.data?.message || 'Failed to create bucket');
+      console.error('Error response:', error.response);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create bucket';
+      toast.error(errorMessage);
     } finally {
       setCreating(false);
     }

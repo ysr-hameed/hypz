@@ -6,6 +6,7 @@ import {
   sendVerificationOTP,
   verifyEmailOTP,
   send2FACode,
+  send2FAEmailFallback,
   verify2FALogin,
   setup2FA,
   enable2FA,
@@ -69,7 +70,8 @@ router.post('/otp/send', emailValidation, validate, sendVerificationOTP);
 router.post('/otp/verify', otpValidation, validate, verifyEmailOTP);
 
 // 2FA Login routes (public)
-router.post('/2fa/send-code', emailValidation, validate, send2FACode);
+router.post('/2fa/send-code', emailValidation, validate, send2FACode); // Legacy
+router.post('/2fa/send-email-fallback', emailValidation, validate, send2FAEmailFallback); // New: Email fallback for lost phone
 router.post('/2fa/verify-login', verify2FAValidation, validate, verify2FALogin);
 
 // 2FA Management routes (protected)

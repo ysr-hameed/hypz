@@ -12,7 +12,8 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
     const fetchConfig = async () => {
       try {
         const response = await configAPI.getPublicConfig();
-        setConfig(response.data);
+        // Response interceptor already unwraps data
+        setConfig(response);
       } catch (err) {
         console.error('Failed to fetch config:', err);
       }
@@ -29,19 +30,32 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
       setLoading(true);
       setError(null);
 
+      // Check if plan has LemonSqueezy variant ID
+      if (!plan.lemonsqueezy_variant_id) {
+        setError('This plan is not available for purchase yet. Please contact support or try another plan.');
+        setLoading(false);
+        return;
+      }
+
       // Create checkout session
       const response = await paymentAPI.createLemonSqueezyCheckout({
         variantId: plan.lemonsqueezy_variant_id,
         planId: plan.id
       });
 
-      const { checkoutUrl } = response.data;
+      // Response interceptor already unwraps data
+      const { checkoutUrl } = response;
+
+      if (!checkoutUrl) {
+        throw new Error('No checkout URL received');
+      }
 
       // Redirect to Lemon Squeezy checkout
       window.location.href = checkoutUrl;
 
     } catch (err) {
-      setError(err.response?.data?.message || 'Payment failed. Please try again.');
+      console.error('LemonSqueezy payment error:', err);
+      setError(err.message || err.response?.data?.message || 'Payment failed. Please try again.');
       setLoading(false);
     }
   };

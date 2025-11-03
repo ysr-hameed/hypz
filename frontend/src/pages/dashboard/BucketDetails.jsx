@@ -27,8 +27,8 @@ const BucketDetails = () => {
   const fetchBucketDetails = async () => {
     try {
       const response = await bucketAPI.getById(bucketId);
-      // Response interceptor already unwraps data
-      setBucket(response);
+      // Backend returns: { success, message, data: bucketObject }
+      setBucket(response?.data || response);
     } catch (error) {
       console.error('Failed to fetch bucket details:', error);
       toast.error('Failed to load bucket details');
@@ -42,8 +42,8 @@ const BucketDetails = () => {
     try {
       setLoading(true);
       const response = await fileAPI.getAll(bucketId);
-      // Response interceptor already unwraps data
-      setFiles(response.files || []);
+      // Backend returns: { success, message, data: { files: [], pagination: {} } }
+      setFiles(response?.data?.files || []);
     } catch (error) {
       console.error('Failed to fetch files:', error);
       toast.error('Failed to load files');
@@ -74,8 +74,10 @@ const BucketDetails = () => {
         formData.append('file', file);
 
         await fileAPI.upload(bucketId, formData, (progressEvent) => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(progress);
+          if (progressEvent && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
+          }
         });
       }
 
@@ -87,7 +89,8 @@ const BucketDetails = () => {
       fetchBucketDetails();
     } catch (error) {
       console.error('Upload failed:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload files');
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to upload files';
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -101,11 +104,13 @@ const BucketDetails = () => {
     try {
       await fileAPI.delete(confirmModal.fileId);
       toast.success('File deleted successfully');
+      setConfirmModal({ isOpen: false, fileId: null, fileName: '' });
       fetchFiles();
       fetchBucketDetails();
     } catch (error) {
       console.error('Failed to delete file:', error);
-      toast.error('Failed to delete file');
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete file';
+      toast.error(errorMessage);
     }
   };
 
@@ -132,6 +137,20 @@ const BucketDetails = () => {
   const copyToClipboard = (text, label = 'URL') => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  // Generate authenticated URL for private files
+  const getAuthenticatedUrl = (fileUrl) => {
+    if (!fileUrl) return '';
+    
+    // If bucket is private, add token to URL
+    if (bucket?.visibility === 'private') {
+      const token = localStorage.getItem('token');
+      const separator = fileUrl.includes('?') ? '&' : '?';
+      return `${fileUrl}${separator}token=${token}`;
+    }
+    
+    return fileUrl;
   };
 
   const formatBytes = (bytes) => {
@@ -301,14 +320,14 @@ const BucketDetails = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end space-x-2">
                         <button
-                          onClick={() => copyToClipboard(file.url, 'URL')}
+                          onClick={() => copyToClipboard(getAuthenticatedUrl(file.url), 'URL')}
                           title="Copy URL"
                           className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg transition"
                         >
                           <Copy size={16} />
                         </button>
                         <a
-                          href={file.url}
+                          href={getAuthenticatedUrl(file.url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Open in new tab"
