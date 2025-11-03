@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import config from '../config/config.js';
 import { query } from '../config/database.js';
 
@@ -80,15 +81,17 @@ export const authenticateApiKey = async (req, res, next) => {
   try {
     const apiKey = req.headers['x-api-key'] || req.query.api_key;
 
+    console.log('🔑 API Key authentication attempt');
+
     if (!apiKey) {
+      console.log('❌ No API key provided');
       return res.status(401).json({
         success: false,
         message: 'API key required'
       });
     }
 
-    // Hash the API key (assuming it's stored hashed in DB)
-    const bcrypt = await import('bcryptjs');
+    console.log('🔍 API Key received:', apiKey.substring(0, 15) + '...');
     
     // Get all active API keys (in production, optimize this)
     const result = await query(
@@ -100,15 +103,25 @@ export const authenticateApiKey = async (req, res, next) => {
        AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`
     );
 
+    console.log(`📊 Found ${result.rows.length} active API keys in database`);
+
     let matchedKey = null;
     for (const key of result.rows) {
-      if (await bcrypt.compare(apiKey, key.key_hash)) {
-        matchedKey = key;
-        break;
+      console.log(`🔍 Comparing with key: ${key.key_prefix}`);
+      try {
+        const isMatch = await bcrypt.compare(apiKey, key.key_hash);
+        console.log(`  Match result: ${isMatch}`);
+        if (isMatch) {
+          matchedKey = key;
+          break;
+        }
+      } catch (compareError) {
+        console.error('  Bcrypt compare error:', compareError.message);
       }
     }
 
     if (!matchedKey) {
+      console.log('❌ API Key authentication failed - Invalid or expired key');
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired API key'
@@ -119,6 +132,8 @@ export const authenticateApiKey = async (req, res, next) => {
     if (matchedKey.role === 'admin') {
       console.warn('⚠️  Admin attempted API key access:', matchedKey.email);
     }
+
+    console.log('✅ API Key authenticated successfully for user:', matchedKey.email);
 
     // Update last used
     await query(
@@ -138,10 +153,12 @@ export const authenticateApiKey = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('API Key authentication error:', error);
+    console.error('❌ API Key authentication error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
-      message: 'Authentication failed'
+      message: 'Authentication failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -156,25 +173,70 @@ export const requirePermission = (requiredPermission) => {
 
     // Check if API key has the required permission
     if (!req.apiKey || !req.apiKey.permissions) {
+      console.log('❌ Permission check failed - API key missing permissions');
       return res.status(403).json({
         success: false,
         message: 'API key missing permissions'
       });
     }
 
-    const permissions = Array.isArray(req.apiKey.permissions) 
-      ? req.apiKey.permissions 
-      : [];
-
-    // Check for specific permission or wildcard
-    if (permissions.includes(requiredPermission) || permissions.includes('*')) {
-      return next();
+    // Parse permissions if it's a string (from DB)
+    let permissions = req.apiKey.permissions;
+    if (typeof permissions === 'string') {
+      try {
+        permissions = JSON.parse(permissions);
+      } catch (e) {
+        console.error('Error parsing permissions:', e);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid API key permissions format'
+        });
+      }
     }
 
+    console.log('🔍 Checking permission:', requiredPermission, 'against:', permissions);
+
+    // Handle array-based permissions (e.g., ['files:write', 'buckets:read', '*'])
+    if (Array.isArray(permissions)) {
+      if (permissions.includes(requiredPermission) || permissions.includes('*')) {
+        console.log('✅ Permission granted (array-based)');
+        return next();
+      }
+      console.log('❌ Permission denied (array-based)');
+      return res.status(403).json({
+        success: false,
+        message: `API key missing required permission: ${requiredPermission}`,
+        required: requiredPermission,
+        available: permissions
+      });
+    }
+
+    // Handle object-based permissions (e.g., { read: true, write: true, delete: false })
+    if (typeof permissions === 'object' && permissions !== null) {
+      // Extract action from permission string (e.g., 'files:write' -> 'write', 'buckets:read' -> 'read')
+      const action = requiredPermission.split(':')[1] || requiredPermission;
+      
+      console.log('🔍 Extracted action:', action, 'from permission:', requiredPermission);
+      
+      // Check if the action is allowed
+      if (permissions[action] === true || permissions['*'] === true) {
+        console.log('✅ Permission granted (object-based)');
+        return next();
+      }
+
+      console.log('❌ Permission denied (object-based)');
+      return res.status(403).json({
+        success: false,
+        message: `API key missing required permission: ${requiredPermission}`,
+        required: requiredPermission,
+        available: permissions
+      });
+    }
+
+    console.log('❌ Invalid permissions format');
     return res.status(403).json({
       success: false,
-      message: `API key missing required permission: ${requiredPermission}`,
-      required: requiredPermission,
+      message: 'Invalid API key permissions format',
       available: permissions
     });
   };
