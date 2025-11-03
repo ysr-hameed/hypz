@@ -20,9 +20,13 @@ class HypzClient {
   async _request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
-      'Content-Type': 'application/json',
       ...options.headers
     };
+
+    // Only add Content-Type for JSON if not uploading files
+    if (options.body && typeof options.body === 'string') {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // Add authentication
     if (this.apiKey) {
@@ -41,9 +45,14 @@ class HypzClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new HypzError(data.message || 'Request failed', response.status, data);
+        throw new HypzError(
+          data.message || 'Request failed', 
+          response.status, 
+          data
+        );
       }
 
+      // Return the data directly (backend wraps it in { success, data, message })
       return data;
     } catch (error) {
       if (error instanceof HypzError) throw error;
@@ -62,11 +71,13 @@ class HypzClient {
     formData.append('file', file);
     Object.keys(data).forEach(key => {
       if (data[key] !== undefined) {
+        // Convert objects/arrays to JSON strings
         formData.append(key, typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]);
       }
     });
 
     const headers = {};
+    // Don't set Content-Type - browser sets it automatically with boundary
     if (this.apiKey) {
       headers['X-API-Key'] = this.apiKey;
     } else if (this.token) {
@@ -84,7 +95,11 @@ class HypzClient {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new HypzError(result.message || 'Upload failed', response.status, result);
+        throw new HypzError(
+          result.message || 'Upload failed', 
+          response.status, 
+          result
+        );
       }
 
       return result;

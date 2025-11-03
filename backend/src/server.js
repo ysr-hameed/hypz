@@ -89,6 +89,9 @@ app.get(`/api/${config.API_VERSION}`, (req, res) => {
   });
 });
 
+// Handle preflight requests globally
+app.options('*', cors(corsOptions));
+
 // Apply rate limiting to API routes
 app.use(`/api/${config.API_VERSION}`, apiLimiter);
 

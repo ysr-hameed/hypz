@@ -33,8 +33,8 @@ const initializeB2 = async () => {
   }
 };
 
-// Upload file to B2
-export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = false) => {
+// Upload file to B2 with progress tracking
+export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = false, onProgress = null) => {
   try {
     if (!b2) {
       await initializeB2();
@@ -52,6 +52,9 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = fals
       throw new Error(`Backblaze B2 ${isPublic ? 'public' : 'private'} bucket not configured`);
     }
 
+    // Report progress: Getting upload URL (10%)
+    if (onProgress) onProgress(10);
+
     // Get upload URL
     const uploadUrlResponse = await b2.getUploadUrl({
       bucketId: bucketId
@@ -60,8 +63,14 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = fals
     const uploadUrl = uploadUrlResponse.data.uploadUrl;
     const uploadAuthToken = uploadUrlResponse.data.authorizationToken;
 
+    // Report progress: Calculating hash (30%)
+    if (onProgress) onProgress(30);
+
     // Generate SHA1 hash of file
     const hash = crypto.createHash('sha1').update(fileBuffer).digest('hex');
+
+    // Report progress: Uploading to B2 (50%)
+    if (onProgress) onProgress(50);
 
     // Upload file
     const uploadResponse = await b2.uploadFile({
@@ -74,6 +83,9 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = fals
         'Content-Type': mimeType
       }
     });
+
+    // Report progress: Upload complete (90%)
+    if (onProgress) onProgress(90);
 
     // Generate download URL
     const fileUrl = `${downloadUrl}/file/${bucketName}/${fileName}`;

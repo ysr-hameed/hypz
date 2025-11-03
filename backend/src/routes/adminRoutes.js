@@ -9,13 +9,14 @@ import {
   getSystemStats,
   getActivityLogs
 } from '../controllers/adminController.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, blockApiKeyAccess } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
 
-// All admin routes require authentication and admin role
+// All admin routes require authentication, admin role, and BLOCK API key access
 router.use(authenticate);
+router.use(blockApiKeyAccess); // Admin routes cannot be accessed via API keys
 router.use(requireAdmin);
 
 // Admin Settings

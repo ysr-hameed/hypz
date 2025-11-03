@@ -58,19 +58,39 @@ export const uploadLimiter = rateLimit({
 // CORS configuration
 export const corsOptions = {
   origin: function (origin, callback) {
+    console.log('🌐 CORS check - Origin:', origin, 'Environment:', config.NODE_ENV);
+    
+    // In development, be very permissive
+    if (config.NODE_ENV === 'development') {
+      // Always allow in development
+      return callback(null, true);
+    }
+    
+    // Production whitelist
     const allowedOrigins = [
       config.FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:3000',
-      'http://localhost:5000'
+      'http://localhost:5000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5000'
     ];
 
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (mobile apps, Postman, curl, server-to-server, etc.)
+    if (!origin) {
+      return callback(null, true);
     }
+    
+    // Check against whitelist
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // Log and reject
+    console.warn('⚠️  CORS blocked origin:', origin);
+    console.warn('   Allowed origins:', allowedOrigins);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,

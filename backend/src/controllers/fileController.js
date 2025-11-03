@@ -71,56 +71,66 @@ export const uploadFile = asyncHandler(async (req, res) => {
       cdnUrl = `${config.FRONTEND_URL}/cdn${fileUrl}`;
     }
 
-    // Store file info in database
-    const result = await query(
-      `INSERT INTO files (
-        bucket_id, user_id, filename, original_name, path, size,
-        mime_type, extension, url, cdn_url, is_public, tags, metadata, b2_file_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING *`,
-      [
-        bucketId,
-        userId,
-        uniqueFilename,
-        req.file.originalname,
-        filePath,
-        req.file.size,
-        req.file.mimetype,
-        path.extname(req.file.originalname),
-        fileUrl,
-        cdnUrl,
-        isPublic,
-        Array.isArray(tags) ? tags : [],
-        typeof metadata === 'object' ? metadata : {},
-        b2FileId || null
-      ]
-    );
+    // Use a transaction for database operations to speed things up
+    const client = await query('BEGIN');
+    
+    try {
+      // Store file info in database
+      const result = await query(
+        `INSERT INTO files (
+          bucket_id, user_id, filename, original_name, path, size,
+          mime_type, extension, url, cdn_url, is_public, tags, metadata, b2_file_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *`,
+        [
+          bucketId,
+          userId,
+          uniqueFilename,
+          req.file.originalname,
+          filePath,
+          req.file.size,
+          req.file.mimetype,
+          path.extname(req.file.originalname),
+          fileUrl,
+          cdnUrl,
+          isPublic,
+          Array.isArray(tags) ? tags : [],
+          typeof metadata === 'object' ? metadata : {},
+          b2FileId || null
+        ]
+      );
 
-    // Update usage
-    await query(
-      `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
-       VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
-       ON CONFLICT (user_id, date)
-       DO UPDATE SET 
-         storage_bytes = usage_records.storage_bytes + $2,
-         upload_bytes = usage_records.upload_bytes + $2,
-         upload_calls = usage_records.upload_calls + 1,
-         api_calls = usage_records.api_calls + 1,
-         bandwidth_bytes = usage_records.bandwidth_bytes + $2,
-         updated_at = CURRENT_TIMESTAMP`,
-      [userId, req.file.size]
-    );
+      // Update usage
+      await query(
+        `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
+         VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET 
+           storage_bytes = usage_records.storage_bytes + $2,
+           upload_bytes = usage_records.upload_bytes + $2,
+           upload_calls = usage_records.upload_calls + 1,
+           api_calls = usage_records.api_calls + 1,
+           bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+           updated_at = CURRENT_TIMESTAMP`,
+        [userId, req.file.size]
+      );
 
-    // Log activity
-    await query(
-      'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
-      [userId, 'file_uploaded', 'file', result.rows[0].id, { filename: req.file.originalname, size: req.file.size }]
-    );
+      // Log activity (non-blocking - we can make this async)
+      query(
+        'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
+        [userId, 'file_uploaded', 'file', result.rows[0].id, { filename: req.file.originalname, size: req.file.size }]
+      ).catch(err => console.error('Activity log error:', err));
 
-    successResponse(res, {
-      ...result.rows[0],
-      formattedSize: formatBytes(result.rows[0].size)
-    }, 'File uploaded successfully', 201);
+      await query('COMMIT');
+
+      successResponse(res, {
+        ...result.rows[0],
+        formattedSize: formatBytes(result.rows[0].size)
+      }, 'File uploaded successfully', 201);
+    } catch (dbError) {
+      await query('ROLLBACK');
+      throw dbError;
+    }
   } catch (error) {
     console.error('Upload error:', error);
     return errorResponse(res, 'Failed to upload file: ' + error.message, 500);

@@ -8,7 +8,7 @@ import {
   deleteFile,
   updateFile
 } from '../controllers/fileController.js';
-import { authenticate, authenticateApiKey } from '../middleware/auth.js';
+import { authenticate, authenticateApiKey, requirePermission, requireOwnership } from '../middleware/auth.js';
 import { uploadLimiter } from '../middleware/security.js';
 
 const router = express.Router();
@@ -23,12 +23,12 @@ const authMiddleware = (req, res, next) => {
   return authenticate(req, res, next);
 };
 
-// Routes
-router.post('/:bucketId/upload', authMiddleware, uploadLimiter, upload.single('file'), uploadFile);
-router.get('/:bucketId/files', authMiddleware, getFiles);
-router.get('/file/:fileId', authMiddleware, getFile);
-router.get('/file/:fileId/download', authMiddleware, downloadFile);
-router.delete('/file/:fileId', authMiddleware, deleteFile);
-router.patch('/file/:fileId', authMiddleware, updateFile);
+// Routes - All routes enforce ownership and permissions
+router.post('/:bucketId/upload', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), uploadLimiter, upload.single('file'), uploadFile);
+router.get('/:bucketId/files', authMiddleware, requirePermission('files:read'), requireOwnership('bucket'), getFiles);
+router.get('/file/:fileId', authMiddleware, requirePermission('files:read'), requireOwnership('file'), getFile);
+router.get('/file/:fileId/download', authMiddleware, requirePermission('files:read'), requireOwnership('file'), downloadFile);
+router.delete('/file/:fileId', authMiddleware, requirePermission('files:delete'), requireOwnership('file'), deleteFile);
+router.patch('/file/:fileId', authMiddleware, requirePermission('files:write'), requireOwnership('file'), updateFile);
 
 export default router;

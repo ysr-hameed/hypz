@@ -8,7 +8,7 @@ import {
   deleteApiKey,
   regenerateApiKey
 } from '../controllers/apiKeyController.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, blockApiKeyAccess, requireOwnership } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
@@ -35,12 +35,12 @@ const updateApiKeyValidation = [
   validate
 ];
 
-// Routes
-router.post('/', authenticate, createApiKeyValidation, createApiKey);
-router.get('/', authenticate, getApiKeys);
-router.get('/:keyId', authenticate, getApiKey);
-router.put('/:keyId', authenticate, updateApiKeyValidation, updateApiKey);
-router.delete('/:keyId', authenticate, deleteApiKey);
-router.post('/:keyId/regenerate', authenticate, regenerateApiKey);
+// Routes - API keys can only be managed via dashboard (JWT), not via other API keys
+router.post('/', authenticate, blockApiKeyAccess, createApiKeyValidation, createApiKey);
+router.get('/', authenticate, blockApiKeyAccess, getApiKeys);
+router.get('/:keyId', authenticate, blockApiKeyAccess, requireOwnership('apikey'), getApiKey);
+router.put('/:keyId', authenticate, blockApiKeyAccess, requireOwnership('apikey'), updateApiKeyValidation, updateApiKey);
+router.delete('/:keyId', authenticate, blockApiKeyAccess, requireOwnership('apikey'), deleteApiKey);
+router.post('/:keyId/regenerate', authenticate, blockApiKeyAccess, requireOwnership('apikey'), regenerateApiKey);
 
 export default router;

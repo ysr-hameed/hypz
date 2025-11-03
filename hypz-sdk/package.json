@@ -1,0 +1,50 @@
+{
+  "name": "hypz-cloud-sdk",
+  "version": "1.0.1",
+  "description": "Official JavaScript SDK for Hypz Cloud Storage",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build",
+    "test": "jest"
+  },
+  "keywords": [
+    "hypz",
+    "cloud-storage",
+    "s3",
+    "file-upload",
+    "storage",
+    "api",
+    "sdk",
+    "bucket",
+    "cdn"
+  ],
+  "author": "Hypz Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ysr-hameed/hypz.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ysr-hameed/hypz/issues"
+  },
+  "homepage": "https://hypz.io",
+  "dependencies": {
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/node": "^20.10.6",
+    "rollup": "^4.9.1",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -52,6 +52,7 @@ export const authenticate = async (req, res, next) => {
 
       // Attach user to request
       req.user = user;
+      req.authMethod = 'jwt'; // Track authentication method
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
@@ -91,10 +92,11 @@ export const authenticateApiKey = async (req, res, next) => {
     
     // Get all active API keys (in production, optimize this)
     const result = await query(
-      `SELECT ak.*, u.id as user_id, u.email, u.plan_id 
+      `SELECT ak.*, u.id as user_id, u.email, u.plan_id, u.role, u.is_active as user_is_active
        FROM api_keys ak 
        JOIN users u ON ak.user_id = u.id 
        WHERE ak.is_active = true 
+       AND u.is_active = true
        AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`
     );
 
@@ -109,8 +111,13 @@ export const authenticateApiKey = async (req, res, next) => {
     if (!matchedKey) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid API key'
+        message: 'Invalid or expired API key'
       });
+    }
+
+    // Security: Block admin/platform operations via API key
+    if (matchedKey.role === 'admin') {
+      console.warn('⚠️  Admin attempted API key access:', matchedKey.email);
     }
 
     // Update last used
@@ -123,9 +130,11 @@ export const authenticateApiKey = async (req, res, next) => {
     req.user = {
       id: matchedKey.user_id,
       email: matchedKey.email,
-      plan_id: matchedKey.plan_id
+      plan_id: matchedKey.plan_id,
+      role: matchedKey.role || 'user'
     };
     req.apiKey = matchedKey;
+    req.authMethod = 'api_key'; // Track authentication method
 
     next();
   } catch (error) {
@@ -135,6 +144,116 @@ export const authenticateApiKey = async (req, res, next) => {
       message: 'Authentication failed'
     });
   }
+};
+
+// Check API key permissions
+export const requirePermission = (requiredPermission) => {
+  return (req, res, next) => {
+    // JWT users (dashboard) have all permissions
+    if (req.authMethod !== 'api_key') {
+      return next();
+    }
+
+    // Check if API key has the required permission
+    if (!req.apiKey || !req.apiKey.permissions) {
+      return res.status(403).json({
+        success: false,
+        message: 'API key missing permissions'
+      });
+    }
+
+    const permissions = Array.isArray(req.apiKey.permissions) 
+      ? req.apiKey.permissions 
+      : [];
+
+    // Check for specific permission or wildcard
+    if (permissions.includes(requiredPermission) || permissions.includes('*')) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `API key missing required permission: ${requiredPermission}`,
+      required: requiredPermission,
+      available: permissions
+    });
+  };
+};
+
+// Ensure user can only access their own resources
+export const requireOwnership = (resourceType) => {
+  return async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      let resourceId;
+      let checkQuery;
+
+      // Get resource ID from params
+      switch (resourceType) {
+        case 'bucket':
+          resourceId = req.params.bucketId || req.params.id;
+          checkQuery = 'SELECT user_id FROM buckets WHERE id = $1';
+          break;
+        
+        case 'file':
+          resourceId = req.params.fileId || req.params.id;
+          checkQuery = 'SELECT user_id FROM files WHERE id = $1';
+          break;
+        
+        case 'apikey':
+          resourceId = req.params.keyId || req.params.id;
+          checkQuery = 'SELECT user_id FROM api_keys WHERE id = $1';
+          break;
+        
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid resource type'
+          });
+      }
+
+      if (!resourceId) {
+        return next(); // No resource ID to check (e.g., listing resources)
+      }
+
+      // Check ownership
+      const result = await query(checkQuery, [resourceId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found`
+        });
+      }
+
+      if (result.rows[0].user_id !== userId) {
+        console.warn(`⚠️  Unauthorized access attempt: User ${userId} tried to access ${resourceType} ${resourceId}`);
+        return res.status(403).json({
+          success: false,
+          message: `You don't have permission to access this ${resourceType}`
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Ownership check error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Authorization failed'
+      });
+    }
+  };
+};
+
+// Block API key access to admin/platform routes
+export const blockApiKeyAccess = (req, res, next) => {
+  if (req.authMethod === 'api_key') {
+    return res.status(403).json({
+      success: false,
+      message: 'This endpoint cannot be accessed with API keys. Please use dashboard authentication.'
+    });
+  }
+  next();
 };
 
 // Role-based authorization middleware

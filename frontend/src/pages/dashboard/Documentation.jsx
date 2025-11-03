@@ -298,8 +298,13 @@ const response = await fetch('${API_BASE_URL}/buckets', {
   })
 });
 
-const bucket = await response.json();
-console.log('Bucket created:', bucket.data.id);`}
+const result = await response.json();
+if (result.success) {
+  console.log('Bucket created:', result.data.id);
+  console.log('Bucket name:', result.data.name);
+} else {
+  console.error('Error:', result.message);
+}`}
                             language="javascript"
                           />
                         </div>
@@ -317,19 +322,27 @@ console.log('Bucket created:', bucket.data.id);`}
                             code={`// Upload a file
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
+// Note: tags and metadata must be JSON strings
 formData.append('tags', JSON.stringify(['user-avatar', 'profile']));
+formData.append('metadata', JSON.stringify({ userId: '123' }));
 
 const uploadResponse = await fetch(\`${API_BASE_URL}/buckets/\${bucketId}/files\`, {
   method: 'POST',
   headers: {
     'X-API-Key': apiKey
+    // Don't set Content-Type - browser sets it automatically for FormData
   },
   body: formData
 });
 
-const file = await uploadResponse.json();
-console.log('File uploaded:', file.data.url);
-console.log('CDN URL:', file.data.cdn_url);`}
+const result = await uploadResponse.json();
+if (result.success) {
+  console.log('File uploaded:', result.data.url);
+  console.log('CDN URL:', result.data.cdn_url);
+  console.log('File ID:', result.data.id);
+} else {
+  console.error('Upload failed:', result.message);
+}`}
                             language="javascript"
                           />
                         </div>
@@ -353,144 +366,386 @@ console.log('CDN URL:', file.data.cdn_url);`}
                 {activeTab === 'sdk' && (
                   <div>
                     <Section title="JavaScript SDK" icon={Package}>
-                      <p className="text-gray-600 dark:text-gray-300 mb-6">
-                        The Hypz JavaScript SDK provides an easy-to-use interface for all API operations. 
-                        It handles authentication, error handling, and provides TypeScript-friendly methods.
-                      </p>
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
+                        <div className="flex items-start gap-4">
+                          <Package className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" size={32} />
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                              Official NPM Package 🎉
+                            </h3>
+                            <p className="text-gray-700 dark:text-gray-300 mb-3">
+                              Install our professional TypeScript-first SDK with full type definitions, 
+                              error handling, and support for both Node.js and browsers.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
+                                ✓ TypeScript Support
+                              </span>
+                              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
+                                ✓ CommonJS + ESM
+                              </span>
+                              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
+                                ✓ Browser & Node.js
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Installation</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-4">
+                        Install via npm or yarn:
+                      </p>
                       <div className="mb-6">
                         <CodeBlock
-                          id="sdk-install-cdn"
-                          code={`<!-- Via CDN (Browser) -->
-<script src="${window.location.origin}/hypz-sdk.js"></script>`}
-                          language="html"
+                          id="sdk-install-npm"
+                          code={`npm install hypz-cloud-sdk`}
+                          language="bash"
                         />
                       </div>
 
                       <div className="mb-6">
                         <CodeBlock
-                          id="sdk-install-download"
-                          code={`// Or download hypz-sdk.js and include it in your project
-// Available at: ${window.location.origin}/hypz-sdk.js`}
+                          id="sdk-install-yarn"
+                          code={`yarn add hypz-cloud-sdk`}
+                          language="bash"
+                        />
+                      </div>
+
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 mt-8">Initialize Client</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-4">
+                        Import and initialize the SDK with your API key:
+                      </p>
+                      
+                      <div className="mb-6">
+                        <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">CommonJS (Node.js)</h4>
+                        <CodeBlock
+                          id="sdk-init-cjs"
+                          code={`const { Hypz } = require('hypz-cloud-sdk');
+
+const hypz = new Hypz({
+  apiKey: process.env.HYPZ_API_KEY,
+  baseURL: '${API_BASE_URL}' // Optional
+});`}
                           language="javascript"
                         />
                       </div>
 
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Initialize Client</h3>
-                      <CodeBlock
-                        id="sdk-init"
-                        code={`// Initialize with API key
-const client = new HypzClient({
-  baseURL: '${API_BASE_URL}',
+                      <div className="mb-6">
+                        <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">ES Modules (Modern JavaScript/TypeScript)</h4>
+                        <CodeBlock
+                          id="sdk-init-esm"
+                          code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: process.env.HYPZ_API_KEY,
+  baseURL: '${API_BASE_URL}' // Optional
+});`}
+                          language="typescript"
+                        />
+                      </div>
+
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-8">
+                        <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2 flex items-center gap-2">
+                          <Shield size={20} />
+                          Security Best Practice
+                        </h4>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                          Never hardcode your API key! Always use environment variables (.env file) and add .env to your .gitignore.
+                        </p>
+                      </div>
+
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 mt-8">Complete Examples</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-6">
+                        Copy and paste these working examples. Just add your API key and run!
+                      </p>
+
+                      <div className="space-y-8">
+                        <div className="border-l-4 border-blue-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Create Bucket</h4>
+                          <CodeBlock
+                            id="sdk-create-bucket"
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here',
+  baseURL: '${API_BASE_URL}'
+});
+
+// Create a public bucket for images
+const bucket = await hypz.createBucket({
+  name: 'my-images',
+  visibility: 'public',
+  description: 'Public images for my website'
+});
+
+console.log('Bucket created:', bucket.id);
+console.log('Bucket name:', bucket.name);`}
+                            language="javascript"
+                          />
+                        </div>
+
+                        <div className="border-l-4 border-green-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Upload File (Browser)</h4>
+                          <CodeBlock
+                            id="sdk-upload-browser"
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here',
+  baseURL: '${API_BASE_URL}'
+});
+
+// Get file from input
+const fileInput = document.querySelector('#fileInput');
+const file = fileInput.files[0];
+
+// Upload with tags and metadata
+const uploaded = await hypz.uploadFile('bucket-id', file, {
+  tags: ['avatar', 'profile'],
+  metadata: {
+    userId: '123',
+    uploadedBy: 'John Doe'
+  }
+});
+
+console.log('File uploaded!');
+console.log('URL:', uploaded.url);
+console.log('CDN URL:', uploaded.cdn_url);`}
+                            language="javascript"
+                          />
+                        </div>
+
+                        <div className="border-l-4 border-purple-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Upload File (Node.js)</h4>
+                          <CodeBlock
+                            id="sdk-upload-nodejs"
+                            code={`const { Hypz } = require('hypz-cloud-sdk');
+const fs = require('fs');
+
+const hypz = new Hypz({
+  apiKey: process.env.HYPZ_API_KEY,
+  baseURL: '${API_BASE_URL}'
+});
+
+// Read file from disk
+const fileBuffer = fs.readFileSync('./image.jpg');
+
+// Upload
+const file = await hypz.uploadFile('bucket-id', fileBuffer, {
+  filename: 'image.jpg',
+  tags: ['photo', 'backup'],
+  metadata: { date: new Date().toISOString() }
+});
+
+console.log('Uploaded:', file.url);`}
+                            language="javascript"
+                          />
+                        </div>
+
+                        <div className="border-l-4 border-orange-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">List Files</h4>
+                          <CodeBlock
+                            id="sdk-list-files"
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
   apiKey: 'your_api_key_here'
 });
 
-// Or initialize with JWT token
-const client = new HypzClient({
-  baseURL: '${API_BASE_URL}',
-  token: 'your_jwt_token_here'
-});`}
-                        language="javascript"
-                      />
-
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 mt-6">SDK Examples</h3>
-
-                      <div className="space-y-6">
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Create Bucket</h4>
-                          <CodeBlock
-                            id="sdk-create-bucket"
-                            code={`const bucket = await client.createBucket({
-  name: 'my-app-files',
-  visibility: 'public', // Files in this bucket will be public
-  description: 'Public files for my app'
-});
-
-console.log(bucket.data);`}
-                            language="javascript"
-                          />
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Upload File</h4>
-                          <CodeBlock
-                            id="sdk-upload"
-                            code={`// Upload file (privacy determined by bucket)
-const file = await client.uploadFile(bucketId, fileInput.files[0], {
-  tags: ['avatar', 'user-profile'],
-  metadata: { userId: '123', category: 'profile' }
-});
-
-console.log('File URL:', file.data.url);
-console.log('CDN URL:', file.data.cdn_url);`}
-                            language="javascript"
-                          />
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">List Files</h4>
-                          <CodeBlock
-                            id="sdk-list-files"
-                            code={`const files = await client.listFiles(bucketId, {
+// List files in a bucket
+const files = await hypz.listFiles('bucket-id', {
   page: 1,
   limit: 20,
   search: 'avatar',
   type: 'image/'
 });
 
-files.data.forEach(file => {
+files.forEach(file => {
   console.log(file.original_name, file.size, file.url);
 });`}
                             language="javascript"
                           />
                         </div>
 
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Delete File</h4>
+                        <div className="border-l-4 border-red-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Get File & Download</h4>
+                          <CodeBlock
+                            id="sdk-get-file"
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here'
+});
+
+// Get file details
+const file = await hypz.getFile('file-id');
+console.log('File:', file.original_name);
+console.log('URL:', file.url);
+console.log('CDN:', file.cdn_url);
+
+// Get download URL
+const downloadUrl = await hypz.getDownloadUrl('file-id');
+window.location.href = downloadUrl; // Download in browser`}
+                            language="javascript"
+                          />
+                        </div>
+
+                        <div className="border-l-4 border-yellow-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Delete File</h4>
                           <CodeBlock
                             id="sdk-delete"
-                            code={`await client.deleteFile(fileId);
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here'
+});
+
+// Delete a file
+await hypz.deleteFile('file-id');
 console.log('File deleted successfully');`}
                             language="javascript"
                           />
                         </div>
 
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Error Handling</h4>
+                        <div className="border-l-4 border-teal-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Get Usage Statistics</h4>
+                          <CodeBlock
+                            id="sdk-usage"
+                            code={`import { Hypz } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here'
+});
+
+// Get current usage
+const usage = await hypz.getUsage();
+console.log('Storage:', (usage.storage_used / 1024 / 1024).toFixed(2), 'MB');
+console.log('Bandwidth:', (usage.bandwidth_used / 1024 / 1024).toFixed(2), 'MB');
+console.log('API Calls:', usage.api_calls);
+console.log('Files:', usage.files_count);
+
+// Get usage history
+const history = await hypz.getUsageHistory({
+  period: 'month' // 'day', 'week', 'month', 'year'
+});`}
+                            language="javascript"
+                          />
+                        </div>
+
+                        <div className="border-l-4 border-pink-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Error Handling</h4>
                           <CodeBlock
                             id="sdk-errors"
-                            code={`try {
-  const file = await client.uploadFile(bucketId, file);
-  console.log('Upload successful');
+                            code={`import { Hypz, HypzError } from 'hypz-cloud-sdk';
+
+const hypz = new Hypz({
+  apiKey: 'your_api_key_here'
+});
+
+try {
+  const file = await hypz.uploadFile('bucket-id', fileInput.files[0]);
+  console.log('Upload successful:', file.url);
 } catch (error) {
   if (error instanceof HypzError) {
     console.error('Status:', error.statusCode);
     console.error('Message:', error.message);
     console.error('Response:', error.response);
+    
+    // Handle specific errors
+    if (error.statusCode === 401) {
+      console.error('Invalid API key');
+    } else if (error.statusCode === 403) {
+      console.error('Permission denied');
+    } else if (error.statusCode === 429) {
+      console.error('Rate limit exceeded');
+    }
+  } else {
+    console.error('Unexpected error:', error);
   }
 }`}
                             language="javascript"
                           />
                         </div>
+
+                        <div className="border-l-4 border-indigo-500 pl-4">
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Complete Working Example</h4>
+                          <p className="text-gray-600 dark:text-gray-300 mb-3">
+                            A complete Node.js script you can run immediately:
+                          </p>
+                          <CodeBlock
+                            id="sdk-complete-example"
+                            code={`// File: example.js
+// Run: node example.js
+
+const { Hypz } = require('hypz-cloud-sdk');
+
+const hypz = new Hypz({
+  apiKey: process.env.HYPZ_API_KEY || 'your_api_key_here',
+  baseURL: '${API_BASE_URL}'
+});
+
+async function main() {
+  try {
+    // 1. Create a bucket
+    console.log('Creating bucket...');
+    const bucket = await hypz.createBucket({
+      name: \`demo-bucket-\${Date.now()}\`,
+      visibility: 'public',
+      description: 'Demo bucket from SDK'
+    });
+    console.log('✓ Bucket created:', bucket.name);
+
+    // 2. List buckets
+    console.log('\\nListing buckets...');
+    const buckets = await hypz.listBuckets();
+    console.log(\`✓ Found \${buckets.length} buckets\`);
+
+    // 3. Get usage
+    console.log('\\nChecking usage...');
+    const usage = await hypz.getUsage();
+    console.log('✓ Storage:', (usage.storage_used / 1024 / 1024).toFixed(2), 'MB');
+    console.log('✓ Files:', usage.files_count);
+
+    console.log('\\n✅ All operations completed successfully!');
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+}
+
+main();`}
+                            language="javascript"
+                          />
+                        </div>
                       </div>
 
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
-                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-                          <Download size={20} />
-                          Download SDK
-                        </h4>
-                        <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-                          Download the JavaScript SDK and start building immediately.
-                        </p>
-                        <a
-                          href="/hypz-sdk.js"
-                          download
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                          <Download size={16} />
-                          Download hypz-sdk.js
-                        </a>
+                      <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 mt-8">
+                        <div className="flex items-start gap-4">
+                          <Check className="text-green-600 dark:text-green-400 flex-shrink-0 mt-1" size={28} />
+                          <div>
+                            <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                              Ready to Build? 🚀
+                            </h4>
+                            <p className="text-gray-700 dark:text-gray-300 mb-4">
+                              The SDK handles all the complexity. Just install, initialize, and start building!
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              <code className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg text-sm font-mono border border-gray-200 dark:border-gray-700">
+                                npm install hypz-cloud-sdk
+                              </code>
+                              <a
+                                href="https://www.npmjs.com/package/hypz-cloud-sdk"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                              >
+                                <ExternalLink size={16} />
+                                View on NPM
+                              </a>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </Section>
                   </div>
@@ -544,14 +799,30 @@ fetch('${API_BASE_URL}/buckets', {
                         language="javascript"
                       />
 
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 mt-6">Using API Keys</h3>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Using API Keys</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-3">
+                        API keys require a JWT token to create them. First login, then create an API key:
+                      </p>
                       <CodeBlock
                         id="auth-apikey"
-                        code={`// Create API key (requires JWT token first)
+                        code={`// Step 1: Login to get JWT token
+const loginResponse = await fetch('${API_BASE_URL}/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: 'user@example.com',
+    password: 'your_password'
+  })
+});
+
+const loginData = await loginResponse.json();
+const jwtToken = loginData.data.token;
+
+// Step 2: Create API key using JWT token
 const response = await fetch('${API_BASE_URL}/api-keys', {
   method: 'POST',
   headers: {
-    'Authorization': \`Bearer \${token}\`,
+    'Authorization': \`Bearer \${jwtToken}\`,
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -560,15 +831,20 @@ const response = await fetch('${API_BASE_URL}/api-keys', {
   })
 });
 
-const { data } = await response.json();
-const apiKey = data.key; // Save this securely!
-
-// Use API key in requests
-fetch('${API_BASE_URL}/buckets', {
-  headers: {
-    'X-API-Key': apiKey
-  }
-});`}
+const result = await response.json();
+if (result.success) {
+  const apiKey = result.data.key; // Save this securely!
+  console.log('API Key created:', apiKey);
+  console.log('Key ID:', result.data.id);
+  
+  // Step 3: Use API key in subsequent requests
+  const bucketsResponse = await fetch('${API_BASE_URL}/buckets', {
+    headers: { 'X-API-Key': apiKey }
+  });
+  
+  const buckets = await bucketsResponse.json();
+  console.log('Buckets:', buckets.data);
+}`}
                         language="javascript"
                       />
 
@@ -632,7 +908,7 @@ fetch('${API_BASE_URL}/buckets', {
                         description="Delete bucket"
                       />
 
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3 mt-6">Create Bucket</h3>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Create Bucket</h3>
                       <CodeBlock
                         id="bucket-create"
                         code={`const response = await fetch('${API_BASE_URL}/buckets', {
@@ -649,8 +925,13 @@ fetch('${API_BASE_URL}/buckets', {
   })
 });
 
-const bucket = await response.json();
-console.log(bucket.data);`}
+const result = await response.json();
+if (result.success) {
+  console.log('Bucket created:', result.data);
+  console.log('Bucket ID:', result.data.id);
+} else {
+  console.error('Error:', result.message);
+}`}
                         language="javascript"
                       />
 
@@ -661,10 +942,20 @@ console.log(bucket.data);`}
   headers: { 'X-API-Key': apiKey }
 });
 
-const { data, pagination } = await response.json();
-data.forEach(bucket => {
-  console.log(bucket.name, bucket.visibility, bucket.file_count);
-});`}
+const result = await response.json();
+if (result.success) {
+  // Access buckets array from data.buckets or data (check backend response)
+  const buckets = result.data.buckets || result.data;
+  buckets.forEach(bucket => {
+    console.log(bucket.name, bucket.visibility, bucket.file_count);
+  });
+  
+  // Pagination info
+  if (result.pagination) {
+    console.log('Total:', result.pagination.total);
+    console.log('Page:', result.pagination.page);
+  }
+}`}
                         language="javascript"
                       />
 
@@ -748,6 +1039,7 @@ const bucket = await response.json();`}
                         code={`// File privacy is determined by the bucket's visibility
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
+// IMPORTANT: tags and metadata must be JSON strings!
 formData.append('tags', JSON.stringify(['user-upload', 'image']));
 formData.append('metadata', JSON.stringify({ 
   userId: '123',
@@ -758,13 +1050,20 @@ const response = await fetch(\`${API_BASE_URL}/buckets/\${bucketId}/files\`, {
   method: 'POST',
   headers: {
     'X-API-Key': apiKey
+    // Don't set Content-Type header - browser handles it for FormData
   },
   body: formData
 });
 
-const file = await response.json();
-console.log('File URL:', file.data.url);
-console.log('CDN URL:', file.data.cdn_url);`}
+const result = await response.json();
+if (result.success) {
+  console.log('File URL:', result.data.url);
+  console.log('CDN URL:', result.data.cdn_url);
+  console.log('File ID:', result.data.id);
+  console.log('File size:', result.data.formatted_size);
+} else {
+  console.error('Upload failed:', result.message);
+}`}
                         language="javascript"
                       />
 
@@ -775,10 +1074,22 @@ console.log('CDN URL:', file.data.cdn_url);`}
   headers: { 'X-API-Key': apiKey }
 });
 
-const { data, pagination } = await response.json();
-data.forEach(file => {
-  console.log(file.original_name, file.size, file.url);
-});`}
+const result = await response.json();
+if (result.success) {
+  // Files are in data.files
+  const files = result.data.files || result.data;
+  files.forEach(file => {
+    console.log('Name:', file.original_name);
+    console.log('Size:', file.formatted_size || file.size);
+    console.log('URL:', file.url);
+    console.log('Tags:', file.tags);
+  });
+  
+  // Pagination
+  if (result.pagination) {
+    console.log('Total files:', result.pagination.total);
+  }
+}`}
                         language="javascript"
                       />
 
@@ -789,11 +1100,16 @@ data.forEach(file => {
   headers: { 'X-API-Key': apiKey }
 });
 
-const { data } = await response.json();
-console.log('Download URL:', data.download_url);
-
-// Use the URL to download
-window.location.href = data.download_url;`}
+const result = await response.json();
+if (result.success) {
+  console.log('Download URL:', result.data.download_url);
+  
+  // Use the URL to download
+  window.location.href = result.data.download_url;
+  
+  // Or open in new tab
+  window.open(result.data.download_url, '_blank');
+}`}
                         language="javascript"
                       />
 
@@ -1020,6 +1336,104 @@ console.log('Files Count:', data.files_count);`}
                       <p className="text-gray-600 dark:text-gray-300 mb-6">
                         Hypz uses standard HTTP status codes and returns consistent error responses to help you handle errors gracefully.
                       </p>
+
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">✅ Complete Working Example</h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                          Copy this tested HTML file and replace the API_KEY to start using Hypz immediately:
+                        </p>
+                        <CodeBlock
+                          id="complete-example"
+                          code={`<!DOCTYPE html>
+<html>
+<head>
+  <title>Hypz Upload Test</title>
+</head>
+<body>
+  <h1>Hypz Cloud Storage Test</h1>
+  
+  <input type="file" id="fileInput" />
+  <button onclick="uploadFile()">Upload</button>
+  <div id="status"></div>
+  
+  <script>
+    // 1. Get your API key from dashboard
+    const API_KEY = 'your_api_key_here';
+    const API_BASE = '${API_BASE_URL}';
+    let bucketId = null;
+    
+    // 2. Create bucket (run once)
+    async function createBucket() {
+      const response = await fetch(\`\${API_BASE}/buckets\`, {
+        method: 'POST',
+        headers: {
+          'X-API-Key': API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: 'test-bucket-' + Date.now(),
+          visibility: 'public',
+          description: 'Test bucket'
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        bucketId = result.data.id;
+        document.getElementById('status').textContent = 
+          '✅ Bucket created: ' + bucketId;
+        return bucketId;
+      }
+      throw new Error(result.message);
+    }
+    
+    // 3. Upload file
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const status = document.getElementById('status');
+      
+      if (!fileInput.files[0]) {
+        status.textContent = '❌ Please select a file';
+        return;
+      }
+      
+      // Create bucket if not exists
+      if (!bucketId) {
+        try {
+          await createBucket();
+        } catch (error) {
+          status.textContent = '❌ Error: ' + error.message;
+          return;
+        }
+      }
+      
+      status.textContent = 'Uploading...';
+      
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('tags', JSON.stringify(['test']));
+      
+      const response = await fetch(\`\${API_BASE}/buckets/\${bucketId}/files\`, {
+        method: 'POST',
+        headers: { 'X-API-Key': API_KEY },
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        status.innerHTML = \`✅ Uploaded!<br>
+          <a href="\${result.data.url}" target="_blank">View File</a>\`;
+      } else {
+        status.textContent = '❌ ' + result.message;
+      }
+    }
+  </script>
+</body>
+</html>`}
+                          language="html"
+                        />
+                      </div>
 
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Error Response Format</h3>
                       <CodeBlock

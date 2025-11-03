@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, blockApiKeyAccess } from '../middleware/auth.js';
 import {
   createLemonSqueezyPayment,
   getPaymentHistory
@@ -11,8 +11,9 @@ const router = express.Router();
 // Webhook routes (no auth - verified by signature)
 router.post('/webhook/lemonsqueezy', express.raw({ type: 'application/json' }), handleLemonSqueezyWebhook);
 
-// Authenticated routes
+// Authenticated routes - Block API key access (payments must be done via dashboard)
 router.use(authenticate);
+router.use(blockApiKeyAccess);
 
 // LemonSqueezy routes
 router.post('/lemonsqueezy/checkout', createLemonSqueezyPayment);

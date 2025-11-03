@@ -191,17 +191,41 @@ const FileManager = () => {
     setUploadProgress(0);
 
     try {
+      // Upload files sequentially with better progress tracking
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const formData = new FormData();
         formData.append('file', file);
 
-        await fileAPI.upload(bucketId, formData, {
-          onUploadProgress: (progressEvent) => {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(Math.round(((i + progress / 100) / selectedFiles.length) * 100));
+        // Calculate progress for multiple files
+        const fileProgressStart = (i / selectedFiles.length) * 100;
+        const fileProgressRange = 100 / selectedFiles.length;
+
+        // Simulate smooth progress for better UX
+        let simulatedProgress = 0;
+        const progressInterval = setInterval(() => {
+          simulatedProgress += 5;
+          if (simulatedProgress < 90) {
+            const totalProgress = fileProgressStart + (simulatedProgress / 100) * fileProgressRange;
+            setUploadProgress(Math.round(totalProgress));
           }
-        });
+        }, 100);
+
+        try {
+          await fileAPI.upload(bucketId, formData, (progressEvent) => {
+            clearInterval(progressInterval);
+            if (progressEvent && progressEvent.total) {
+              const fileProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              const totalProgress = fileProgressStart + (fileProgress / 100) * fileProgressRange;
+              setUploadProgress(Math.round(totalProgress));
+            }
+          });
+        } finally {
+          clearInterval(progressInterval);
+        }
+
+        // Set progress to complete for this file
+        setUploadProgress(Math.round(fileProgressStart + fileProgressRange));
       }
 
       toast.success(`${selectedFiles.length} file(s) uploaded successfully`);

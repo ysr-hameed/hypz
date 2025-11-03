@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, blockApiKeyAccess } from '../middleware/auth.js';
 import {
   getProfile,
   updateProfile,
@@ -12,6 +12,10 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
+
+// Block API key access to all user management routes
+router.use(authenticate);
+router.use(blockApiKeyAccess); // User profile/account changes must be done via dashboard
 
 // Validation rules
 const updateProfileValidation = [

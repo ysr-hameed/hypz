@@ -8,10 +8,20 @@ import {
   deleteBucket,
   getBucketStats
 } from '../controllers/bucketController.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authenticateApiKey, requirePermission, requireOwnership } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
+
+// Support both JWT and API key authentication
+const authMiddleware = (req, res, next) => {
+  // Check if API key is provided
+  if (req.headers['x-api-key'] || req.query.api_key) {
+    return authenticateApiKey(req, res, next);
+  }
+  // Otherwise use JWT
+  return authenticate(req, res, next);
+};
 
 // Validation
 const createBucketValidation = [
@@ -48,12 +58,12 @@ const updateBucketValidation = [
   validate
 ];
 
-// Routes
-router.post('/', authenticate, createBucketValidation, createBucket);
-router.get('/', authenticate, getBuckets);
-router.get('/:bucketId', authenticate, getBucket);
-router.put('/:bucketId', authenticate, updateBucketValidation, updateBucket);
-router.delete('/:bucketId', authenticate, deleteBucket);
-router.get('/:bucketId/stats', authenticate, getBucketStats);
+// Routes - Support both JWT and API key authentication
+router.post('/', authMiddleware, requirePermission('buckets:write'), createBucketValidation, createBucket);
+router.get('/', authMiddleware, requirePermission('buckets:read'), getBuckets);
+router.get('/:bucketId', authMiddleware, requirePermission('buckets:read'), requireOwnership('bucket'), getBucket);
+router.put('/:bucketId', authMiddleware, requirePermission('buckets:write'), requireOwnership('bucket'), updateBucketValidation, updateBucket);
+router.delete('/:bucketId', authMiddleware, requirePermission('buckets:write'), requireOwnership('bucket'), deleteBucket);
+router.get('/:bucketId/stats', authMiddleware, requirePermission('buckets:read'), requireOwnership('bucket'), getBucketStats);
 
 export default router;
