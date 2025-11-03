@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { plansAPI } from '../services/api';
 import { apiCache } from '../utils/apiCache';
 import { useUser } from '../context/UserContext';
-import PaymentModal from '../components/PaymentModalNew';
+import PaymentModal from '../components/PaymentModal';
 import { toast } from 'react-hot-toast';
 
 const Pricing = () => {

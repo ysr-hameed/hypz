@@ -76,7 +76,8 @@ const FileManager = () => {
     setLoading(true);
     try {
       const response = await bucketAPI.getAll({ search: searchQuery });
-      setBuckets(response.data.buckets || []);
+      // Response interceptor already unwraps data
+      setBuckets(response.buckets || []);
       setBreadcrumbs([{ name: 'All Buckets', path: null }]);
     } catch (error) {
       toast.error('Failed to load buckets');
@@ -91,11 +92,13 @@ const FileManager = () => {
     try {
       // Fetch bucket details
       const bucketResponse = await bucketAPI.getById(bucketId);
-      setCurrentBucket(bucketResponse.data.bucket);
+      // Response interceptor already unwraps data
+      setCurrentBucket(bucketResponse);
 
       // Fetch files in bucket
       const filesResponse = await fileAPI.getAll(bucketId);
-      let fetchedFiles = filesResponse.data.files || [];
+      // Response interceptor already unwraps data
+      let fetchedFiles = filesResponse.files || [];
 
       // Apply filters
       if (filterType !== 'all') {
@@ -120,7 +123,7 @@ const FileManager = () => {
       // Update breadcrumbs
       setBreadcrumbs([
         { name: 'All Buckets', path: null },
-        { name: bucketResponse.data.bucket.name, path: bucketId }
+        { name: bucketResponse.name, path: bucketId }
       ]);
     } catch (error) {
       toast.error('Failed to load bucket contents');
@@ -216,7 +219,7 @@ const FileManager = () => {
   const handleDownload = async (fileId, fileName) => {
     try {
       const response = await fileAPI.download(fileId);
-      const url = response.data.url;
+      const url = response.downloadUrl;
       
       const link = document.createElement('a');
       link.href = url;

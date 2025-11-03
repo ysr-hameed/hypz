@@ -1,414 +1,445 @@
 import { useState, useEffect } from 'react';
-import { usePlan } from '../../context/PlanContext';
-import { formatStorage, formatBandwidth, formatApiCalls } from '../../config/plans';
 import { 
-  CreditCardIcon, 
-  ArrowPathIcon, 
-  BoltIcon, 
-  DocumentTextIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  CalendarIcon,
-  BanknotesIcon
-} from '@heroicons/react/24/outline';
-import { Link } from 'react-router-dom';
-import { SkeletonBilling } from '../../components/SkeletonLoaders';
+  CreditCard, 
+  RefreshCw, 
+  Download, 
+  Calendar,
+  DollarSign,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  TrendingUp,
+  Settings as SettingsIcon
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import apiConfig from '../../config/api';
 
 const Billing = () => {
-  const { userData, planDetails, updateRenewalSettings } = usePlan();
-  const [autoRenew, setAutoRenew] = useState(userData?.currentPlan?.renewalType === 'auto');
-  const [autoUpgrade, setAutoUpgrade] = useState(userData?.currentPlan?.autoUpgrade || false);
-  const [showInvoices, setShowInvoices] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState(null);
+  const [usageCost, setUsageCost] = useState(null);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [pendingInvoices, setPendingInvoices] = useState([]);
+  const [autoRenew, setAutoRenew] = useState(true);
+  const [updating, setUpdating] = useState(false);
+
+  const api = axios.create({
+    baseURL: apiConfig.API_URL,
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('token')}`
+    }
+  });
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
+    fetchBillingData();
   }, []);
 
-  // Mock payment methods
-  const [paymentMethods, setPaymentMethods] = useState([
-    {
-      id: 'card_1',
-      type: 'card',
-      last4: '4242',
-      brand: 'Visa',
-      expiry: '12/26',
-      isDefault: true
-    }
-  ]);
+  const fetchBillingData = async () => {
+    setLoading(true);
+    try {
+      // Fetch subscription status
+      const subRes = await api.get('/subscriptions/status');
+      setSubscription(subRes.data.data || subRes.data);
+      setAutoRenew(subRes.data.data?.auto_renew ?? subRes.data.auto_renew ?? true);
 
-  // Mock invoices
-  const invoices = [
-    {
-      id: 'inv_001',
-      date: '2025-10-01',
-      amount: 0,
-      status: 'paid',
-      plan: 'Free Plan',
-      description: 'Monthly subscription'
-    }
-  ];
+      // Fetch current usage cost (for PAYG users)
+      try {
+        const usageRes = await api.get('/subscriptions/usage-cost');
+        setUsageCost(usageRes.data.data || usageRes.data);
+      } catch (err) {
+        // Not a PAYG user or no usage yet
+        console.log('No usage cost data');
+      }
 
-  const handleRenewalToggle = () => {
-    const newRenewalType = !autoRenew ? 'auto' : 'manual';
-    setAutoRenew(!autoRenew);
-    updateRenewalSettings(newRenewalType, autoUpgrade);
+      // Fetch payment history
+      try {
+        const historyRes = await api.get('/payments/history');
+        const historyData = historyRes.data.data || historyRes.data;
+        setPaymentHistory(historyData.payments || historyData || []);
+      } catch (err) {
+        console.error('Failed to fetch payment history:', err);
+        setPaymentHistory([]);
+      }
+
+      // Fetch pending invoices
+      try {
+        const invoicesRes = await api.get('/subscriptions/pending-invoices');
+        const invoicesData = invoicesRes.data.data || invoicesRes.data;
+        setPendingInvoices(invoicesData.invoices || invoicesData || []);
+      } catch (err) {
+        console.log('No pending invoices');
+        setPendingInvoices([]);
+      }
+
+    } catch (error) {
+      console.error('Failed to load billing data:', error);
+      toast.error('Failed to load billing information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAutoRenewToggle = async () => {
+    setUpdating(true);
+    try {
+      await api.put('/subscriptions/auto-renew', { autoRenew: !autoRenew });
+      setAutoRenew(!autoRenew);
+      toast.success(`Auto-renewal ${!autoRenew ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      toast.error('Failed to update auto-renewal setting');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handlePayInvoice = async (billingId) => {
+    try {
+      await api.post('/subscriptions/pay-invoice', { billingId });
+      toast.success('Payment successful!');
+      fetchBillingData(); // Refresh data
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Payment failed');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      active: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', icon: CheckCircle },
+      pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', icon: AlertCircle },
+      past_due: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', icon: XCircle },
+      cancelled: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-800 dark:text-gray-300', icon: XCircle }
+    };
+
+    const badge = badges[status] || badges.pending;
+    const Icon = badge.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
+        <Icon className="w-4 h-4" />
+        {status.replace('_', ' ').toUpperCase()}
+      </span>
+    );
   };
 
   if (loading) {
-    return <SkeletonBilling />;
+    return (
+      <div className="p-6 space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+          <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
   }
 
-  const handleAutoUpgradeToggle = () => {
-    setAutoUpgrade(!autoUpgrade);
-    updateRenewalSettings(autoRenew ? 'auto' : 'manual', !autoUpgrade);
-  };
-
-  const currency = '$';
-  const currentPrice = planDetails?.priceUSD || 0;
-
   return (
-    <div className="p-6 space-y-6 content-wrapper content-loaded">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center animate-slideIn">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Billing & Payments</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage your subscription, payment methods, and billing history
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Billing & Payments</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Manage your subscription, payments, and billing history
+        </p>
       </div>
 
-      {/* Current Plan Summary */}
-      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-6 text-white shadow-xl">
-        <div className="flex justify-between items-start">
+      {/* Current Subscription Card */}
+      <div className="bg-gradient-to-br from-primary-500 to-purple-600 rounded-xl p-6 text-white shadow-xl">
+        <div className="flex justify-between items-start mb-4">
           <div>
-            <p className="text-blue-100 text-sm mb-1">Current Plan</p>
-            <h2 className="text-3xl font-bold mb-2">{planDetails?.name || 'Loading...'}</h2>
-            <p className="text-blue-100 text-sm">
-              {planDetails?.type === 'scalable' ? 'Pay-as-you-go billing' : 'Fixed monthly billing'}
-            </p>
+            <p className="text-white/80 text-sm mb-1">Current Subscription</p>
+            <h2 className="text-3xl font-bold">{subscription?.plan_name || 'Free Plan'}</h2>
+            <p className="text-white/90 mt-1">{subscription?.plan_type || 'free'} plan</p>
           </div>
           <div className="text-right">
-            <p className="text-blue-100 text-sm mb-1">Monthly Cost</p>
-            <p className="text-4xl font-bold">
-              {currentPrice === 'usage_based' ? 'Variable' : currentPrice === 0 ? 'Free' : `${currency}${currentPrice}`}
-            </p>
-            {currentPrice !== 0 && currentPrice !== 'usage_based' && (
-              <p className="text-blue-100 text-xs mt-1">per month</p>
-            )}
+            {getStatusBadge(subscription?.status || 'active')}
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/20">
-          <div>
-            <p className="text-blue-100 text-xs mb-1">Storage</p>
-            <p className="font-semibold">{formatStorage(planDetails?.storageGB || planDetails?.freeStorageGB || 0)}</p>
+        {subscription?.current_period_end && (
+          <div className="flex items-center gap-2 text-white/90 text-sm">
+            <Calendar className="w-4 h-4" />
+            <span>Next billing: {formatDate(subscription.current_period_end)}</span>
           </div>
-          <div>
-            <p className="text-blue-100 text-xs mb-1">Bandwidth</p>
-            <p className="font-semibold">{formatBandwidth(planDetails?.bandwidthGB || planDetails?.freeBandwidthGB || 0)}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs mb-1">API Calls</p>
-            <p className="font-semibold">{formatApiCalls(planDetails?.apiCalls || planDetails?.apiFree || 0)}</p>
-          </div>
-        </div>
+        )}
 
-        <div className="mt-4">
-          <Link
-            to="/plans"
-            className="inline-flex items-center px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
-          >
-            <BoltIcon className="h-4 w-4 mr-2" />
-            Upgrade Plan
-          </Link>
+        {/* Auto-Renewal Toggle */}
+        <div className="mt-6 pt-6 border-t border-white/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold">Auto-Renewal</p>
+              <p className="text-sm text-white/80">
+                {autoRenew ? 'Your subscription will renew automatically' : 'You need to manually renew'}
+              </p>
+            </div>
+            <button
+              onClick={handleAutoRenewToggle}
+              disabled={updating}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                autoRenew ? 'bg-white' : 'bg-white/30'
+              } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-primary-600 transition-transform ${
+                  autoRenew ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Renewal Settings */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <div className="flex items-center mb-4">
-            <ArrowPathIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Renewal Settings</h2>
+      {/* Current Month Usage (PAYG Only) */}
+      {usageCost && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <TrendingUp className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Current Month Usage & Costs</h3>
+              {usageCost.plan && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {usageCost.plan.name} Plan • Billing Period: {formatDate(usageCost.billingPeriod.start)} - {formatDate(usageCost.billingPeriod.end)}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {/* Auto Renewal */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  Auto Renewal
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Automatically renew your subscription each billing cycle
+          {/* Main Usage Categories */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Storage Used</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{usageCost.usage.storageGB} GB</p>
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 font-semibold">{formatCurrency(usageCost.costs.storage)}</p>
+              {usageCost.plan?.storageLimit > 0 && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Limit: {usageCost.plan.storageLimit} GB
                 </p>
-                {autoRenew && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center">
-                    <CheckCircleIcon className="h-4 w-4 mr-1" />
-                    Next renewal: {userData?.currentPlan?.renewalDate || 'N/A'}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={handleRenewalToggle}
-                disabled={planDetails?.renewal === 'auto' && autoRenew}
-                className={`ml-4 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  autoRenew ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                } ${planDetails?.renewal === 'auto' ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    autoRenew ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+              )}
             </div>
 
-            {/* Auto Upgrade */}
-            {planDetails?.autoUpgrade !== false && (
-              <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
-                    <BoltIcon className="h-4 w-4 mr-1 text-yellow-500" />
-                    Auto Upgrade
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Automatically upgrade when you exceed plan limits
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+              <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">Bandwidth</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{usageCost.usage.bandwidthGB} GB</p>
+              <p className="text-sm text-purple-600 dark:text-purple-400 mt-1 font-semibold">{formatCurrency(usageCost.costs.bandwidth)}</p>
+              {usageCost.plan?.bandwidthLimit > 0 && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Limit: {usageCost.plan.bandwidthLimit} GB
+                </p>
+              )}
+            </div>
+
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-600 dark:text-green-400 mb-1">Meta Operations</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {(usageCost.usage.uploadCalls + usageCost.usage.deleteCalls + usageCost.usage.listCalls).toLocaleString()}
+              </p>
+              <p className="text-sm text-green-600 dark:text-green-400 mt-1 font-semibold">{formatCurrency(usageCost.costs.metaOps)}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Upload, Delete, List</p>
+            </div>
+
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+              <p className="text-sm text-orange-600 dark:text-orange-400 mb-1">Access Operations</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {usageCost.usage.downloadCalls.toLocaleString()}
+              </p>
+              <p className="text-sm text-orange-600 dark:text-orange-400 mt-1 font-semibold">{formatCurrency(usageCost.costs.accessOps)}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Download Operations</p>
+            </div>
+          </div>
+
+          {/* Detailed Breakdown */}
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Detailed Usage Breakdown</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Upload</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{usageCost.usage.uploadGB} GB</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{usageCost.usage.uploadCalls.toLocaleString()} calls</p>
+              </div>
+
+              <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Download</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{usageCost.usage.downloadGB} GB</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{usageCost.usage.downloadCalls.toLocaleString()} calls</p>
+              </div>
+
+              <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Delete</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{usageCost.usage.deleteCalls.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">operations</p>
+              </div>
+
+              <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">List</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{usageCost.usage.listCalls.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">operations</p>
+              </div>
+
+              <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total API</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{usageCost.usage.apiCalls.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">calls</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cost Summary */}
+          <div className="bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/30 dark:to-primary-800/30 rounded-lg p-6 border-2 border-primary-200 dark:border-primary-700">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Storage Cost</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(usageCost.costs.storage)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Bandwidth Cost</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(usageCost.costs.bandwidth)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Meta Ops Cost</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(usageCost.costs.metaOps)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Access Ops Cost</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(usageCost.costs.accessOps)}</p>
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <p className="text-xs text-primary-600 dark:text-primary-400 mb-1 font-semibold">TOTAL COST</p>
+                <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">{formatCurrency(usageCost.costs.total)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+              This amount will be charged on the 1st of next month
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Invoices */}
+      {Array.isArray(pendingInvoices) && pendingInvoices.length > 0 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Pending Invoices</h3>
+          </div>
+
+          <div className="space-y-3">
+            {pendingInvoices.map((invoice) => (
+              <div key={invoice.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-4">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    Invoice for {formatDate(invoice.billing_period_start)} - {formatDate(invoice.billing_period_end)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                    {planDetails?.afterLimit === 'auto_bill' ? 'Pay-as-you-go overages enabled' : 'Prevents service interruption'}
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Amount: {formatCurrency(invoice.total_cost)}
                   </p>
                 </div>
                 <button
-                  onClick={handleAutoUpgradeToggle}
-                  className={`ml-4 relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 ${
-                    autoUpgrade ? 'bg-yellow-600' : 'bg-gray-200 dark:bg-gray-600'
-                  }`}
+                  onClick={() => handlePayInvoice(invoice.id)}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition"
                 >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      autoUpgrade ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
+                  Pay Now
                 </button>
               </div>
-            )}
-
-            {/* Plan Behavior Info */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <h4 className="font-medium text-blue-900 dark:text-blue-200 text-sm mb-2">
-                When Limits Are Reached
-              </h4>
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                {planDetails?.afterLimit === 'stop_or_upgrade' && '⛔ Service stops - upgrade required'}
-                {planDetails?.afterLimit === 'auto_bill' && '💳 Automatic billing for overages'}
-                {planDetails?.afterLimit === 'throttle_and_alert' && '⚠️ Service throttled with email alerts'}
-                {planDetails?.afterLimit === 'contact_support' && '📞 Contact support for custom limits'}
-              </p>
-            </div>
-
-            {/* Next Billing Date */}
-            {userData?.currentPlan?.renewalDate && (
-              <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="flex items-center">
-                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Next Billing Date</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{userData.currentPlan.renewalDate}</p>
-                  </div>
-                </div>
-                {currentPrice !== 0 && currentPrice !== 'usage_based' && (
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {currency}{currentPrice}
-                  </p>
-                )}
-              </div>
-            )}
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Payment Methods */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <CreditCardIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Payment Methods</h2>
-            </div>
-            <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-              + Add New
-            </button>
-          </div>
-
-          {paymentMethods.length === 0 ? (
-            <div className="text-center py-8">
-              <CreditCardIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 dark:text-gray-400 mb-4">No payment methods added</p>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Add Payment Method
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                >
-                  <div className="flex items-center">
-                    <div className="w-12 h-8 bg-gray-900 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
-                      <span className="text-white text-xs font-bold">{method.brand}</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        •••• {method.last4}
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Expires {method.expiry}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {method.isDefault && (
-                      <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
-                        Default
-                      </span>
-                    )}
-                    <button className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400">
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add UPI/Net Banking for India */}
-          {userData?.region === 'india' && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-              <div className="flex items-center mb-2">
-                <BanknotesIcon className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
-                <h3 className="font-semibold text-purple-900 dark:text-purple-200">Indian Payment Methods</h3>
-              </div>
-              <p className="text-sm text-purple-800 dark:text-purple-300 mb-3">
-                Support for UPI, Net Banking, and local payment methods
-              </p>
-              <button className="text-sm text-purple-600 dark:text-purple-400 hover:underline font-medium">
-                Add UPI or Net Banking →
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Billing History */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <DocumentTextIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Billing History</h2>
-          </div>
-          <button
-            onClick={() => setShowInvoices(!showInvoices)}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            {showInvoices ? 'Hide' : 'Show'} Invoices
-          </button>
+      {/* Payment History */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <DollarSign className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Payment History</h3>
         </div>
 
-        {showInvoices && (
+        {!Array.isArray(paymentHistory) || paymentHistory.length === 0 ? (
+          <p className="text-gray-600 dark:text-gray-400 text-center py-8">No payment history yet</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Date</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Description</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Amount</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Status</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">Actions</th>
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Date</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Description</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Amount</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Status</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600 dark:text-gray-400">Invoice</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+              <tbody>
+                {paymentHistory.map((payment) => (
+                  <tr key={payment.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
-                      {new Date(invoice.date).toLocaleDateString()}
+                      {formatDate(payment.created_at)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
-                      {invoice.plan} - {invoice.description}
+                    <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">
+                      {payment.billing_reason || 'Subscription payment'}
                     </td>
-                    <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">
-                      {invoice.amount === 0 ? 'Free' : `${currency}${invoice.amount}`}
+                    <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
+                      {formatCurrency(payment.amount)}
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          invoice.status === 'paid'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : invoice.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}
-                      >
-                        {invoice.status === 'paid' && <CheckCircleIcon className="h-3 w-3 mr-1" />}
-                        {invoice.status === 'failed' && <XCircleIcon className="h-3 w-3 mr-1" />}
-                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        payment.status === 'completed' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                      }`}>
+                        {payment.status}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                        Download
-                      </button>
+                      {payment.invoice_url && (
+                        <a 
+                          href={payment.invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-700 dark:text-primary-400 inline-flex items-center gap-1 text-sm"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </a>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-
-            {invoices.length === 0 && (
-              <div className="text-center py-8">
-                <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 dark:text-gray-400">No invoices yet</p>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* Billing Information */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Billing Information</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Billing Email
-            </label>
-            <input
-              type="email"
-              value={userData?.email || ''}
-              readOnly
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Region
-            </label>
-            <input
-              type="text"
-              value={userData?.region === 'india' ? 'India' : 'Global'}
-              readOnly
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-        </div>
-        <button className="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline">
-          Update Billing Information
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onClick={fetchBillingData}
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+        >
+          <RefreshCw className="w-5 h-5" />
+          <span className="font-medium">Refresh Data</span>
+        </button>
+
+        <button
+          onClick={() => window.location.href = '/pricing'}
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition font-medium"
+        >
+          <SettingsIcon className="w-5 h-5" />
+          <span>Change Plan</span>
         </button>
       </div>
     </div>

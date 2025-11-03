@@ -27,7 +27,8 @@ const BucketDetails = () => {
   const fetchBucketDetails = async () => {
     try {
       const response = await bucketAPI.getById(bucketId);
-      setBucket(response.data);
+      // Response interceptor already unwraps data
+      setBucket(response);
     } catch (error) {
       console.error('Failed to fetch bucket details:', error);
       toast.error('Failed to load bucket details');
@@ -41,7 +42,8 @@ const BucketDetails = () => {
     try {
       setLoading(true);
       const response = await fileAPI.getAll(bucketId);
-      setFiles(response.data.files || []);
+      // Response interceptor already unwraps data
+      setFiles(response.files || []);
     } catch (error) {
       console.error('Failed to fetch files:', error);
       toast.error('Failed to load files');
@@ -110,11 +112,12 @@ const BucketDetails = () => {
   const handleDownload = async (fileId, fileName) => {
     try {
       const response = await fileAPI.download(fileId);
-      const url = response.data.downloadUrl;
+      const url = response.downloadUrl;
       
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

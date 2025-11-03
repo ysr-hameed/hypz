@@ -138,14 +138,20 @@ export const toggleAutoRenewal = asyncHandler(async (req, res) => {
 export const getCurrentUsageAndCost = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   
-  // Get current month's usage
+  // Get current month's usage with detailed breakdown
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   
   const usageResult = await query(
     `SELECT 
       SUM(storage_bytes) as total_storage,
       SUM(bandwidth_bytes) as total_bandwidth,
-      SUM(api_calls) as total_api_calls
+      SUM(upload_bytes) as total_upload,
+      SUM(download_bytes) as total_download,
+      SUM(api_calls) as total_api_calls,
+      SUM(upload_calls) as total_upload_calls,
+      SUM(download_calls) as total_download_calls,
+      SUM(delete_calls) as total_delete_calls,
+      SUM(list_calls) as total_list_calls
      FROM usage_records
      WHERE user_id = $1 AND TO_CHAR(date, 'YYYY-MM') = $2`,
     [userId, currentMonth]
@@ -161,24 +167,96 @@ export const getCurrentUsageAndCost = asyncHandler(async (req, res) => {
 
   const plan = planResult.rows[0];
 
-  // Calculate costs (example rates)
+  // If no plan found, return zero usage/cost
+  if (!plan) {
+    return successResponse(res, {
+      usage: {
+        storageGB: '0.00',
+        bandwidthGB: '0.00',
+        uploadGB: '0.00',
+        downloadGB: '0.00',
+        apiCalls: 0,
+        uploadCalls: 0,
+        downloadCalls: 0,
+        deleteCalls: 0,
+        listCalls: 0
+      },
+      costs: {
+        storage: '0.00',
+        bandwidth: '0.00',
+        metaOps: '0.00',
+        accessOps: '0.00',
+        total: '0.00'
+      },
+      plan: {
+        name: 'No Plan',
+        type: 'free',
+        storageLimit: 0,
+        bandwidthLimit: 0
+      },
+      billingPeriod: {
+        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]
+      }
+    });
+  }
+
+  // Calculate usage in GB
   const storageGB = Number(usage.total_storage || 0) / (1024 ** 3);
   const bandwidthGB = Number(usage.total_bandwidth || 0) / (1024 ** 3);
+  const uploadGB = Number(usage.total_upload || 0) / (1024 ** 3);
+  const downloadGB = Number(usage.total_download || 0) / (1024 ** 3);
   
-  const storageCost = storageGB * (plan.payg_storage_rate || 0.015);
-  const bandwidthCost = bandwidthGB * (plan.payg_bandwidth_rate || 0.05);
-  const totalCost = storageCost + bandwidthCost;
+  // Calculate costs based on plan type
+  let storageCost = 0;
+  let bandwidthCost = 0;
+  let metaOpsCost = 0; // For upload, delete, list operations
+  let accessOpsCost = 0; // For download operations
+  
+  if (plan.type === 'payg') {
+    // PAYG pricing
+    storageCost = storageGB * (plan.payg_storage_rate || 0.015);
+    bandwidthCost = bandwidthGB * (plan.payg_bandwidth_rate || 0.05);
+    
+    // Meta operations (upload, delete, list) - typically per 10k requests
+    const metaOps = Number(usage.total_upload_calls || 0) + 
+                    Number(usage.total_delete_calls || 0) + 
+                    Number(usage.total_list_calls || 0);
+    metaOpsCost = (metaOps / 10000) * (plan.payg_meta_ops_rate || 0.005);
+    
+    // Access operations (download) - typically per 1k requests
+    const accessOps = Number(usage.total_download_calls || 0);
+    accessOpsCost = (accessOps / 1000) * (plan.payg_access_ops_rate || 0.004);
+  }
+  
+  const totalCost = storageCost + bandwidthCost + metaOpsCost + accessOpsCost;
 
   successResponse(res, {
     usage: {
       storageGB: storageGB.toFixed(2),
       bandwidthGB: bandwidthGB.toFixed(2),
-      apiCalls: Number(usage.total_api_calls || 0)
+      uploadGB: uploadGB.toFixed(2),
+      downloadGB: downloadGB.toFixed(2),
+      apiCalls: Number(usage.total_api_calls || 0),
+      uploadCalls: Number(usage.total_upload_calls || 0),
+      downloadCalls: Number(usage.total_download_calls || 0),
+      deleteCalls: Number(usage.total_delete_calls || 0),
+      listCalls: Number(usage.total_list_calls || 0)
     },
     costs: {
       storage: storageCost.toFixed(4),
       bandwidth: bandwidthCost.toFixed(4),
+      metaOps: metaOpsCost.toFixed(4),
+      accessOps: accessOpsCost.toFixed(4),
       total: totalCost.toFixed(2)
+    },
+    plan: {
+      name: plan.name,
+      type: plan.type,
+      storageLimit: plan.storage_gb,
+      bandwidthLimit: plan.bandwidth_gb,
+      apiCallsLimit: plan.api_calls,
+      freeBandwidthMultiplier: plan.free_bandwidth_multiplier
     },
     billingPeriod: {
       start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -275,10 +353,9 @@ export const getPendingInvoices = asyncHandler(async (req, res) => {
       billing_period_end,
       storage_gb_hours,
       bandwidth_gb,
-      request_count,
+      api_calls,
       total_cost,
       payment_status,
-      due_date,
       created_at
     FROM usage_billing
     WHERE user_id = $1 AND payment_status IN ('pending', 'overdue')

@@ -20,7 +20,7 @@ import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
 import FileManager from './pages/dashboard/FileManager';
 import Pricing from './pages/Pricing';
-import Billing from './pages/dashboard/BillingNew';
+import Billing from './pages/dashboard/Billing';
 import Settings from './pages/dashboard/Settings';
 import ApiKeys from './pages/dashboard/ApiKeys';
 import Usage from './pages/dashboard/Usage';

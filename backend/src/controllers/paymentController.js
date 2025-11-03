@@ -1,99 +1,9 @@
 import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
-import { createRazorpayOrder, verifyRazorpaySignature, verifyRazorpayWebhook } from '../services/razorpayService.js';
 import { createLemonSqueezyCheckout, verifyLemonSqueezyWebhook } from '../services/lemonSqueezyService.js';
 
-// Create payment order (Razorpay for India)
-export const createRazorpayPayment = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-  const { amount, planId, currency = 'INR' } = req.body;
-
-  // Get plan details
-  const planResult = await query('SELECT * FROM plans WHERE id = $1', [planId]);
-  
-  if (planResult.rows.length === 0) {
-    return errorResponse(res, 'Plan not found', 404);
-  }
-
-  const plan = planResult.rows[0];
-
-  // Create Razorpay order
-  const receipt = `rcpt_${Date.now()}_${userId.substring(0, 8)}`;
-  const order = await createRazorpayOrder(amount, currency, receipt, {
-    userId,
-    planId,
-    planName: plan.name
-  });
-
-  // Store payment record
-  const paymentResult = await query(
-    `INSERT INTO payments (
-      user_id, plan_id, amount, currency, status, payment_method,
-      payment_gateway, transaction_id, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING *`,
-    [
-      userId,
-      planId,
-      amount,
-      currency,
-      'pending',
-      'razorpay',
-      'razorpay',
-      order.id,
-      { orderId: order.id, receipt }
-    ]
-  );
-
-  successResponse(res, {
-    orderId: order.id,
-    amount: order.amount,
-    currency: order.currency,
-    payment: paymentResult.rows[0]
-  });
-});
-
-// Verify Razorpay payment
-export const verifyRazorpayPayment = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-  const { orderId, paymentId, signature, planId } = req.body;
-
-  // Verify signature
-  const isValid = verifyRazorpaySignature(orderId, paymentId, signature);
-
-  if (!isValid) {
-    return errorResponse(res, 'Invalid payment signature', 400);
-  }
-
-  await transaction(async (client) => {
-    // Update payment status
-    await client.query(
-      `UPDATE payments 
-       SET status = $1, transaction_id = $2, metadata = metadata || $3::jsonb, updated_at = CURRENT_TIMESTAMP
-       WHERE transaction_id = $4 AND user_id = $5`,
-      ['completed', paymentId, JSON.stringify({ paymentId, verified: true }), orderId, userId]
-    );
-
-    // Update user's plan
-    await client.query(
-      `UPDATE users 
-       SET plan_id = $1, plan_start_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [planId, userId]
-    );
-
-    // Log activity
-    await client.query(
-      'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
-      [userId, 'payment_completed', { orderId, paymentId, planId, gateway: 'razorpay' }]
-    );
-  });
-
-  successResponse(res, { verified: true }, 'Payment verified successfully');
-});
-
-// Create Lemon Squeezy checkout (for international)
+// Create Lemon Squeezy checkout
 export const createLemonSqueezyPayment = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { variantId, planId } = req.body;
@@ -140,35 +50,7 @@ export const createLemonSqueezyPayment = asyncHandler(async (req, res) => {
   });
 });
 
-// Razorpay webhook
-export const razorpayWebhook = asyncHandler(async (req, res) => {
-  const signature = req.headers['x-razorpay-signature'];
-  const payload = JSON.stringify(req.body);
-
-  // Verify webhook signature
-  const isValid = verifyRazorpayWebhook(payload, signature);
-
-  if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Invalid signature' });
-  }
-
-  const event = req.body.event;
-  const paymentData = req.body.payload.payment.entity;
-
-  if (event === 'payment.captured') {
-    // Update payment status
-    await query(
-      `UPDATE payments 
-       SET status = $1, metadata = metadata || $2::jsonb, updated_at = CURRENT_TIMESTAMP
-       WHERE transaction_id = $3`,
-      ['completed', JSON.stringify({ webhookEvent: event, webhookData: paymentData }), paymentData.order_id]
-    );
-  }
-
-  res.status(200).json({ success: true });
-});
-
-// Lemon Squeezy webhook
+// Lemon Squeezy webhook (handled by webhookController.js now)
 export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
   const signature = req.headers['x-signature'];
   const payload = JSON.stringify(req.body);
@@ -248,10 +130,7 @@ export const getPaymentHistory = asyncHandler(async (req, res) => {
 });
 
 export default {
-  createRazorpayPayment,
-  verifyRazorpayPayment,
   createLemonSqueezyPayment,
-  razorpayWebhook,
   lemonSqueezyWebhook,
   getPaymentHistory
 };

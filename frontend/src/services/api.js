@@ -92,17 +92,19 @@ export const bucketAPI = {
 };
 
 export const fileAPI = {
-  upload: (bucketId, formData, config = {}) => {
+  upload: (bucketId, formData, onUploadProgress) => {
     return api.post(apiConfig.endpoints.uploadFile(bucketId), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      ...config
+      onUploadProgress
     });
   },
   getAll: (bucketId, params) => api.get(apiConfig.endpoints.getFiles(bucketId), { params }),
   getById: (fileId) => api.get(apiConfig.endpoints.getFile(fileId)),
   download: (fileId) => {
-    return api.get(apiConfig.endpoints.downloadFile(fileId), {
-      responseType: 'blob'
+    // For download, we need the full URL since it returns a file, not JSON
+    const token = localStorage.getItem('token');
+    return Promise.resolve({
+      downloadUrl: `${apiConfig.API_URL}${apiConfig.endpoints.downloadFile(fileId)}?token=${token}`
     });
   },
   delete: (fileId) => api.delete(apiConfig.endpoints.deleteFile(fileId)),

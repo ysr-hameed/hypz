@@ -29,7 +29,8 @@ const Buckets = () => {
     try {
       setLoading(true);
       const response = await bucketAPI.getAll({ search: searchQuery });
-      setBuckets(response.data.buckets || []);
+      // Response interceptor already unwraps data, so response.buckets not response.data.buckets
+      setBuckets(response.buckets || []);
     } catch (error) {
       console.error('Failed to fetch buckets:', error);
       toast.error('Failed to load buckets');

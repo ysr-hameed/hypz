@@ -21,7 +21,7 @@ const config = {
     bucket: (id) => `/buckets/${id}`,
     bucketStats: (id) => `/buckets/${id}/stats`,
 
-    // Files
+    // Files - Mounted at /api/v1/files
     uploadFile: (bucketId) => `/files/${bucketId}/upload`,
     getFiles: (bucketId) => `/files/${bucketId}/files`,
     getFile: (fileId) => `/files/file/${fileId}`,

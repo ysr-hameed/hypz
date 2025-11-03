@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, Loader2, Star, Sparkles, Zap } from 'lucide-react';
 import { plansAPI } from '../../services/api';
-import PaymentModal from '../../components/PaymentModalNew';
+import PaymentModal from '../../components/PaymentModal';
 import { SkeletonPlans } from '../../components/SkeletonLoaders';
 
 const Plans = () => {
