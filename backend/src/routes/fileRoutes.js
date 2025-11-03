@@ -24,7 +24,10 @@ const authMiddleware = (req, res, next) => {
   return authenticate(req, res, next);
 };
 
-// Routes - All routes enforce ownership and permissions
+// Public routes (no authentication required)
+router.get('/public/:fileId/download', publicDownloadFile);
+
+// Protected routes - All routes enforce ownership and permissions
 router.post('/:bucketId/upload', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), uploadLimiter, upload.single('file'), uploadFile);
 router.get('/:bucketId/files', authMiddleware, requirePermission('files:read'), requireOwnership('bucket'), getFiles);
 router.get('/file/:fileId', authMiddleware, requirePermission('files:read'), requireOwnership('file'), getFile);

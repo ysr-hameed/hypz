@@ -5,28 +5,18 @@
 
 export const performanceMonitor = (req, res, next) => {
   const start = process.hrtime();
-  
-  // Store original end function
-  const originalEnd = res.end;
-  
-  // Override end function
-  res.end = function(...args) {
-    // Calculate duration
+
+  // Use finish event to log duration without mutating response methods
+  res.on('finish', () => {
     const diff = process.hrtime(start);
-    const time = (diff[0] * 1e9 + diff[1]) / 1e6; // Convert to milliseconds
-    
-    // Set response time header
-    res.setHeader('X-Response-Time', `${time.toFixed(2)}ms`);
-    
-    // Log slow requests (>500ms)
+    const time = (diff[0] * 1e9 + diff[1]) / 1e6; // ms
+
+    // NOTE: Do not set headers here; headers are already sent at 'finish'
     if (time > 500) {
       console.warn(`⚠️  Slow request: ${req.method} ${req.originalUrl} - ${time.toFixed(2)}ms`);
     }
-    
-    // Call original end function
-    originalEnd.apply(res, args);
-  };
-  
+  });
+
   next();
 };
 

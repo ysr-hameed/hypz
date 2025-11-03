@@ -250,36 +250,70 @@ export const downloadFile = asyncHandler(async (req, res) => {
   }
 
   const file = result.rows[0];
+  console.log('Download request for file:', {
+    id: file.id,
+    path: file.path,
+    url: file.url,
+    b2_file_id: file.b2_file_id,
+    is_public: file.is_public
+  });
 
-  // Check if file exists on disk
-  try {
-    await fs.access(file.path);
-  } catch (error) {
-    return errorResponse(res, 'File not found on server', 404);
-  }
+  // Increment download counter (non-blocking)
+  query('UPDATE files SET downloads = downloads + 1 WHERE id = $1', [fileId])
+    .catch(err => console.error('Failed to update download count:', err));
 
-  // Increment download counter
-  await query(
-    'UPDATE files SET downloads = downloads + 1 WHERE id = $1',
-    [fileId]
-  );
-
-  // Update bandwidth usage
-  await query(
+  // Update bandwidth usage (non-blocking; conservative if size unknown later)
+  query(
     `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
-     VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
+     VALUES ($1, $2, $3, $3, 1, 1)
      ON CONFLICT (user_id, date)
      DO UPDATE SET 
-       bandwidth_bytes = usage_records.bandwidth_bytes + $2,
-       download_bytes = usage_records.download_bytes + $2,
+       bandwidth_bytes = usage_records.bandwidth_bytes + EXCLUDED.bandwidth_bytes,
+       download_bytes = usage_records.download_bytes + EXCLUDED.download_bytes,
        download_calls = usage_records.download_calls + 1,
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
-    [userId, file.size]
-  );
+    [userId, new Date().toISOString().slice(0, 10), file.size || 0]
+  ).catch(err => console.error('Failed to update usage:', err));
 
-  // Send file
-  res.download(file.path, file.original_name);
+  // If stored in Backblaze B2, stream or redirect appropriately
+  if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
+    try {
+      // For private buckets, stream via SDK; for public buckets, redirect to URL
+      if (file.url && file.url.includes('/file/') && file.is_public) {
+        return res.redirect(file.url);
+      }
+
+      // Attempt streaming from B2 (defaults to private bucket when bucket not provided)
+  const { downloadFromB2 } = await import('../services/b2Service.js');
+  const data = await downloadFromB2(file.path);
+
+      // Set headers and send
+      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+
+      if (data && typeof data.pipe === 'function') {
+        return data.pipe(res);
+      }
+      return res.send(data);
+    } catch (err) {
+      console.error('B2 download failed, falling back:', err);
+      // If B2 streaming fails but URL exists, try redirect as last resort
+      if (file.url) {
+        return res.redirect(file.url);
+      }
+      return errorResponse(res, 'File not available', 404);
+    }
+  }
+
+  // Local storage path
+  try {
+    await fs.access(file.path);
+    return res.download(file.path, file.original_name);
+  } catch (error) {
+    console.error('Local download failed:', error?.message || error);
+    return errorResponse(res, 'File not found on server', 404);
+  }
 });
 
 // Delete file
