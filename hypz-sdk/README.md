@@ -1,20 +1,33 @@
 # Hypz Cloud Storage SDK
 
-Official JavaScript/TypeScript SDK for [Hypz Cloud Storage](https://hypz.io) - S3-compatible cloud storage made simple.
+Official SDKs for [Hypz Cloud Storage](https://hypz.io) - S3-compatible cloud storage made simple.
+
+Available in **JavaScript/TypeScript** and **Python** 🎉
 
 [![npm version](https://badge.fury.io/js/hypz-cloud-sdk.svg)](https://www.npmjs.com/package/hypz-cloud-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Available SDKs
+
+### 🟨 JavaScript/TypeScript SDK (This Directory)
+Full-featured SDK for Node.js and browser environments.
+
+### 🐍 Python SDK ([See python/ folder](./python/))
+Full-featured Python client for server-side applications. [Get Started →](./python/QUICKSTART.md)
 
 ## Features
 
 ✨ **Easy to Use** - Simple, intuitive API
 🔐 **Secure** - API key authentication
-📦 **TypeScript Support** - Full type definitions included
-🚀 **Fast** - Built on Axios for optimal performance
-🌐 **Universal** - Works in Browser and Node.js
+📦 **TypeScript Support** - Full type definitions included (JS SDK)
+🐍 **Python Support** - NEW! Full-featured Python SDK
+🚀 **Fast** - Built on Axios (JS) / Requests (Python) for optimal performance
+🌐 **Universal** - Works in Browser and Node.js (JS) / Python 3.7+ (Python)
 📝 **Well Documented** - Comprehensive guides and examples
 
 ## Installation
+
+### JavaScript/TypeScript
 
 ```bash
 npm install hypz-cloud-sdk
@@ -26,13 +39,28 @@ Or with yarn:
 yarn add hypz-cloud-sdk
 ```
 
+### Python
+
+```bash
+cd python
+pip install -e .
+```
+
+Or install requirements only:
+
+```bash
+pip install requests>=2.25.0
+```
+
 ## Quick Start
 
-### 1. Get Your API Key
+### JavaScript/TypeScript
+
+#### 1. Get Your API Key
 
 Sign up at [hypz.io](https://hypz.io) and create an API key from your dashboard.
 
-### 2. Initialize the SDK
+#### 2. Initialize the SDK
 
 ```javascript
 const { Hypz } = require('hypz-cloud-sdk');
@@ -71,6 +99,50 @@ const file = await hypz.uploadFile(bucket.id, fileInput.files[0], {
 
 console.log('File uploaded:', file.url);
 ```
+
+### Python
+
+#### 1. Get Your API Key
+
+Create an API key from your dashboard at http://localhost:5173
+
+#### 2. Initialize the SDK
+
+```python
+from hypz import HypzClient
+
+# Initialize client
+client = HypzClient(api_key='your_api_key_here')
+```
+
+#### 3. Create a Bucket
+
+```python
+bucket = client.buckets.create(
+    name='my-bucket',
+    description='My first bucket',
+    visibility='private'
+)
+```
+
+#### 4. Upload Files
+
+```python
+# Upload from file path
+file = client.files.upload(
+    bucket_id=bucket['id'],
+    file_path='./photo.jpg',
+    is_public=False,
+    tags=['photo', 'vacation'],
+    metadata={'location': 'Paris'}
+)
+
+print(f"File uploaded: {file['url']}")
+```
+
+**👉 For complete Python SDK documentation, see [python/README.md](./python/README.md)**
+
+**👉 For Python quick start, see [python/QUICKSTART.md](./python/QUICKSTART.md)**
 
 ## API Reference
 

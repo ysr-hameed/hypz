@@ -15,6 +15,7 @@ import {
   requestLogger,
   sanitizeData
 } from './middleware/security.js';
+import { performanceMonitor } from './middleware/performance.js';
 
 // Routes
 import authRoutes from './routes/authRoutes.js';
@@ -43,6 +44,9 @@ const app = express();
 
 // Trust proxy (important for rate limiting and IP detection)
 app.set('trust proxy', 1);
+
+// Performance monitoring
+app.use(performanceMonitor);
 
 // Security middleware
 app.use(helmetConfig);

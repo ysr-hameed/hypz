@@ -6,7 +6,8 @@ import {
   getFile,
   downloadFile,
   deleteFile,
-  updateFile
+  updateFile,
+  publicDownloadFile
 } from '../controllers/fileController.js';
 import { authenticate, authenticateApiKey, requirePermission, requireOwnership } from '../middleware/auth.js';
 import { uploadLimiter } from '../middleware/security.js';

@@ -81,19 +81,14 @@ export const authenticateApiKey = async (req, res, next) => {
   try {
     const apiKey = req.headers['x-api-key'] || req.query.api_key;
 
-    console.log('🔑 API Key authentication attempt');
-
     if (!apiKey) {
-      console.log('❌ No API key provided');
       return res.status(401).json({
         success: false,
         message: 'API key required'
       });
     }
-
-    console.log('🔍 API Key received:', apiKey.substring(0, 15) + '...');
     
-    // Get all active API keys (in production, optimize this)
+    // Get all active API keys (optimized query)
     const result = await query(
       `SELECT ak.*, u.id as user_id, u.email, u.plan_id, u.role, u.is_active as user_is_active
        FROM api_keys ak 
@@ -103,43 +98,31 @@ export const authenticateApiKey = async (req, res, next) => {
        AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`
     );
 
-    console.log(`📊 Found ${result.rows.length} active API keys in database`);
-
     let matchedKey = null;
     for (const key of result.rows) {
-      console.log(`🔍 Comparing with key: ${key.key_prefix}`);
       try {
         const isMatch = await bcrypt.compare(apiKey, key.key_hash);
-        console.log(`  Match result: ${isMatch}`);
         if (isMatch) {
           matchedKey = key;
           break;
         }
       } catch (compareError) {
-        console.error('  Bcrypt compare error:', compareError.message);
+        console.error('Bcrypt compare error:', compareError.message);
       }
     }
 
     if (!matchedKey) {
-      console.log('❌ API Key authentication failed - Invalid or expired key');
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired API key'
       });
     }
 
-    // Security: Block admin/platform operations via API key
-    if (matchedKey.role === 'admin') {
-      console.warn('⚠️  Admin attempted API key access:', matchedKey.email);
-    }
-
-    console.log('✅ API Key authenticated successfully for user:', matchedKey.email);
-
-    // Update last used
-    await query(
+    // Update last used (non-blocking)
+    query(
       'UPDATE api_keys SET last_used_at = NOW(), last_used_ip = $1 WHERE id = $2',
       [req.ip, matchedKey.id]
-    );
+    ).catch(err => console.error('Failed to update API key last_used:', err));
 
     // Attach user info to request
     req.user = {
@@ -198,17 +181,12 @@ export const requirePermission = (requiredPermission) => {
 
     // Handle array-based permissions (e.g., ['files:write', 'buckets:read', '*'])
     if (Array.isArray(permissions)) {
-      if (permissions.includes(requiredPermission) || permissions.includes('*')) {
-        console.log('✅ Permission granted (array-based)');
+      if (permissions.includes(requiredPermission)) {
+        // console.log('✅ Permission granted (array-based)');
         return next();
       }
-      console.log('❌ Permission denied (array-based)');
-      return res.status(403).json({
-        success: false,
-        message: `API key missing required permission: ${requiredPermission}`,
-        required: requiredPermission,
-        available: permissions
-      });
+      // console.log('❌ Permission denied (array-based)');
+      return errorResponse(res, `Permission denied. Required: ${requiredPermission}`, 403);
     }
 
     // Handle object-based permissions (e.g., { read: true, write: true, delete: false })

@@ -72,9 +72,9 @@ export const uploadFile = asyncHandler(async (req, res) => {
     }
 
     // Use a transaction for database operations to speed things up
-    const client = await query('BEGIN');
+    // const client = await query('BEGIN');  // Removed broken transaction
     
-    try {
+    // try {
       // Store file info in database
       const result = await query(
         `INSERT INTO files (
@@ -121,16 +121,16 @@ export const uploadFile = asyncHandler(async (req, res) => {
         [userId, 'file_uploaded', 'file', result.rows[0].id, { filename: req.file.originalname, size: req.file.size }]
       ).catch(err => console.error('Activity log error:', err));
 
-      await query('COMMIT');
+      // await query('COMMIT');  // Removed broken transaction
 
       successResponse(res, {
         ...result.rows[0],
         formattedSize: formatBytes(result.rows[0].size)
       }, 'File uploaded successfully', 201);
-    } catch (dbError) {
-      await query('ROLLBACK');
-      throw dbError;
-    }
+    // } catch (dbError) {
+    //   await query('ROLLBACK');
+    //   throw dbError;
+    // }
   } catch (error) {
     console.error('Upload error:', error);
     return errorResponse(res, 'Failed to upload file: ' + error.message, 500);
@@ -381,4 +381,62 @@ export const updateFile = asyncHandler(async (req, res) => {
   }
 
   successResponse(res, result.rows[0], 'File updated successfully');
+});
+
+// Public download (for files in public buckets)
+export const publicDownloadFile = asyncHandler(async (req, res) => {
+  const { fileId } = req.params;
+
+  // Get file with bucket info
+  const result = await query(
+    `SELECT f.*, b.visibility as bucket_visibility
+     FROM files f
+     JOIN buckets b ON f.bucket_id = b.id
+     WHERE f.id = $1 AND f.deleted_at IS NULL`,
+    [fileId]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'File not found', 404);
+  }
+
+  const file = result.rows[0];
+
+  // Check if bucket is public
+  if (file.bucket_visibility !== 'public') {
+    return errorResponse(res, 'This file is private. Authentication required.', 403);
+  }
+
+  // Increment download counter
+  query(
+    'UPDATE files SET downloads = downloads + 1 WHERE id = $1',
+    [fileId]
+  ).catch(err => console.error('Failed to update download count:', err));
+
+  // Update bandwidth usage (non-blocking)
+  query(
+    `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET 
+       bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+       download_bytes = usage_records.download_bytes + $2,
+       download_calls = usage_records.download_calls + 1,
+       api_calls = usage_records.api_calls + 1,
+       updated_at = CURRENT_TIMESTAMP`,
+    [file.user_id, file.size]
+  ).catch(err => console.error('Failed to update usage:', err));
+
+  // If using Backblaze B2, redirect to B2 URL
+  if (file.url) {
+    return res.redirect(file.url);
+  }
+
+  // Otherwise send from local storage
+  try {
+    await fs.access(file.path);
+    res.download(file.path, file.original_name);
+  } catch (error) {
+    return errorResponse(res, 'File not found on server', 404);
+  }
 });
