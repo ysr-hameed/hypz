@@ -279,14 +279,31 @@ export const downloadFile = asyncHandler(async (req, res) => {
   // If stored in Backblaze B2, stream or redirect appropriately
   if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
     try {
-      // For private buckets, stream via SDK; for public buckets, redirect to URL
-      if (file.url && file.url.includes('/file/') && file.is_public) {
+      // If we have B2 file ID, prefer downloading by ID for private buckets
+      if (file.b2_file_id) {
+        console.log('Attempting B2 download by ID:', file.b2_file_id);
+        const { streamById } = await import('../services/b2Service.js');
+        const stream = await streamById(file.b2_file_id);
+        res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        return stream.pipe(res);
+      }
+
+      // Determine B2 bucket from URL if present
+      let bucketName = null;
+      if (file.url) {
+        const match = file.url.match(/\/file\/([^/]+)\//);
+        if (match) bucketName = match[1];
+      }
+
+      // If it's clearly in the configured PUBLIC bucket, allow redirect
+      if (bucketName && bucketName === config.B2_PUBLIC_BUCKET_NAME) {
         return res.redirect(file.url);
       }
 
-      // Attempt streaming from B2 (defaults to private bucket when bucket not provided)
-  const { downloadFromB2 } = await import('../services/b2Service.js');
-  const data = await downloadFromB2(file.path);
+      // Otherwise stream from B2 (private or unknown bucket)
+      const { downloadFromB2 } = await import('../services/b2Service.js');
+      const data = await downloadFromB2(file.path, bucketName || undefined);
 
       // Set headers and send
       res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');

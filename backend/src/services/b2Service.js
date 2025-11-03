@@ -1,4 +1,5 @@
 import B2 from 'backblaze-b2';
+import axios from 'axios';
 import config from '../config/config.js';
 import crypto from 'crypto';
 
@@ -117,6 +118,7 @@ export const downloadFromB2 = async (fileName, bucketName) => {
 
     // Use provided bucket name or default to private bucket
     const targetBucket = bucketName || config.B2_PRIVATE_BUCKET_NAME;
+    console.log('B2 download request:', { bucketName: targetBucket, fileName });
 
     const response = await b2.downloadFileByName({
       bucketName: targetBucket,
@@ -125,7 +127,47 @@ export const downloadFromB2 = async (fileName, bucketName) => {
 
     return response.data;
   } catch (error) {
-    console.error('Error downloading from B2:', error);
+    console.error('Error downloading from B2:', error?.response?.data || error?.message || error);
+    throw error;
+  }
+};
+
+// Download by file ID (works reliably for private buckets)
+export const downloadById = async (fileId) => {
+  try {
+    if (!b2) {
+      await initializeB2();
+    }
+    if (!b2) {
+      throw new Error('Backblaze B2 not initialized');
+    }
+    console.log('B2 download by ID:', { fileId });
+    const response = await b2.downloadFileById({ fileId });
+    return response.data;
+  } catch (error) {
+    console.error('Error downloading by ID from B2:', error?.response?.data || error?.message || error);
+    throw error;
+  }
+};
+
+// Stream using raw axios against b2_download_file_by_id (works with account auth)
+export const streamById = async (fileId) => {
+  try {
+    if (!b2) {
+      await initializeB2();
+    }
+    if (!b2 || !authorizationToken || !apiUrl) {
+      throw new Error('Backblaze B2 not initialized');
+    }
+    const url = `${apiUrl}/b2api/v2/b2_download_file_by_id?fileId=${encodeURIComponent(fileId)}`;
+    console.log('B2 raw stream by ID:', { url });
+    const resp = await axios.get(url, {
+      responseType: 'stream',
+      headers: { Authorization: authorizationToken }
+    });
+    return resp.data; // stream
+  } catch (error) {
+    console.error('Error streaming by ID from B2:', error?.response?.status, error?.response?.data || error?.message || error);
     throw error;
   }
 };
