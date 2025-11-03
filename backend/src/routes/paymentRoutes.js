@@ -1,31 +1,23 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import {
-  createRazorpayPayment,
-  verifyRazorpayPayment,
   createLemonSqueezyPayment,
-  razorpayWebhook,
-  lemonSqueezyWebhook,
   getPaymentHistory
 } from '../controllers/paymentController.js';
+import { handleLemonSqueezyWebhook } from '../controllers/webhookController.js';
 
 const router = express.Router();
 
-// Webhook routes (no auth required)
-router.post('/webhook/razorpay', razorpayWebhook);
-router.post('/webhook/lemonsqueezy', lemonSqueezyWebhook);
+// Webhook routes (no auth - verified by signature)
+router.post('/webhook/lemonsqueezy', express.raw({ type: 'application/json' }), handleLemonSqueezyWebhook);
 
-// Protected routes
+// Authenticated routes
 router.use(authenticate);
 
-// Razorpay routes
-router.post('/razorpay/create', createRazorpayPayment);
-router.post('/razorpay/verify', verifyRazorpayPayment);
+// LemonSqueezy routes
+router.post('/lemonsqueezy/checkout', createLemonSqueezyPayment);
 
-// Lemon Squeezy routes
-router.post('/lemonsqueezy/create', createLemonSqueezyPayment);
-
-// Payment history
+// Get payment history
 router.get('/history', getPaymentHistory);
 
 export default router;

@@ -92,10 +92,10 @@ export const bucketAPI = {
 };
 
 export const fileAPI = {
-  upload: (bucketId, formData, onProgress) => {
+  upload: (bucketId, formData, config = {}) => {
     return api.post(apiConfig.endpoints.uploadFile(bucketId), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: onProgress
+      ...config
     });
   },
   getAll: (bucketId, params) => api.get(apiConfig.endpoints.getFiles(bucketId), { params }),

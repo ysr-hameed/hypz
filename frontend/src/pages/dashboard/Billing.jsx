@@ -68,9 +68,8 @@ const Billing = () => {
     updateRenewalSettings(autoRenew ? 'auto' : 'manual', !autoUpgrade);
   };
 
-  const currency = userData?.region === 'india' ? '₹' : '$';
-  const priceKey = userData?.region === 'india' ? 'priceINR' : 'priceUSD';
-  const currentPrice = planDetails?.[priceKey] || 0;
+  const currency = '$';
+  const currentPrice = planDetails?.priceUSD || 0;
 
   return (
     <div className="p-6 space-y-6 content-wrapper content-loaded">

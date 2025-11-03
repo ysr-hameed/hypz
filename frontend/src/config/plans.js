@@ -325,7 +325,6 @@ export const CURRENCIES = [
   { code: "USD", symbol: "$", name: "US Dollar", provider: "lemon_squeezy", flag: "🇺🇸" },
   { code: "EUR", symbol: "€", name: "Euro", provider: "lemon_squeezy", flag: "🇪🇺" },
   { code: "GBP", symbol: "£", name: "British Pound", provider: "lemon_squeezy", flag: "🇬🇧" },
-  { code: "INR", symbol: "₹", name: "Indian Rupee", provider: "razorpay", flag: "🇮🇳" },
   { code: "CAD", symbol: "C$", name: "Canadian Dollar", provider: "lemon_squeezy", flag: "🇨🇦" },
   { code: "AUD", symbol: "A$", name: "Australian Dollar", provider: "lemon_squeezy", flag: "🇦🇺" },
 ];

@@ -4,7 +4,6 @@ import { paymentAPI, plansAPI, configAPI } from '../services/api';
 
 const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
-  const [country, setCountry] = useState('US');
   const [error, setError] = useState(null);
   const [config, setConfig] = useState(null);
 
@@ -21,97 +20,10 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
     fetchConfig();
   }, []);
 
-  // Detect user's country for payment gateway selection
-  useEffect(() => {
-    fetch('https://ipapi.co/json/')
-      .then(res => res.json())
-      .then(data => {
-        setCountry(data.country_code || 'US');
-      })
-      .catch(() => setCountry('US'));
-  }, []);
+  const currency = 'USD';
+  const price = plan.price_usd;
 
-  const isIndia = country === 'IN';
-  const currency = isIndia ? 'INR' : 'USD';
-  const price = isIndia ? plan.price_inr : plan.price_usd;
-
-  // Handle Razorpay payment (for India)
-  const handleRazorpayPayment = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Create Razorpay order
-      const response = await paymentAPI.createRazorpayOrder({
-        amount: Math.round(price * 100), // Convert to paise
-        planId: plan.id,
-        currency: 'INR'
-      });
-
-      const { orderId, amount } = response.data;
-
-      // Load Razorpay script
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      document.body.appendChild(script);
-
-      script.onload = () => {
-        const options = {
-          key: config?.payment?.razorpay?.keyId,
-          amount: amount,
-          currency: 'INR',
-          name: 'Hypz Storage',
-          description: `Subscribe to ${plan.name}`,
-          order_id: orderId,
-          handler: async function (response) {
-            try {
-              // Verify payment on backend
-              await paymentAPI.verifyRazorpayPayment({
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                planId: plan.id
-              });
-
-              // Update user's plan
-              await plansAPI.updateUserPlan(plan.id);
-
-              onSuccess?.();
-              onClose();
-            } catch (err) {
-              setError('Payment verification failed. Please contact support.');
-            }
-          },
-          prefill: {
-            email: localStorage.getItem('userEmail') || '',
-          },
-          theme: {
-            color: '#6366f1'
-          },
-          modal: {
-            ondismiss: function() {
-              setLoading(false);
-            }
-          }
-        };
-
-        const razorpay = new window.Razorpay(options);
-        razorpay.open();
-      };
-
-      script.onerror = () => {
-        setError('Failed to load payment gateway. Please try again.');
-        setLoading(false);
-      };
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'Payment failed. Please try again.');
-      setLoading(false);
-    }
-  };
-
-  // Handle Lemon Squeezy payment (for international)
+  // Handle Lemon Squeezy payment
   const handleLemonSqueezyPayment = async () => {
     try {
       setLoading(true);
@@ -153,8 +65,6 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const handleSubscribe = () => {
     if (plan.type === 'free' || price === 0) {
       handleFreePlan();
-    } else if (isIndia) {
-      handleRazorpayPayment();
     } else {
       handleLemonSqueezyPayment();
     }
@@ -199,7 +109,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
               <div className="mt-4 pt-4 border-t border-primary-200 dark:border-primary-700">
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {currency === 'INR' ? '₹' : '$'}{price}
+                    ${price}
                   </span>
                   <span className="text-gray-600 dark:text-gray-400">/month</span>
                 </div>
@@ -223,19 +133,9 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
                 </span>
               </div>
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                {isIndia ? (
-                  <>
-                    Powered by <span className="font-semibold">Razorpay</span>
-                    <br />
-                    <span className="text-xs">Supports UPI, Cards, Net Banking, Wallets & more</span>
-                  </>
-                ) : (
-                  <>
-                    Powered by <span className="font-semibold">Lemon Squeezy</span>
-                    <br />
-                    <span className="text-xs">Supports Credit/Debit Cards, PayPal & more</span>
-                  </>
-                )}
+                Powered by <span className="font-semibold">Lemon Squeezy</span>
+                <br />
+                <span className="text-xs">Supports Credit/Debit Cards, PayPal & more</span>
               </p>
             </div>
           )}

@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Globe, Code, Check, Star } from 'lucide-react';
 import { PLANS_DATA } from '../config/plans';
+import { useUser } from '../context/UserContext';
 
 const Landing = () => {
+  const { isAuthenticated } = useUser();
   const freePlan = PLANS_DATA.plans.free;
   const paygPlan = PLANS_DATA.plans.payg;
   
@@ -36,13 +38,23 @@ const Landing = () => {
               Store, manage, and deliver files globally with our S3-compatible object storage. Simple pricing, powerful APIs.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                to="/register"
-                className="inline-flex items-center px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg transition shadow-xl shadow-primary-500/50"
-              >
-                Start Free Trial
-                <ArrowRight className="ml-2" size={20} />
-              </Link>
+              {isAuthenticated ? (
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg transition shadow-xl shadow-primary-500/50"
+                >
+                  Get Started
+                  <ArrowRight className="ml-2" size={20} />
+                </Link>
+              ) : (
+                <Link
+                  to="/register"
+                  className="inline-flex items-center px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg transition shadow-xl shadow-primary-500/50"
+                >
+                  Start Free Trial
+                  <ArrowRight className="ml-2" size={20} />
+                </Link>
+              )}
               <Link
                 to="/docs"
                 className="inline-flex items-center px-8 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition"

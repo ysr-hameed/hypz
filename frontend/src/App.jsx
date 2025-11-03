@@ -19,9 +19,8 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
 import FileManager from './pages/dashboard/FileManager';
-import Plans from './pages/dashboard/Plans';
 import Pricing from './pages/Pricing';
-import Billing from './pages/dashboard/Billing';
+import Billing from './pages/dashboard/BillingNew';
 import Settings from './pages/dashboard/Settings';
 import ApiKeys from './pages/dashboard/ApiKeys';
 import Usage from './pages/dashboard/Usage';
@@ -102,7 +101,6 @@ function AppContent() {
             <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/file-manager" element={<FileManager />} />
-              <Route path="/dashboard/plans" element={<Plans />} />
               <Route path="/buckets" element={<Buckets />} />
               <Route path="/buckets/:bucketId" element={<BucketDetails />} />
               <Route path="/billing" element={<Billing />} />

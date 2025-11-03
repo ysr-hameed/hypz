@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { plansAPI } from '../services/api';
 import { apiCache } from '../utils/apiCache';
 import { useUser } from '../context/UserContext';
+import PaymentModal from '../components/PaymentModalNew';
+import { toast } from 'react-hot-toast';
 
 const Pricing = () => {
   const [plans, setPlans] = useState([]);
@@ -118,8 +120,8 @@ const Pricing = () => {
       localStorage.setItem('selectedPlan', plan.id);
       navigate('/register');
     } else {
-      // Redirect to dashboard plans page for authenticated users
-      navigate('/dashboard/plans');
+      // Keep users on the pricing page (no navigation needed)
+      setSelectedPlan(plan);
     }
   };
 
@@ -378,10 +380,7 @@ const Pricing = () => {
                     <span className="text-5xl font-bold text-white">${proPlan.price_usd}</span>
                     <span className="text-white/70">/month</span>
                   </div>
-                  <p className="text-sm text-yellow-300 font-medium mt-2">
-                    or ₹{proPlan.price_inr}/month
-                  </p>
-                  <p className="text-sm text-white/80 mt-1">
+                  <p className="text-sm text-white/80 mt-2">
                     Save 60% vs AWS for similar usage
                   </p>
                 </div>
@@ -802,6 +801,19 @@ const Pricing = () => {
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {selectedPlan && (
+        <PaymentModal
+          plan={selectedPlan}
+          onClose={() => setSelectedPlan(null)}
+          onSuccess={() => {
+            setSelectedPlan(null);
+            toast.success('Successfully subscribed to ' + selectedPlan.name + '!');
+            navigate('/dashboard');
+          }}
+        />
+      )}
     </div>
   );
 };

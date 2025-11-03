@@ -30,6 +30,13 @@ const createTables = async () => {
         two_factor_backup_codes TEXT[],
         last_login TIMESTAMP,
         last_login_ip VARCHAR(45),
+        auto_renew BOOLEAN DEFAULT true,
+        subscription_id VARCHAR(255),
+        subscription_status VARCHAR(50),
+        lemon_customer_id VARCHAR(255),
+        billing_cycle_day INTEGER DEFAULT 1,
+        next_billing_date DATE,
+        services_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -155,30 +162,132 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id);
     `);
 
-    // Payments/Subscriptions table
+    // Subscriptions table - tracks all subscriptions (Pro, PAYG, etc.)
     await query(`
-      CREATE TABLE IF NOT EXISTS payments (
+      CREATE TABLE IF NOT EXISTS subscriptions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         plan_id VARCHAR(50) NOT NULL,
-        amount DECIMAL(10, 2) NOT NULL,
-        currency VARCHAR(3) DEFAULT 'USD',
-        status VARCHAR(20) DEFAULT 'pending',
-        payment_method VARCHAR(50),
-        payment_gateway VARCHAR(50),
-        transaction_id VARCHAR(255),
-        invoice_url TEXT,
-        period_start DATE,
-        period_end DATE,
+        lemon_subscription_id VARCHAR(255) UNIQUE,
+        lemon_customer_id VARCHAR(255),
+        lemon_order_id VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'active',
+        billing_cycle VARCHAR(20) DEFAULT 'monthly',
+        current_period_start DATE,
+        current_period_end DATE,
+        cancel_at_period_end BOOLEAN DEFAULT false,
+        cancelled_at TIMESTAMP,
+        trial_start DATE,
+        trial_end DATE,
         metadata JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    console.log('✅ Created subscriptions table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_lemon_id ON subscriptions(lemon_subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_period_end ON subscriptions(current_period_end);
+    `);
+
+    // Unified Payments table - all payment transactions
+    await query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+        plan_id VARCHAR(50) NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        currency VARCHAR(3) DEFAULT 'USD',
+        status VARCHAR(20) DEFAULT 'pending',
+        payment_method VARCHAR(50),
+        payment_gateway VARCHAR(50) DEFAULT 'lemonsqueezy',
+        lemon_order_id VARCHAR(255),
+        lemon_subscription_invoice_id VARCHAR(255),
+        transaction_id VARCHAR(255),
+        invoice_url TEXT,
+        billing_reason VARCHAR(100),
+        period_start DATE,
+        period_end DATE,
+        usage_details JSONB,
+        refunded BOOLEAN DEFAULT false,
+        refund_amount DECIMAL(10, 2),
+        refund_reason TEXT,
+        refunded_at TIMESTAMP,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created payments table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_subscription ON payments(subscription_id);
       CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+      CREATE INDEX IF NOT EXISTS idx_payments_lemon_order ON payments(lemon_order_id);
+    `);
+
+    // Usage billing table - for PAYG monthly invoices
+    await query(`
+      CREATE TABLE IF NOT EXISTS usage_billing (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+        billing_period_start DATE NOT NULL,
+        billing_period_end DATE NOT NULL,
+        storage_gb_hours DECIMAL(12, 2) DEFAULT 0,
+        bandwidth_gb DECIMAL(12, 2) DEFAULT 0,
+        api_calls INTEGER DEFAULT 0,
+        storage_cost DECIMAL(10, 4) DEFAULT 0,
+        bandwidth_cost DECIMAL(10, 4) DEFAULT 0,
+        total_cost DECIMAL(10, 4) DEFAULT 0,
+        payment_status VARCHAR(50) DEFAULT 'pending',
+        payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+        lemon_invoice_id VARCHAR(255),
+        invoice_generated BOOLEAN DEFAULT false,
+        invoice_url TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, billing_period_start)
+      );
+    `);
+    console.log('✅ Created usage_billing table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_usage_billing_user ON usage_billing(user_id);
+      CREATE INDEX IF NOT EXISTS idx_usage_billing_period ON usage_billing(billing_period_start, billing_period_end);
+      CREATE INDEX IF NOT EXISTS idx_usage_billing_status ON usage_billing(payment_status);
+    `);
+
+    // Payment methods table - stores user payment methods
+    await query(`
+      CREATE TABLE IF NOT EXISTS payment_methods (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        lemon_payment_method_id VARCHAR(255),
+        type VARCHAR(50) DEFAULT 'card',
+        brand VARCHAR(50),
+        last4 VARCHAR(4),
+        exp_month INTEGER,
+        exp_year INTEGER,
+        is_default BOOLEAN DEFAULT false,
+        billing_email VARCHAR(255),
+        billing_name VARCHAR(255),
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created payment_methods table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_payment_methods_user ON payment_methods(user_id);
+      CREATE INDEX IF NOT EXISTS idx_payment_methods_default ON payment_methods(user_id, is_default);
     `);
 
     // Team members table (for collaboration)

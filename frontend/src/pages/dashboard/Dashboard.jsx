@@ -190,7 +190,7 @@ const Dashboard = () => {
                 : 'Pay only for what you use with no base fees'}
             </p>
             <button 
-              onClick={() => navigate('/dashboard/plans')}
+              onClick={() => navigate('/pricing')}
               className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition shadow-lg shadow-primary-500/50">
               {currentPlan?.plan?.type === 'free' ? 'Upgrade to Pay-As-You-Go' : 'View Plan Details'}
             </button>
@@ -202,7 +202,7 @@ const Dashboard = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <button
-          onClick={() => navigate('/dashboard/buckets')}
+          onClick={() => navigate('/buckets')}
           className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
         >
           <Database className="w-10 h-10 text-blue-500 mb-3 group-hover:scale-110 transition" />
@@ -211,7 +211,7 @@ const Dashboard = () => {
         </button>
 
         <button
-          onClick={() => navigate('/dashboard/api-keys')}
+          onClick={() => navigate('/api-keys')}
           className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
         >
           <Zap className="w-10 h-10 text-purple-500 mb-3 group-hover:scale-110 transition" />
@@ -220,7 +220,7 @@ const Dashboard = () => {
         </button>
 
         <button
-          onClick={() => navigate('/dashboard/documentation')}
+          onClick={() => navigate('/documentation')}
           className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition text-left group"
         >
           <Activity className="w-10 h-10 text-green-500 mb-3 group-hover:scale-110 transition" />

@@ -175,7 +175,7 @@ const Usage = () => {
             </p>
           </div>
           <button
-            onClick={() => window.location.href = '/dashboard/plans'}
+            onClick={() => window.location.href = '/pricing'}
             className="px-4 py-2 bg-white text-primary-600 rounded-lg font-medium hover:bg-gray-100 transition"
           >
             Upgrade Plan
@@ -494,7 +494,7 @@ const Usage = () => {
               Upgrade to Pro or Pay-as-you-go plan to unlock detailed usage trends, historical charts, and performance metrics.
             </p>
             <button
-              onClick={() => window.location.href = '/dashboard/plans'}
+              onClick={() => window.location.href = '/pricing'}
               className="px-6 py-3 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white rounded-lg font-medium transition"
             >
               Upgrade Now

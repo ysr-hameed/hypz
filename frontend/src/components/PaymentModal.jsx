@@ -4,22 +4,10 @@ import { paymentAPI } from '../services/api';
 
 const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
-  const [country, setCountry] = useState('US');
   const [paymentMethod, setPaymentMethod] = useState('card');
 
-  // Detect user's country
-  useEffect(() => {
-    fetch('https://ipapi.co/json/')
-      .then(res => res.json())
-      .then(data => {
-        setCountry(data.country_code || 'US');
-      })
-      .catch(() => setCountry('US'));
-  }, []);
-
-  const isIndia = country === 'IN';
-  const currency = isIndia ? 'INR' : 'USD';
-  const price = isIndia ? plan.price_inr : plan.price_usd;
+  const currency = 'USD';
+  const price = plan.price_usd;
 
   const handleApplyCoupon = () => {
     // Simulate coupon validation
