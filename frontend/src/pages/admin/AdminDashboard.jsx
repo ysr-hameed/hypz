@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { adminAPI } from '../../services/api';
 import {
   Users,
   Database,
@@ -33,36 +34,92 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [systemStats, setSystemStats] = useState(null);
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
 
-  const stats = [
-    { name: 'Total Users', value: '1,245', change: '+12%', icon: Users, color: 'blue' },
-    { name: 'Total Storage', value: '2.4 TB', change: '+8%', icon: Database, color: 'green' },
-    { name: 'API Requests', value: '1.2M', change: '+24%', icon: Activity, color: 'purple' },
-    { name: 'Revenue', value: '$45,678', change: '+15%', icon: DollarSign, color: 'yellow' },
-  ];
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
 
-  const recentUsers = [
-    { id: 1, name: 'John Doe', email: 'john@example.com', plan: 'Free', joined: '2024-03-20', status: 'active' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', plan: 'PAYG', joined: '2024-03-19', status: 'active' },
-    { id: 3, name: 'Bob Wilson', email: 'bob@example.com', plan: 'Free', joined: '2024-03-18', status: 'suspended' },
-    { id: 4, name: 'Alice Brown', email: 'alice@example.com', plan: 'PAYG', joined: '2024-03-17', status: 'active' },
-    { id: 5, name: 'Charlie Davis', email: 'charlie@example.com', plan: 'Free', joined: '2024-03-16', status: 'active' },
-  ];
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch system stats
+      const statsResponse = await adminAPI.getSystemStats();
+      setSystemStats(statsResponse.data);
+
+      // Fetch recent users
+      const usersResponse = await adminAPI.getUsers({ page: 1, limit: 5 });
+      setRecentUsers(usersResponse.data.users || []);
+
+      // Fetch recent activity logs
+      const logsResponse = await adminAPI.getActivityLogs({ page: 1, limit: 5 });
+      setActivityLogs(logsResponse.data.logs || []);
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const formatNumber = (num) => {
+    if (!num) return '0';
+    return new Intl.NumberFormat().format(num);
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '$0';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  const stats = systemStats ? [
+    { 
+      name: 'Total Users', 
+      value: formatNumber(systemStats.users?.total_users || 0),
+      change: systemStats.users?.new_users_30d ? `+${systemStats.users.new_users_30d} this month` : '+0',
+      icon: Users, 
+      color: 'blue' 
+    },
+    { 
+      name: 'Total Storage', 
+      value: formatBytes(systemStats.storage?.total_storage_bytes || 0),
+      change: `${formatNumber(systemStats.storage?.total_files || 0)} files`,
+      icon: Database, 
+      color: 'green' 
+    },
+    { 
+      name: 'Total Buckets', 
+      value: formatNumber(systemStats.buckets?.total_buckets || 0),
+      change: `${formatNumber(systemStats.activity?.total_activities || 0)} activities today`,
+      icon: Activity, 
+      color: 'purple' 
+    },
+    { 
+      name: 'Revenue (30d)', 
+      value: formatCurrency(systemStats.revenue?.revenue_30d || 0),
+      change: `${formatNumber(systemStats.revenue?.total_payments || 0)} payments`,
+      icon: DollarSign, 
+      color: 'yellow' 
+    },
+  ] : [];
 
   const systemHealth = [
     { service: 'API Server', status: 'operational', uptime: '99.98%', responseTime: '45ms' },
     { service: 'Storage Service', status: 'operational', uptime: '99.95%', responseTime: '120ms' },
     { service: 'Database', status: 'operational', uptime: '99.99%', responseTime: '15ms' },
-    { service: 'CDN', status: 'degraded', uptime: '98.50%', responseTime: '180ms' },
+    { service: 'CDN', status: 'operational', uptime: '99.50%', responseTime: '180ms' },
     { service: 'Auth Service', status: 'operational', uptime: '99.97%', responseTime: '35ms' },
-  ];
-
-  const activityLogs = [
-    { id: 1, user: 'John Doe', action: 'Created bucket', timestamp: '2 mins ago', type: 'success' },
-    { id: 2, user: 'Admin', action: 'Updated system settings', timestamp: '15 mins ago', type: 'info' },
-    { id: 3, user: 'Jane Smith', action: 'Failed login attempt', timestamp: '1 hour ago', type: 'warning' },
-    { id: 4, user: 'Bob Wilson', action: 'Account suspended', timestamp: '2 hours ago', type: 'warning' },
-    { id: 5, user: 'Alice Brown', action: 'Upgraded to PAYG', timestamp: '3 hours ago', type: 'success' },
   ];
 
   const getStatusColor = (status) => {
@@ -71,15 +128,6 @@ const AdminDashboard = () => {
       case 'degraded': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400';
       case 'down': return 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400';
       default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700 dark:text-gray-400';
-    }
-  };
-
-  const getLogTypeColor = (type) => {
-    switch (type) {
-      case 'success': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
-      case 'warning': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
-      case 'info': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
     }
   };
 
@@ -171,16 +219,28 @@ const AdminDashboard = () => {
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
               <div className="space-y-3">
-                {activityLogs.slice(0, 5).map((log) => (
+                {loading ? (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading...</div>
+                ) : activityLogs.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">No activity logs found</div>
+                ) : activityLogs.slice(0, 5).map((log) => (
                   <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${getLogTypeColor(log.type)}`}></div>
+                      <div className={`w-2 h-2 rounded-full ${
+                        log.action?.includes('error') || log.action?.includes('failed') ? 'bg-red-500' :
+                        log.action?.includes('warning') ? 'bg-yellow-500' : 
+                        'bg-green-500'
+                      }`}></div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{log.action}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">{log.user}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{log.action || 'Unknown action'}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {log.email || `${log.first_name || ''} ${log.last_name || ''}`.trim() || 'Unknown user'}
+                        </p>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{log.timestamp}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {new Date(log.created_at).toLocaleString()}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -225,27 +285,39 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {recentUsers.map((user) => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">Loading...</td>
+                    </tr>
+                  ) : recentUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No users found</td>
+                    </tr>
+                  ) : recentUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'No name'}
+                          </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300">
-                          {user.plan}
+                          {user.plan_id || 'Free'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{user.joined}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.status === 'active'
+                          user.is_active
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                             : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         }`}>
-                          {user.status}
+                          {user.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -370,16 +442,28 @@ const AdminDashboard = () => {
               </button>
             </div>
             <div className="space-y-3">
-              {activityLogs.map((log) => (
+              {loading ? (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading...</div>
+              ) : activityLogs.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">No activity logs found</div>
+              ) : activityLogs.map((log) => (
                 <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${getLogTypeColor(log.type)}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${
+                      log.action?.includes('error') || log.action?.includes('failed') ? 'bg-red-500' :
+                      log.action?.includes('warning') ? 'bg-yellow-500' : 
+                      'bg-green-500'
+                    }`}></div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{log.action}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">by {log.user}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{log.action || 'Unknown action'}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        by {log.email || `${log.first_name || ''} ${log.last_name || ''}`.trim() || 'Unknown user'}
+                      </p>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{log.timestamp}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(log.created_at).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>

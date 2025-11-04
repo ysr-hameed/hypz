@@ -8,6 +8,7 @@ import LandingLayout from './layouts/LandingLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import AuthLayout from './layouts/AuthLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminPasswordProtection from './components/AdminPasswordProtection';
 import Landing from './pages/Landing';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -27,8 +28,22 @@ import ApiKeys from './pages/dashboard/ApiKeys';
 import Usage from './pages/dashboard/Usage';
 // import Documentation from './pages/dashboard/Documentation';
 import Team from './pages/dashboard/Team';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminLayout from './layouts/AdminLayout';
+import AdminDashboardPage from './pages/admin/Dashboard';
+import AdminUsersPage from './pages/admin/Users';
+import AdminBucketsPage from './pages/admin/Buckets';
+import AdminFilesPage from './pages/admin/Files';
+import AdminStoragePage from './pages/admin/Storage';
+import AdminBillingPage from './pages/admin/Billing';
+import AdminPlansPage from './pages/admin/Plans';
+import AdminApiKeysPage from './pages/admin/ApiKeys';
+import AdminActivityPage from './pages/admin/Activity';
+import AdminAnalyticsPage from './pages/admin/Analytics';
+import AdminNotificationsPage from './pages/admin/Notifications';
+import AdminSecurityPage from './pages/admin/Security';
+import AdminCorsPage from './pages/admin/Cors';
+import AdminWebhooksPage from './pages/admin/Webhooks';
+import AdminSettingsPage from './pages/admin/Settings';
 import Terms from './pages/legal/Terms';
 import Privacy from './pages/legal/Privacy';
 import Security from './pages/legal/Security';
@@ -111,9 +126,30 @@ function AppContent() {
               <Route path="/settings" element={<Settings />} />
             </Route>
 
-            {/* Admin Panel (Separate full-page layout, no sidebar) */}
-            <Route path="/admin-panel" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/notifications" element={<ProtectedRoute><AdminNotifications /></ProtectedRoute>} />
+            {/* Admin Panel with Sidebar - Protected with admin role + password */}
+            <Route path="/admin" element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminPasswordProtection>
+                  <AdminLayout />
+                </AdminPasswordProtection>
+              </ProtectedRoute>
+            }>
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="buckets" element={<AdminBucketsPage />} />
+              <Route path="files" element={<AdminFilesPage />} />
+              <Route path="storage" element={<AdminStoragePage />} />
+              <Route path="billing" element={<AdminBillingPage />} />
+              <Route path="plans" element={<AdminPlansPage />} />
+              <Route path="api-keys" element={<AdminApiKeysPage />} />
+              <Route path="activity" element={<AdminActivityPage />} />
+              <Route path="analytics" element={<AdminAnalyticsPage />} />
+              <Route path="notifications" element={<AdminNotificationsPage />} />
+              <Route path="security" element={<AdminSecurityPage />} />
+              <Route path="cors" element={<AdminCorsPage />} />
+              <Route path="webhooks" element={<AdminWebhooksPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+            </Route>
           </Routes>
         </Router>
       );
