@@ -320,31 +320,52 @@ export const downloadFile = asyncHandler(async (req, res) => {
 export const createSignedUrl = asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   const userId = req.user.id;
-  const maxSeconds = 7 * 24 * 60 * 60; // 7 days
+  const MAX_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days (604800 seconds)
+  const DEFAULT_EXPIRY_SECONDS = 3600; // 1 hour
+  
   let { expiresIn } = req.body;
-  let seconds = parseInt(expiresIn || 3600, 10);
-  if (Number.isNaN(seconds) || seconds <= 0) seconds = 3600;
-  if (seconds > maxSeconds) seconds = maxSeconds;
+  let seconds = parseInt(expiresIn || DEFAULT_EXPIRY_SECONDS, 10);
+  
+  // Validate expiry time
+  if (Number.isNaN(seconds) || seconds <= 0) {
+    seconds = DEFAULT_EXPIRY_SECONDS;
+  }
+  
+  // Enforce max 7-day limit
+  if (seconds > MAX_EXPIRY_SECONDS) {
+    seconds = MAX_EXPIRY_SECONDS;
+  }
 
   const result = await query(
-    `SELECT f.id, f.user_id, b.visibility as bucket_visibility
+    `SELECT f.id, f.user_id, f.is_public, b.visibility as bucket_visibility
      FROM files f
      JOIN buckets b ON f.bucket_id = b.id
      WHERE f.id = $1 AND f.user_id = $2 AND f.deleted_at IS NULL`,
-    [fileId, userId]
+    [fileId, userId],
+    { cache: true, cacheTTL: 30000 }
   );
 
   if (result.rows.length === 0) {
     return errorResponse(res, 'File not found', 404);
   }
 
+  const file = result.rows[0];
+  
+  // Generate signed URL
   const payload = { t: 'file', fid: fileId, uid: userId };
   const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: seconds });
   const origin = `${req.protocol}://${req.get('host')}`;
   const url = `${origin}/api/${config.API_VERSION}/files/file/${fileId}/download-signed?token=${token}`;
   const expiresAt = new Date(Date.now() + seconds * 1000).toISOString();
 
-  return successResponse(res, { url, expiresAt, expiresIn: seconds }, 'Signed URL generated');
+  return successResponse(res, { 
+    url, 
+    expiresAt, 
+    expiresIn: seconds,
+    maxExpiresIn: MAX_EXPIRY_SECONDS,
+    isPrivate: !file.is_public,
+    note: seconds === MAX_EXPIRY_SECONDS ? 'Maximum expiry time (7 days) applied' : null
+  }, 'Signed URL generated successfully');
 });
 
 // Download via signed token (no auth header required)
@@ -570,4 +591,379 @@ export const publicDownloadFile = asyncHandler(async (req, res) => {
   } catch (error) {
     return errorResponse(res, 'File not found on server', 404);
   }
+});
+
+// Bulk delete files
+export const bulkDeleteFiles = asyncHandler(async (req, res) => {
+  const { fileIds } = req.body;
+  const userId = req.user.id;
+
+  if (!Array.isArray(fileIds) || fileIds.length === 0) {
+    return errorResponse(res, 'fileIds must be a non-empty array', 400);
+  }
+
+  if (fileIds.length > 100) {
+    return errorResponse(res, 'Cannot delete more than 100 files at once', 400);
+  }
+
+  // Fetch all files to be deleted
+  const placeholders = fileIds.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await query(
+    `SELECT * FROM files WHERE id IN (${placeholders}) AND user_id = $1 AND deleted_at IS NULL`,
+    [userId, ...fileIds]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'No files found to delete', 404);
+  }
+
+  const files = result.rows;
+  const totalSize = files.reduce((sum, file) => sum + parseInt(file.size), 0);
+
+  // Soft delete all files
+  await query(
+    `UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders}) AND user_id = $1`,
+    [userId, ...fileIds]
+  );
+
+  // Update usage
+  await query(
+    `INSERT INTO usage_records (user_id, date, storage_bytes, delete_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, 0, $2, 1)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET 
+       storage_bytes = GREATEST(usage_records.storage_bytes - $3, 0),
+       delete_calls = usage_records.delete_calls + $2,
+       api_calls = usage_records.api_calls + 1,
+       updated_at = CURRENT_TIMESTAMP`,
+    [userId, files.length, totalSize]
+  );
+
+  // Delete physical files (non-blocking)
+  files.forEach(async (file) => {
+    try {
+      if (file.b2_file_id) {
+        await deleteFromB2(file.b2_file_id, file.path);
+      } else if (file.path && !file.path.startsWith('http')) {
+        await fs.unlink(file.path);
+      }
+    } catch (error) {
+      console.error('Failed to delete physical file:', file.id, error);
+    }
+  });
+
+  // Log activity
+  await query(
+    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+    [userId, 'bulk_files_deleted', 'file', { count: files.length, totalSize }]
+  );
+
+  successResponse(res, { deletedCount: files.length, totalSize }, 'Files deleted successfully');
+});
+
+// Bulk update files
+export const bulkUpdateFiles = asyncHandler(async (req, res) => {
+  const { fileIds, isPublic, tags, metadata } = req.body;
+  const userId = req.user.id;
+
+  if (!Array.isArray(fileIds) || fileIds.length === 0) {
+    return errorResponse(res, 'fileIds must be a non-empty array', 400);
+  }
+
+  if (fileIds.length > 100) {
+    return errorResponse(res, 'Cannot update more than 100 files at once', 400);
+  }
+
+  const updates = [];
+  const params = [userId];
+  let paramIndex = 2;
+
+  if (isPublic !== undefined) {
+    updates.push(`is_public = $${paramIndex++}`);
+    params.push(isPublic);
+  }
+  if (tags !== undefined) {
+    updates.push(`tags = $${paramIndex++}`);
+    params.push(Array.isArray(tags) ? tags : []);
+  }
+  if (metadata !== undefined) {
+    updates.push(`metadata = $${paramIndex++}`);
+    params.push(typeof metadata === 'object' ? metadata : {});
+  }
+
+  if (updates.length === 0) {
+    return errorResponse(res, 'No fields to update', 400);
+  }
+
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+
+  // Create placeholders for file IDs
+  const placeholders = fileIds.map((id, i) => `$${paramIndex + i}`).join(', ');
+  params.push(...fileIds);
+
+  const result = await query(
+    `UPDATE files SET ${updates.join(', ')} 
+     WHERE user_id = $1 AND id IN (${placeholders}) AND deleted_at IS NULL
+     RETURNING id`,
+    params
+  );
+
+  // Log activity
+  await query(
+    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+    [userId, 'bulk_files_updated', 'file', { count: result.rows.length, updates: { isPublic, tags: !!tags, metadata: !!metadata } }]
+  );
+
+  successResponse(res, { updatedCount: result.rows.length }, 'Files updated successfully');
+});
+
+// Bulk download files (returns array of signed URLs)
+export const bulkDownloadFiles = asyncHandler(async (req, res) => {
+  const { fileIds } = req.body;
+  const userId = req.user.id;
+
+  if (!Array.isArray(fileIds) || fileIds.length === 0) {
+    return errorResponse(res, 'fileIds must be a non-empty array', 400);
+  }
+
+  if (fileIds.length > 50) {
+    return errorResponse(res, 'Cannot download more than 50 files at once', 400);
+  }
+
+  // Fetch all files
+  const placeholders = fileIds.map((_, i) => `$${i + 2}`).join(', ');
+  const result = await query(
+    `SELECT id, filename, original_name, size, url, cdn_url, mime_type FROM files 
+     WHERE id IN (${placeholders}) AND user_id = $1 AND deleted_at IS NULL`,
+    [userId, ...fileIds]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'No files found', 404);
+  }
+
+  const files = result.rows;
+  const totalSize = files.reduce((sum, file) => sum + parseInt(file.size), 0);
+
+  // Generate download tokens for each file
+  const downloadUrls = files.map(file => {
+    const token = jwt.sign(
+      { fileId: file.id, userId, type: 'download' },
+      config.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    return {
+      fileId: file.id,
+      filename: file.original_name,
+      size: file.size,
+      mimeType: file.mime_type,
+      downloadUrl: `${config.BACKEND_URL}/api/files/${file.id}/download?token=${token}`,
+      directUrl: file.cdn_url || file.url
+    };
+  });
+
+  // Update usage (non-blocking)
+  query(
+    `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, $2, $2, $3, 1)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET 
+       bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+       download_bytes = usage_records.download_bytes + $2,
+       download_calls = usage_records.download_calls + $3,
+       api_calls = usage_records.api_calls + 1,
+       updated_at = CURRENT_TIMESTAMP`,
+    [userId, totalSize, files.length]
+  ).catch(err => console.error('Failed to update usage:', err));
+
+  // Log activity
+  await query(
+    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+    [userId, 'bulk_files_downloaded', 'file', { count: files.length, totalSize }]
+  );
+
+  successResponse(res, { files: downloadUrls, totalSize }, 'Download URLs generated successfully');
+});
+
+// Bulk move files to another bucket
+export const bulkMoveFiles = asyncHandler(async (req, res) => {
+  const { fileIds, targetBucketId } = req.body;
+  const userId = req.user.id;
+
+  if (!Array.isArray(fileIds) || fileIds.length === 0) {
+    return errorResponse(res, 'fileIds must be a non-empty array', 400);
+  }
+
+  if (!targetBucketId) {
+    return errorResponse(res, 'targetBucketId is required', 400);
+  }
+
+  if (fileIds.length > 100) {
+    return errorResponse(res, 'Cannot move more than 100 files at once', 400);
+  }
+
+  // Verify target bucket ownership
+  const targetBucket = await query(
+    'SELECT id FROM buckets WHERE id = $1 AND user_id = $2',
+    [targetBucketId, userId]
+  );
+
+  if (targetBucket.rows.length === 0) {
+    return errorResponse(res, 'Target bucket not found', 404);
+  }
+
+  // Move files
+  const placeholders = fileIds.map((_, i) => `$${i + 3}`).join(', ');
+  const result = await query(
+    `UPDATE files SET bucket_id = $1, updated_at = CURRENT_TIMESTAMP 
+     WHERE user_id = $2 AND id IN (${placeholders}) AND deleted_at IS NULL
+     RETURNING id`,
+    [targetBucketId, userId, ...fileIds]
+  );
+
+  // Log activity
+  await query(
+    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+    [userId, 'bulk_files_moved', 'file', { count: result.rows.length, targetBucketId }]
+  );
+
+  successResponse(res, { movedCount: result.rows.length }, 'Files moved successfully');
+});
+
+// Bulk upload files
+export const bulkUploadFiles = asyncHandler(async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return errorResponse(res, 'No files uploaded', 400);
+  }
+
+  const { bucketId } = req.params;
+  const userId = req.user.id;
+  
+  if (req.files.length > 20) {
+    return errorResponse(res, 'Cannot upload more than 20 files at once', 400);
+  }
+
+  // Verify bucket ownership
+  const bucket = await query(
+    'SELECT id, name, visibility FROM buckets WHERE id = $1 AND user_id = $2',
+    [bucketId, userId]
+  );
+
+  if (bucket.rows.length === 0) {
+    return errorResponse(res, 'Bucket not found', 404);
+  }
+
+  const bucketVisibility = bucket.rows[0].visibility;
+  const isPublicBucket = bucketVisibility === 'public';
+  
+  const uploadedFiles = [];
+  const errors = [];
+  let totalSize = 0;
+
+  // Process each file
+  for (const file of req.files) {
+    try {
+      const { isPublic = false, tags = [], metadata = {} } = req.body;
+      const uniqueFilename = generateUniqueFilename(file.originalname);
+
+      let fileUrl, cdnUrl, filePath, b2FileId;
+
+      if (isB2Available()) {
+        const b2Path = `${userId}/${bucketId}/${uniqueFilename}`;
+        const uploadResult = await uploadToB2(file.buffer, b2Path, file.mimetype, isPublicBucket);
+        
+        fileUrl = uploadResult.url;
+        cdnUrl = uploadResult.url;
+        filePath = b2Path;
+        b2FileId = uploadResult.fileId;
+      } else {
+        const uploadDir = path.join(config.UPLOAD_DIR, userId);
+        await fs.mkdir(uploadDir, { recursive: true });
+        
+        filePath = path.join(uploadDir, uniqueFilename);
+        await fs.writeFile(filePath, file.buffer);
+        
+        fileUrl = `/uploads/${userId}/${uniqueFilename}`;
+        cdnUrl = `${config.FRONTEND_URL}/cdn${fileUrl}`;
+      }
+
+      // Store file info in database
+      const result = await query(
+        `INSERT INTO files (
+          bucket_id, user_id, filename, original_name, path, size,
+          mime_type, extension, url, cdn_url, is_public, tags, metadata, b2_file_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *`,
+        [
+          bucketId,
+          userId,
+          uniqueFilename,
+          file.originalname,
+          filePath,
+          file.size,
+          file.mimetype,
+          path.extname(file.originalname),
+          fileUrl,
+          cdnUrl,
+          isPublic,
+          Array.isArray(tags) ? tags : [],
+          typeof metadata === 'object' ? metadata : {},
+          b2FileId || null
+        ]
+      );
+
+      uploadedFiles.push({
+        ...result.rows[0],
+        formattedSize: formatBytes(result.rows[0].size)
+      });
+      totalSize += file.size;
+    } catch (error) {
+      errors.push({
+        filename: file.originalname,
+        error: error.message
+      });
+    }
+  }
+
+  // Update usage
+  if (totalSize > 0) {
+    await query(
+      `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
+       VALUES ($1, CURRENT_DATE, $2, $2, $3, 1)
+       ON CONFLICT (user_id, date)
+       DO UPDATE SET 
+         storage_bytes = usage_records.storage_bytes + $2,
+         upload_bytes = usage_records.upload_bytes + $2,
+         upload_calls = usage_records.upload_calls + $3,
+         api_calls = usage_records.api_calls + 1,
+         bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, totalSize, uploadedFiles.length]
+    );
+  }
+
+  // Log activity
+  await query(
+    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+    [userId, 'bulk_files_uploaded', 'file', { count: uploadedFiles.length, totalSize, errors: errors.length }]
+  );
+
+  const response = {
+    uploadedCount: uploadedFiles.length,
+    files: uploadedFiles,
+    totalSize,
+    formattedSize: formatBytes(totalSize)
+  };
+
+  if (errors.length > 0) {
+    response.errors = errors;
+    response.errorCount = errors.length;
+  }
+
+  const message = errors.length > 0 
+    ? `Uploaded ${uploadedFiles.length} files with ${errors.length} errors`
+    : `Successfully uploaded ${uploadedFiles.length} files`;
+
+  successResponse(res, response, message, 201);
 });

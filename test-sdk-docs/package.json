@@ -1,0 +1,24 @@
+{
+  "name": "hypz-sdk-docs-test",
+  "version": "1.0.0",
+  "description": "Test scripts to verify Hypz SDK examples from documentation",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test:all": "node test-all-examples.js",
+    "test:auth": "node examples/authentication.js",
+    "test:buckets": "node examples/buckets.js",
+    "test:files": "node examples/files.js",
+    "test:bulk": "node examples/bulk-operations.js",
+    "test:apikeys": "node examples/api-keys.js",
+    "test:advanced": "node examples/advanced.js"
+  },
+  "dependencies": {
+    "@hypz/sdk": "file:../hypz-sdk/nodejs",
+    "axios": "^1.13.1",
+    "dotenv": "^16.0.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

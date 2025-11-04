@@ -170,10 +170,11 @@ export const updateBucket = asyncHandler(async (req, res) => {
   successResponse(res, result.rows[0], 'Bucket updated successfully');
 });
 
-// Delete bucket
+// Delete bucket (only if empty - safety check)
 export const deleteBucket = asyncHandler(async (req, res) => {
   const { bucketId } = req.params;
   const userId = req.user.id;
+  const { force = false } = req.query; // Optional force parameter
 
   await transaction(async (client) => {
     // Check if bucket exists
@@ -186,19 +187,34 @@ export const deleteBucket = asyncHandler(async (req, res) => {
       throw new Error('Bucket not found');
     }
 
-    // Soft delete all files in bucket
-    await client.query(
-      'UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE bucket_id = $1',
+    // Safety check: Count active files in bucket
+    const fileCountResult = await client.query(
+      'SELECT COUNT(*) as count FROM files WHERE bucket_id = $1 AND deleted_at IS NULL',
       [bucketId]
     );
+
+    const fileCount = parseInt(fileCountResult.rows[0].count);
+
+    // If bucket has files and force is not true, reject the deletion
+    if (fileCount > 0 && force !== 'true') {
+      throw new Error(`Cannot delete bucket with ${fileCount} file(s). Please delete all files first or use force=true parameter.`);
+    }
+
+    // If force is true, soft delete all files in bucket first
+    if (force === 'true' && fileCount > 0) {
+      await client.query(
+        'UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE bucket_id = $1',
+        [bucketId]
+      );
+    }
 
     // Delete bucket
     await client.query('DELETE FROM buckets WHERE id = $1', [bucketId]);
 
     // Log activity
     await client.query(
-      'INSERT INTO activity_logs (user_id, action, resource_type, resource_id) VALUES ($1, $2, $3, $4)',
-      [userId, 'bucket_deleted', 'bucket', bucketId]
+      'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [userId, 'bucket_deleted', 'bucket', bucketId, { force, fileCount }]
     );
   });
 

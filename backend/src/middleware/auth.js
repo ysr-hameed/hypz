@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs';
 import config from '../config/config.js';
 import { query } from '../config/database.js';
 
+// Simple in-memory cache for user lookups
+const userCache = new Map();
+const USER_CACHE_TTL = 300000; // 5 minutes
+
 // JWT authentication middleware
 export const authenticate = async (req, res, next) => {
   try {
@@ -29,20 +33,31 @@ export const authenticate = async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, config.JWT_SECRET);
 
-      // Get user from database
-      const result = await query(
-        'SELECT id, email, first_name, last_name, role, plan_id, is_active FROM users WHERE id = $1',
-        [decoded.id]
-      );
+      // Check cache first
+      const cacheKey = `user:${decoded.id}`;
+      const cached = userCache.get(cacheKey);
+      let user;
+      
+      if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL) {
+        user = cached.user;
+      } else {
+        // Get user from database
+        const result = await query(
+          'SELECT id, email, first_name, last_name, role, plan_id, is_active FROM users WHERE id = $1',
+          [decoded.id],
+          { cache: true, cacheTTL: USER_CACHE_TTL }
+        );
 
-      if (result.rows.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found or token invalid'
-        });
+        if (result.rows.length === 0) {
+          return res.status(401).json({
+            success: false,
+            message: 'User not found or token invalid'
+          });
+        }
+
+        user = result.rows[0];
+        userCache.set(cacheKey, { user, timestamp: Date.now() });
       }
-
-      const user = result.rows[0];
 
       if (!user.is_active) {
         return res.status(403).json({
@@ -76,6 +91,10 @@ export const authenticate = async (req, res, next) => {
   }
 };
 
+// API Key cache
+const apiKeyCache = new Map();
+const API_KEY_CACHE_TTL = 600000; // 10 minutes
+
 // API Key authentication middleware
 export const authenticateApiKey = async (req, res, next) => {
   try {
@@ -88,26 +107,56 @@ export const authenticateApiKey = async (req, res, next) => {
       });
     }
     
-    // Get all active API keys (optimized query)
-    const result = await query(
-      `SELECT ak.*, u.id as user_id, u.email, u.plan_id, u.role, u.is_active as user_is_active
-       FROM api_keys ak 
-       JOIN users u ON ak.user_id = u.id 
-       WHERE ak.is_active = true 
-       AND u.is_active = true
-       AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`
-    );
-
+    // Extract key prefix for faster lookup (must match database format)
+    const keyPrefix = apiKey.substring(0, 12) + '...';
+    const cacheKey = `apikey:${keyPrefix}`;
+    const cached = apiKeyCache.get(cacheKey);
+    
     let matchedKey = null;
-    for (const key of result.rows) {
+    
+    // Check cache first
+    if (cached && Date.now() - cached.timestamp < API_KEY_CACHE_TTL) {
       try {
-        const isMatch = await bcrypt.compare(apiKey, key.key_hash);
+        const isMatch = await bcrypt.compare(apiKey, cached.key_hash);
         if (isMatch) {
-          matchedKey = key;
-          break;
+          matchedKey = cached.data;
         }
-      } catch (compareError) {
-        console.error('Bcrypt compare error:', compareError.message);
+      } catch (err) {
+        // Cache miss, continue to DB lookup
+      }
+    }
+    
+    // If not in cache, query database
+    if (!matchedKey) {
+      // Optimized query with prefix filter
+      const result = await query(
+        `SELECT ak.*, u.id as user_id, u.email, u.plan_id, u.role, u.is_active as user_is_active
+         FROM api_keys ak 
+         JOIN users u ON ak.user_id = u.id 
+         WHERE ak.key_prefix = $1
+         AND ak.is_active = true 
+         AND u.is_active = true
+         AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
+        [keyPrefix],
+        { cache: true }
+      );
+
+      for (const key of result.rows) {
+        try {
+          const isMatch = await bcrypt.compare(apiKey, key.key_hash);
+          if (isMatch) {
+            matchedKey = key;
+            // Cache the matched key
+            apiKeyCache.set(cacheKey, {
+              key_hash: key.key_hash,
+              data: key,
+              timestamp: Date.now()
+            });
+            break;
+          }
+        } catch (compareError) {
+          console.error('Bcrypt compare error:', compareError.message);
+        }
       }
     }
 
@@ -118,11 +167,11 @@ export const authenticateApiKey = async (req, res, next) => {
       });
     }
 
-    // Update last used (non-blocking)
+    // Update last used (non-blocking, no await)
     query(
       'UPDATE api_keys SET last_used_at = NOW(), last_used_ip = $1 WHERE id = $2',
       [req.ip, matchedKey.id]
-    ).catch(err => console.error('Failed to update API key last_used:', err));
+    ).catch(err => console.error('Failed to update API key last_used:', err.message));
 
     // Attach user info to request
     req.user = {

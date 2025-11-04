@@ -165,7 +165,83 @@ await hypz.files.download(fileId, { saveTo: 'downloads/report.pdf' });
 
 ---
 
-## 5) Private access: Signed URLs (≤ 7 days)
+## 5) Bulk Operations
+
+Perform operations on multiple files at once for better efficiency.
+
+### Bulk Delete (up to 100 files)
+
+```js
+const result = await hypz.files.bulkDelete([fileId1, fileId2, fileId3]);
+console.log(`Deleted ${result.data.deletedCount} files`);
+console.log(`Freed ${result.data.totalSize} bytes`);
+```
+
+### Bulk Update (up to 100 files)
+
+```js
+const result = await hypz.files.bulkUpdate({
+  fileIds: [fileId1, fileId2, fileId3],
+  isPublic: true,
+  tags: ['archived', '2024'],
+  metadata: { processed: true }
+});
+console.log(`Updated ${result.data.updatedCount} files`);
+```
+
+### Bulk Download URLs (up to 50 files)
+
+```js
+const result = await hypz.files.bulkDownload([fileId1, fileId2, fileId3]);
+result.data.files.forEach(file => {
+  console.log(`${file.filename}: ${file.downloadUrl}`);
+});
+```
+
+### Bulk Move (up to 100 files)
+
+```js
+const result = await hypz.files.bulkMove({
+  fileIds: [fileId1, fileId2, fileId3],
+  targetBucketId: 'target-bucket-id'
+});
+console.log(`Moved ${result.data.movedCount} files`);
+```
+
+### Bulk Upload (up to 20 files)
+
+```js
+const fs = require('fs');
+
+const result = await hypz.files.bulkUpload({
+  bucketId: 'your-bucket-id',
+  files: [
+    { file: fs.createReadStream('./photo1.jpg'), filename: 'photo1.jpg' },
+    { file: fs.createReadStream('./photo2.jpg'), filename: 'photo2.jpg' },
+    { file: Buffer.from('content'), filename: 'data.txt' }
+  ],
+  isPublic: false,
+  tags: ['batch-upload', '2024'],
+  metadata: { source: 'bulk-import' }
+});
+
+console.log(`Uploaded ${result.data.uploadedCount} files`);
+console.log(`Total size: ${result.data.totalSize} bytes`);
+
+// Check for partial failures
+if (result.data.errors && result.data.errors.length > 0) {
+  console.log(`Errors: ${result.data.errorCount}`);
+  result.data.errors.forEach(err => {
+    console.log(`  - ${err.filename}: ${err.error}`);
+  });
+}
+```
+
+**Note:** Bulk upload supports partial success - some files may upload successfully while others fail.
+
+---
+
+## 6) Private access: Signed URLs (≤ 7 days)
 
 ```js
 // Generate time‑limited link
@@ -183,7 +259,7 @@ Use cases:
 
 ---
 
-## 6) Usage (metering)
+## 7) Usage (metering)
 
 ```js
 await hypz.usage.current();
@@ -193,7 +269,7 @@ await hypz.usage.analytics({ from: '2025-01-01', to: '2025-02-01' });
 
 ---
 
-## 7) Error handling and retries
+## 8) Error handling and retries
 
 All API errors throw `HypzError`:
 
@@ -213,7 +289,7 @@ Axios retry behavior:
 
 ---
 
-## 8) Timeouts and configuration
+## 9) Timeouts and configuration
 
 ```js
 const hypz = new HypzSDK({
@@ -227,7 +303,7 @@ const hypz = new HypzSDK({
 
 ---
 
-## 9) TypeScript
+## 10) TypeScript
 
 Types are bundled. Example:
 
@@ -244,7 +320,7 @@ Key types include:
 
 ---
 
-## 10) Environment examples
+## 11) Environment examples
 
 ### Node (Express)
 
@@ -277,7 +353,7 @@ console.log('Uploaded');
 
 ---
 
-## 11) Troubleshooting
+## 12) Troubleshooting
 
 - “Invalid or expired API key” → Create a new key in dashboard; ensure it’s active.
 - “Permission denied” → Set API key permissions (files:read/write/delete) as needed.
@@ -286,7 +362,7 @@ console.log('Uploaded');
 
 ---
 
-## 12) FAQ
+## 13) FAQ
 
 - Q: Why is there a `.tgz` file in the Node SDK folder?
 - A: That’s the package tarball created by `npm pack`. It’s used for local installs and is what npm uploads when publishing. You can test locally with `npm i ./hypz-sdk-1.0.1.tgz`.

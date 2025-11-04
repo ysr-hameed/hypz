@@ -57,6 +57,7 @@ class HypzSDK extends EventEmitter {
     );
     
     // Initialize resource managers
+    this.auth = new AuthManager(this);
     this.buckets = new BucketManager(this);
     this.files = new FileManager(this);
     this.apiKeys = new APIKeyManager(this);
@@ -136,6 +137,22 @@ class HypzSDK extends EventEmitter {
 }
 
 /**
+ * Auth Manager - Authentication utilities
+ */
+class AuthManager {
+  constructor(sdk) {
+    this.sdk = sdk;
+  }
+  
+  /**
+   * Get current authenticated user
+   */
+  async getCurrentUser() {
+    return this.sdk._request('GET', '/auth/me');
+  }
+}
+
+/**
  * Bucket Manager - Manage storage buckets
  */
 class BucketManager {
@@ -174,15 +191,20 @@ class BucketManager {
   /**
    * Delete bucket
    */
-  async delete(bucketId) {
-    return this.sdk._request('DELETE', `/buckets/${bucketId}`);
+  async delete(bucketId, force = false) {
+    const url = `/buckets/${bucketId}${force ? '?force=true' : ''}`;
+    return this.sdk._request('DELETE', url);
   }
   
   /**
    * Get bucket statistics
    */
-  async stats(bucketId) {
+  async getStats(bucketId) {
     return this.sdk._request('GET', `/buckets/${bucketId}/stats`);
+  }
+
+  async stats(bucketId) {
+    return this.getStats(bucketId);
   }
 }
 
@@ -299,7 +321,7 @@ class FileManager {
   async getSignedURL(fileId, expiresInSeconds = 3600) {
     const body = { expiresIn: Math.min(Math.max(1, Math.floor(expiresInSeconds)), 604800) };
     const res = await this.sdk._request('POST', `/files/file/${fileId}/signed-url`, body);
-    return res?.data?.url || res?.data?.signedUrl || res?.url; // tolerate shapes
+    return res; // Return full response with metadata
   }
   
   /**
@@ -339,6 +361,124 @@ class FileManager {
     
     return response.data;
   }
+
+  /**
+   * Bulk delete files (up to 100 files)
+   */
+  async bulkDelete(fileIds) {
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      throw new Error('fileIds must be a non-empty array');
+    }
+    if (fileIds.length > 100) {
+      throw new Error('Maximum 100 files can be deleted at once');
+    }
+    return this.sdk._request('POST', '/files/bulk/delete', { fileIds });
+  }
+
+  /**
+   * Bulk update files (up to 100 files)
+   */
+  async bulkUpdate(data) {
+    const { fileIds, isPublic, tags, metadata } = data;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      throw new Error('fileIds must be a non-empty array');
+    }
+    if (fileIds.length > 100) {
+      throw new Error('Maximum 100 files can be updated at once');
+    }
+    return this.sdk._request('POST', '/files/bulk/update', { fileIds, isPublic, tags, metadata });
+  }
+
+  /**
+   * Bulk download - get download URLs for multiple files (up to 50 files)
+   */
+  async bulkDownload(fileIds) {
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      throw new Error('fileIds must be a non-empty array');
+    }
+    if (fileIds.length > 50) {
+      throw new Error('Maximum 50 files can be downloaded at once');
+    }
+    return this.sdk._request('POST', '/files/bulk/download', { fileIds });
+  }
+
+  /**
+   * Bulk move files to another bucket (up to 100 files)
+   */
+  async bulkMove(data) {
+    const { fileIds, targetBucketId } = data;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      throw new Error('fileIds must be a non-empty array');
+    }
+    if (!targetBucketId) {
+      throw new Error('targetBucketId is required');
+    }
+    if (fileIds.length > 100) {
+      throw new Error('Maximum 100 files can be moved at once');
+    }
+    return this.sdk._request('POST', '/files/bulk/move', { fileIds, targetBucketId });
+  }
+
+  /**
+   * Bulk upload files (up to 20 files)
+   * @param {Object} options - Upload options
+   * @param {string} options.bucketId - Target bucket ID
+   * @param {Array} options.files - Array of file objects {file: Buffer|Stream|Path, filename: string}
+   * @param {boolean} options.isPublic - Make files public
+   * @param {Array} options.tags - Tags for all files
+   * @param {Object} options.metadata - Metadata for all files
+   */
+  async bulkUpload(options) {
+    const { bucketId, files, isPublic, tags, metadata } = options;
+    
+    if (!bucketId) {
+      throw new Error('bucketId is required');
+    }
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new Error('files must be a non-empty array');
+    }
+    if (files.length > 20) {
+      throw new Error('Maximum 20 files can be uploaded at once');
+    }
+
+    const formData = new FormData();
+    
+    // Add each file
+    files.forEach((fileObj, index) => {
+      const { file, filename } = fileObj;
+      if (typeof file === 'string') {
+        // File path
+        formData.append('files', fs.createReadStream(file), filename || file);
+      } else if (file.pipe) {
+        // Stream
+        formData.append('files', file, filename || 'file');
+      } else if (Buffer.isBuffer(file)) {
+        // Buffer
+        formData.append('files', file, { filename: filename || `file-${index}` });
+      } else {
+        throw new Error(`Invalid file input at index ${index}`);
+      }
+    });
+
+    // Add common options
+    if (isPublic !== undefined) {
+      formData.append('isPublic', String(isPublic));
+    }
+    if (tags) {
+      formData.append('tags', JSON.stringify(tags));
+    }
+    if (metadata) {
+      formData.append('metadata', JSON.stringify(metadata));
+    }
+
+    const config = {
+      headers: formData.getHeaders(),
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
+    };
+
+    return this.sdk._request('POST', `/files/${bucketId}/bulk-upload`, formData, config);
+  }
 }
 
 /**
@@ -367,6 +507,10 @@ class APIKeyManager {
   
   async delete(keyId) {
     return this.sdk._request('DELETE', `/api-keys/${keyId}`);
+  }
+
+  async revoke(keyId) {
+    return this.delete(keyId);
   }
   
   async regenerate(keyId) {
