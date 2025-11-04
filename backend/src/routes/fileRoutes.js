@@ -7,9 +7,11 @@ import {
   downloadFile,
   deleteFile,
   updateFile,
-  publicDownloadFile
+  publicDownloadFile,
+  createSignedUrl,
+  downloadFileSigned
 } from '../controllers/fileController.js';
-import { authenticate, authenticateApiKey, requirePermission, requireOwnership } from '../middleware/auth.js';
+import { authenticate, authenticateApiKey, requirePermission, requireOwnership, authenticateFileToken } from '../middleware/auth.js';
 import { uploadLimiter } from '../middleware/security.js';
 
 const router = express.Router();
@@ -26,12 +28,15 @@ const authMiddleware = (req, res, next) => {
 
 // Public routes (no authentication required)
 router.get('/public/:fileId/download', publicDownloadFile);
+// Signed download (no auth header required)
+router.get('/file/:fileId/download-signed', authenticateFileToken, downloadFileSigned);
 
 // Protected routes - All routes enforce ownership and permissions
 router.post('/:bucketId/upload', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), uploadLimiter, upload.single('file'), uploadFile);
 router.get('/:bucketId/files', authMiddleware, requirePermission('files:read'), requireOwnership('bucket'), getFiles);
 router.get('/file/:fileId', authMiddleware, requirePermission('files:read'), requireOwnership('file'), getFile);
 router.get('/file/:fileId/download', authMiddleware, requirePermission('files:read'), requireOwnership('file'), downloadFile);
+router.post('/file/:fileId/signed-url', authMiddleware, requirePermission('files:read'), requireOwnership('file'), createSignedUrl);
 router.delete('/file/:fileId', authMiddleware, requirePermission('files:delete'), requireOwnership('file'), deleteFile);
 router.patch('/file/:fileId', authMiddleware, requirePermission('files:write'), requireOwnership('file'), updateFile);
 

@@ -26,25 +26,29 @@ class HypzSDK extends EventEmitter {
   constructor(apiKey, options = {}) {
     super();
     
-    if (!apiKey) {
-      throw new Error('API key is required');
+    // Support constructor(HYPZ_API_KEY, options) or constructor({ apiKey, baseURL, jwt, ... })
+    if (apiKey && typeof apiKey === 'object') {
+      options = apiKey || {};
+      apiKey = options.apiKey;
     }
-    
-    this.apiKey = apiKey;
+
+    this.apiKey = apiKey || null;
+    this.jwt = options.jwt || options.token || null; // allow dashboard JWT usage
+    if (!this.apiKey && !this.jwt) {
+      throw new Error('API key or JWT token is required');
+    }
+
     this.baseURL = options.baseURL || 'http://localhost:5000/api/v1';
     this.timeout = options.timeout || 30000;
     this.retries = options.retries || 3;
     this.retryDelay = options.retryDelay || 1000;
     
     // Initialize axios client
-    this.client = axios.create({
-      baseURL: this.baseURL,
-      timeout: this.timeout,
-      headers: {
-        'X-API-Key': this.apiKey,
-        'Content-Type': 'application/json'
-      }
-    });
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.apiKey) headers['X-API-Key'] = this.apiKey;
+    if (this.jwt) headers['Authorization'] = `Bearer ${this.jwt}`;
+
+    this.client = axios.create({ baseURL: this.baseURL, timeout: this.timeout, headers });
     
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
@@ -194,6 +198,20 @@ class FileManager {
    * Upload file to bucket
    */
   async upload(bucketId, file, options = {}) {
+    // Support signature: upload({ bucketId, file, fileName, isPublic, tags, metadata, onProgress })
+    if (bucketId && typeof bucketId === 'object' && !file) {
+      const input = bucketId;
+      bucketId = input.bucketId;
+      file = input.file;
+      options = {
+        filename: input.fileName || input.filename,
+        isPublic: input.isPublic,
+        tags: input.tags,
+        metadata: input.metadata,
+        onProgress: input.onProgress
+      };
+    }
+    
     const formData = new FormData();
     
     // Handle file input
@@ -205,7 +223,7 @@ class FileManager {
       formData.append('file', file);
     } else if (Buffer.isBuffer(file)) {
       // Buffer
-      formData.append('file', file, { filename: options.filename || 'file' });
+      formData.append('file', file, { filename: options.filename || options.fileName || 'file' });
     } else {
       throw new Error('Invalid file input');
     }
@@ -271,6 +289,17 @@ class FileManager {
    */
   getDownloadURL(fileId) {
     return `${this.sdk.baseURL}/files/file/${fileId}/download`;
+  }
+  
+  /**
+   * Generate signed download URL for private files
+   * @param {string} fileId
+   * @param {number} expiresInSeconds up to 7 days (604800)
+   */
+  async getSignedURL(fileId, expiresInSeconds = 3600) {
+    const body = { expiresIn: Math.min(Math.max(1, Math.floor(expiresInSeconds)), 604800) };
+    const res = await this.sdk._request('POST', `/files/file/${fileId}/signed-url`, body);
+    return res?.data?.url || res?.data?.signedUrl || res?.url; // tolerate shapes
   }
   
   /**

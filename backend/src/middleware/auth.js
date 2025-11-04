@@ -296,6 +296,24 @@ export const blockApiKeyAccess = (req, res, next) => {
   next();
 };
 
+// Signed file token verifier (query token)
+export const authenticateFileToken = (req, res, next) => {
+  const token = req.query.token;
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Missing token' });
+  }
+  try {
+    const decoded = jwt.verify(token, config.JWT_SECRET);
+    if (decoded.t !== 'file' || !decoded.fid) {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+    req.fileToken = decoded; // { t: 'file', fid, uid, iat, exp }
+    next();
+  } catch (e) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+};
+
 // Role-based authorization middleware
 export const authorize = (...roles) => {
   return (req, res, next) => {

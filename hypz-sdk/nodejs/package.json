@@ -1,6 +1,6 @@
 {
   "name": "@hypz/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official Hypz File Storage SDK for Node.js - S3-compatible cloud storage API",
   "main": "index.js",
   "types": "index.d.ts",

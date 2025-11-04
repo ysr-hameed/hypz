@@ -132,6 +132,7 @@ export const downloadFromB2 = async (fileName, bucketName) => {
   }
 };
 
+
 // Download by file ID (works reliably for private buckets)
 export const downloadById = async (fileId) => {
   try {
@@ -229,6 +230,7 @@ export default {
   uploadToB2,
   downloadFromB2,
   deleteFromB2,
+  streamById,
   getB2FileInfo,
   isB2Available
 };

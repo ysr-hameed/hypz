@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hypz-sdk",
-    version="1.0.0",
+    version="1.0.1",
     author="Hypz Team",
     author_email="support@hypz.io",
     description="Python SDK for Hypz file storage API",

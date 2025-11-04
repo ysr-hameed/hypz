@@ -1,6 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import jwt from 'jsonwebtoken';
 import { query } from '../config/database.js';
 import { generateUniqueFilename, formatBytes, successResponse, errorResponse, paginate, getPaginationMeta } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
@@ -241,7 +242,10 @@ export const downloadFile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
   const result = await query(
-    'SELECT * FROM files WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL',
+    `SELECT f.*, b.visibility as bucket_visibility
+     FROM files f
+     JOIN buckets b ON f.bucket_id = b.id
+     WHERE f.id = $1 AND f.user_id = $2 AND f.deleted_at IS NULL`,
     [fileId, userId]
   );
 
@@ -279,31 +283,10 @@ export const downloadFile = asyncHandler(async (req, res) => {
   // If stored in Backblaze B2, stream or redirect appropriately
   if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
     try {
-      // If we have B2 file ID, prefer downloading by ID for private buckets
-      if (file.b2_file_id) {
-        console.log('Attempting B2 download by ID:', file.b2_file_id);
-        const { streamById } = await import('../services/b2Service.js');
-        const stream = await streamById(file.b2_file_id);
-        res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
-        return stream.pipe(res);
-      }
-
-      // Determine B2 bucket from URL if present
-      let bucketName = null;
-      if (file.url) {
-        const match = file.url.match(/\/file\/([^/]+)\//);
-        if (match) bucketName = match[1];
-      }
-
-      // If it's clearly in the configured PUBLIC bucket, allow redirect
-      if (bucketName && bucketName === config.B2_PUBLIC_BUCKET_NAME) {
-        return res.redirect(file.url);
-      }
-
-      // Otherwise stream from B2 (private or unknown bucket)
+      // Determine bucket name from bucket visibility
       const { downloadFromB2 } = await import('../services/b2Service.js');
-      const data = await downloadFromB2(file.path, bucketName || undefined);
+      const bucketName = file.bucket_visibility === 'public' ? config.B2_PUBLIC_BUCKET_NAME : config.B2_PRIVATE_BUCKET_NAME;
+      const data = await downloadFromB2(file.path, bucketName);
 
       // Set headers and send
       res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
@@ -329,6 +312,103 @@ export const downloadFile = asyncHandler(async (req, res) => {
     return res.download(file.path, file.original_name);
   } catch (error) {
     console.error('Local download failed:', error?.message || error);
+    return errorResponse(res, 'File not found on server', 404);
+  }
+});
+
+// Generate time-limited signed download URL for private files (max 7 days)
+export const createSignedUrl = asyncHandler(async (req, res) => {
+  const { fileId } = req.params;
+  const userId = req.user.id;
+  const maxSeconds = 7 * 24 * 60 * 60; // 7 days
+  let { expiresIn } = req.body;
+  let seconds = parseInt(expiresIn || 3600, 10);
+  if (Number.isNaN(seconds) || seconds <= 0) seconds = 3600;
+  if (seconds > maxSeconds) seconds = maxSeconds;
+
+  const result = await query(
+    `SELECT f.id, f.user_id, b.visibility as bucket_visibility
+     FROM files f
+     JOIN buckets b ON f.bucket_id = b.id
+     WHERE f.id = $1 AND f.user_id = $2 AND f.deleted_at IS NULL`,
+    [fileId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'File not found', 404);
+  }
+
+  const payload = { t: 'file', fid: fileId, uid: userId };
+  const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: seconds });
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const url = `${origin}/api/${config.API_VERSION}/files/file/${fileId}/download-signed?token=${token}`;
+  const expiresAt = new Date(Date.now() + seconds * 1000).toISOString();
+
+  return successResponse(res, { url, expiresAt, expiresIn: seconds }, 'Signed URL generated');
+});
+
+// Download via signed token (no auth header required)
+export const downloadFileSigned = asyncHandler(async (req, res) => {
+  const { fileId } = req.params;
+  const { fileToken } = req; // set by authenticateFileToken
+  if (!fileToken || fileToken.fid !== fileId) {
+    return errorResponse(res, 'Invalid or expired token', 401);
+  }
+
+  // Ensure file still exists and belongs to token user
+  const result = await query(
+    `SELECT f.*, b.visibility as bucket_visibility
+     FROM files f
+     JOIN buckets b ON f.bucket_id = b.id
+     WHERE f.id = $1 AND f.user_id = $2 AND f.deleted_at IS NULL`,
+    [fileId, fileToken.uid]
+  );
+
+  if (result.rows.length === 0) {
+    return errorResponse(res, 'File not found', 404);
+  }
+
+  const file = result.rows[0];
+
+  // Non-blocking metrics
+  query('UPDATE files SET downloads = downloads + 1 WHERE id = $1', [fileId])
+    .catch(err => console.error('Failed to update download count:', err));
+  query(
+    `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
+     VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
+     ON CONFLICT (user_id, date)
+     DO UPDATE SET 
+       bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+       download_bytes = usage_records.download_bytes + $2,
+       download_calls = usage_records.download_calls + 1,
+       api_calls = usage_records.api_calls + 1,
+       updated_at = CURRENT_TIMESTAMP`,
+    [file.user_id, file.size || 0]
+  ).catch(err => console.error('Failed to update usage:', err));
+
+  // B2 or local
+  if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
+    try {
+      const { downloadFromB2 } = await import('../services/b2Service.js');
+      const bucketName = file.bucket_visibility === 'public' ? config.B2_PUBLIC_BUCKET_NAME : config.B2_PRIVATE_BUCKET_NAME;
+      const data = await downloadFromB2(file.path, bucketName);
+      res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+      if (data && typeof data.pipe === 'function') {
+        return data.pipe(res);
+      }
+      return res.send(data);
+    } catch (err) {
+      console.error('B2 download-signed failed:', err);
+      if (file.url) return res.redirect(file.url);
+      return errorResponse(res, 'File not available', 404);
+    }
+  }
+
+  try {
+    await fs.access(file.path);
+    return res.download(file.path, file.original_name);
+  } catch (e) {
     return errorResponse(res, 'File not found on server', 404);
   }
 });

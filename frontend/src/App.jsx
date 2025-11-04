@@ -20,6 +20,7 @@ import Buckets from './pages/dashboard/Buckets';
 import BucketDetails from './pages/dashboard/BucketDetails';
 import FileManager from './pages/dashboard/FileManager';
 import Pricing from './pages/Pricing';
+import Documentation from './pages/Documentation';
 import Billing from './pages/dashboard/Billing';
 import Settings from './pages/dashboard/Settings';
 import ApiKeys from './pages/dashboard/ApiKeys';
@@ -66,8 +67,8 @@ function AppContent() {
               <Route element={<LandingLayout />}>
                 <Route path="/" element={<Landing />} />
                 <Route path="/pricing" element={<Pricing />} />
-                {/* <Route path="/documentation" element={<Documentation />} />
-                <Route path="/docs" element={<Documentation />} /> */}
+                <Route path="/documentation" element={<Documentation />} />
+                <Route path="/docs" element={<Documentation />} />
               </Route>
 
               {/* Auth Routes */}
