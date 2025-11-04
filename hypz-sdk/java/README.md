@@ -210,7 +210,7 @@ for (HypzFile file : files) {
 HypzFile file = client.files().get(fileId);
 System.out.println("File: " + file.getFilename());
 System.out.println("Size: " + file.getSize() + " bytes");
-System.out.println("Public: " + file.isPublic());
+System.out.println("Public: " + file.isPublic());  // Reflects bucket visibility
 ```
 
 #### Download File
@@ -238,10 +238,10 @@ client.files().downloadTo(fileId, "downloads/document.pdf");
 ```java
 import java.util.Arrays;
 
+// Note: File visibility is inherited from bucket and cannot be changed
 HypzFile updated = client.files().update(
     fileId,
-    true,  // isPublic
-    Arrays.asList("public", "updated")  // tags
+    Arrays.asList("public", "updated")  // tags only
 );
 ```
 

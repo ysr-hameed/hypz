@@ -7,6 +7,43 @@ export const createBucket = asyncHandler(async (req, res) => {
   const { name, visibility = 'private', description, region = 'us-east-1' } = req.body;
   const userId = req.user.id;
 
+  // Get user's plan to check limits
+  const userPlanResult = await query(
+    `SELECT p.* FROM users u
+     JOIN plans p ON u.plan_id = p.id
+     WHERE u.id = $1`,
+    [userId]
+  );
+
+  if (userPlanResult.rows.length === 0) {
+    return errorResponse(res, 'User plan not found', 404);
+  }
+
+  const plan = userPlanResult.rows[0];
+
+  // Check bucket type permission
+  if (visibility === 'public' && !plan.public_buckets_allowed) {
+    return errorResponse(res, `Your plan (${plan.name}) does not allow public buckets. Please upgrade to create public buckets.`, 403);
+  }
+
+  if (visibility === 'private' && !plan.private_buckets_allowed) {
+    return errorResponse(res, `Your plan (${plan.name}) does not allow private buckets.`, 403);
+  }
+
+  // Check bucket limit
+  if (plan.max_buckets > 0) {
+    const bucketCountResult = await query(
+      'SELECT COUNT(*) as count FROM buckets WHERE user_id = $1',
+      [userId]
+    );
+    
+    const currentBuckets = parseInt(bucketCountResult.rows[0].count);
+    
+    if (currentBuckets >= plan.max_buckets) {
+      return errorResponse(res, `You have reached your bucket limit (${plan.max_buckets} buckets). Please upgrade your plan to create more buckets.`, 403);
+    }
+  }
+
   // Generate slug
   const slug = slugify(name) + '-' + Date.now().toString(36);
 

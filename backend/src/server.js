@@ -16,6 +16,7 @@ import {
   sanitizeData
 } from './middleware/security.js';
 import { performanceMonitor } from './middleware/performance.js';
+import { planBasedRateLimit, globalRateLimit } from './middleware/rateLimiter.js';
 
 // Routes
 import authRoutes from './routes/authRoutes.js';
@@ -96,24 +97,24 @@ app.get(`/api/${config.API_VERSION}`, (req, res) => {
 // Handle preflight requests globally
 app.options('*', cors(corsOptions));
 
-// Apply rate limiting to API routes
-app.use(`/api/${config.API_VERSION}`, apiLimiter);
+// Apply global rate limiting to API routes (IP-based for unauthenticated)
+app.use(`/api/${config.API_VERSION}`, globalRateLimit(20)); // 20 req/s for unauthenticated
 
-// API Routes
+// API Routes - Plan-based rate limiting applied after authentication in routes
 app.use(`/api/${config.API_VERSION}/config`, configRoutes);
 app.use(`/api/${config.API_VERSION}/auth`, authRoutes);
 app.use(`/api/${config.API_VERSION}/auth`, twoFactorRoutes);
 app.use(`/api/${config.API_VERSION}/oauth`, oauthRoutes);
 app.use(`/api/${config.API_VERSION}/admin`, adminRoutes);
-app.use(`/api/${config.API_VERSION}/buckets`, bucketRoutes);
-app.use(`/api/${config.API_VERSION}/files`, fileRoutes);
-app.use(`/api/${config.API_VERSION}/api-keys`, apiKeyRoutes);
-app.use(`/api/${config.API_VERSION}/usage`, usageRoutes);
+app.use(`/api/${config.API_VERSION}/buckets`, planBasedRateLimit, bucketRoutes);
+app.use(`/api/${config.API_VERSION}/files`, planBasedRateLimit, fileRoutes);
+app.use(`/api/${config.API_VERSION}/api-keys`, planBasedRateLimit, apiKeyRoutes);
+app.use(`/api/${config.API_VERSION}/usage`, planBasedRateLimit, usageRoutes);
 app.use(`/api/${config.API_VERSION}/plans`, planRoutes);
 app.use(`/api/${config.API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${config.API_VERSION}/subscriptions`, subscriptionRoutes);
-app.use(`/api/${config.API_VERSION}/user`, userRoutes);
-app.use(`/api/${config.API_VERSION}/notifications`, notificationRoutes);
+app.use(`/api/${config.API_VERSION}/user`, planBasedRateLimit, userRoutes);
+app.use(`/api/${config.API_VERSION}/notifications`, planBasedRateLimit, notificationRoutes);
 
 // 404 handler
 app.use(notFound);

@@ -26,11 +26,11 @@ async function testAdvanced() {
     });
     testBucketId = bucket.data?.id || bucket.id;
 
+    // Note: File visibility automatically matches bucket visibility
     const file = await hypz.files.upload({
       bucketId: testBucketId,
       file: Buffer.from('Secret file content'),
-      fileName: 'secret.txt',
-      isPublic: false
+      fileName: 'secret.txt'
     });
     testFileId = file.data?.id || file.id;
     console.log('   Test resources created');
@@ -48,13 +48,25 @@ async function testAdvanced() {
     console.log('   Note: Max expiry is 7 days (604800 seconds)');
     console.log();
 
-    // Example 2: Public Files (from documentation)
-    console.log('✅ Example 2: Make file publicly accessible');
-    await hypz.files.update(testFileId, { isPublic: true });
-    console.log('   File is now public');
+    // Example 2: Public Files - Upload to public bucket
+    console.log('✅ Example 2: Make files publicly accessible');
+    const publicBucket = await hypz.buckets.create({
+      name: `test-public-${Date.now()}`,
+      isPublicBucket: true
+    });
+    const publicBucketId = publicBucket.data?.id || publicBucket.id;
+    
+    const publicFile = await hypz.files.upload({
+      bucketId: publicBucketId,
+      file: Buffer.from('Public content'),
+      fileName: 'public-file.txt'
+    });
+    const publicFileId = publicFile.data?.id || publicFile.id;
+    
+    console.log('   File uploaded to public bucket - automatically public');
     
     const baseUrl = process.env.HYPZ_BASE_URL || 'http://localhost:5000/api/v1';
-    const publicUrl = `${baseUrl}/files/public/${testFileId}/download`;
+    const publicUrl = `${baseUrl}/files/public/${publicFileId}/download`;
     console.log('   Public download URL (no auth required):');
     console.log('   ', publicUrl);
     console.log();

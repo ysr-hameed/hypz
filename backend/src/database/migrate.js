@@ -448,10 +448,7 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_notifications_global ON notifications(is_global);
     `);
 
-    // Drop old plans table and create new plans table with updated schema
-    await query('DROP TABLE IF EXISTS plans CASCADE');
-    console.log('✅ Dropped old plans table');
-
+    // Plans table - S3-like storage provider features
     await query(`
       CREATE TABLE IF NOT EXISTS plans (
         id VARCHAR(50) PRIMARY KEY,
@@ -467,54 +464,109 @@ const createTables = async () => {
         lemonsqueezy_variant_id VARCHAR(100),
         lemonsqueezy_product_id VARCHAR(100),
         
-        -- Storage & Bandwidth
-        storage_gb INTEGER DEFAULT 0, -- 0 means unlimited for PAYG
-        bandwidth_gb INTEGER DEFAULT 0, -- 0 means pay per use
-        free_bandwidth_multiplier INTEGER DEFAULT 2, -- 2x of storage
+        -- Storage & Bandwidth Limits
+        storage_gb INTEGER DEFAULT 0, -- 0 means unlimited
+        bandwidth_gb INTEGER DEFAULT 0, -- 0 means unlimited
+        free_bandwidth_multiplier INTEGER DEFAULT 2,
         
-        -- API Limits
+        -- API Rate Limits
         api_calls INTEGER DEFAULT 0, -- 0 means unlimited
+        requests_per_second INTEGER DEFAULT 10,
         
-        -- Team & Collaboration
-        team_members INTEGER DEFAULT 1,
+        -- Bucket Limits
+        max_buckets INTEGER DEFAULT 0, -- 0 means unlimited
+        public_buckets_allowed BOOLEAN DEFAULT true,
+        private_buckets_allowed BOOLEAN DEFAULT true,
         
-        -- Features (JSONB for flexibility)
-        features JSONB DEFAULT '{}',
+        -- File Size Limits (MB)
+        max_file_size_mb INTEGER DEFAULT 0, -- 0 means unlimited
+        max_multipart_file_size_gb INTEGER DEFAULT 0, -- For multipart uploads
         
-        -- Custom Domain
-        custom_domain BOOLEAN DEFAULT false,
+        -- S3-Compatible Features
+        signed_urls_enabled BOOLEAN DEFAULT false,
+        presigned_post_enabled BOOLEAN DEFAULT false,
+        cors_enabled BOOLEAN DEFAULT false,
+        lifecycle_policies_enabled BOOLEAN DEFAULT false,
+        object_lock_enabled BOOLEAN DEFAULT false,
+        versioning_enabled BOOLEAN DEFAULT false,
+        replication_enabled BOOLEAN DEFAULT false,
         
-        -- Versioning & Backup
-        versioning BOOLEAN DEFAULT false,
-        backup_retention_days INTEGER DEFAULT 0,
-        
-        -- CDN
+        -- Advanced Features
         cdn_enabled BOOLEAN DEFAULT false,
+        custom_domain BOOLEAN DEFAULT false,
+        ssl_certificates BOOLEAN DEFAULT false,
+        
+        -- Storage Classes (S3-like)
+        storage_classes TEXT[] DEFAULT ARRAY['STANDARD'],
+        intelligent_tiering BOOLEAN DEFAULT false,
+        
+        -- Access Control
+        bucket_policies_enabled BOOLEAN DEFAULT false,
+        acl_enabled BOOLEAN DEFAULT false,
+        iam_policies_enabled BOOLEAN DEFAULT false,
+        
+        -- Data Management
+        batch_operations_enabled BOOLEAN DEFAULT false,
+        inventory_reports BOOLEAN DEFAULT false,
+        analytics_enabled BOOLEAN DEFAULT false,
+        cloudwatch_metrics BOOLEAN DEFAULT false,
+        
+        -- Backup & Recovery
+        backup_retention_days INTEGER DEFAULT 0,
+        point_in_time_recovery BOOLEAN DEFAULT false,
+        cross_region_replication BOOLEAN DEFAULT false,
+        
+        -- Encryption
+        encryption_at_rest BOOLEAN DEFAULT true,
+        encryption_in_transit BOOLEAN DEFAULT true,
+        kms_encryption BOOLEAN DEFAULT false,
+        
+        -- Compliance & Logging
+        audit_logs BOOLEAN DEFAULT false,
+        access_logs BOOLEAN DEFAULT false,
+        compliance_mode BOOLEAN DEFAULT false,
+        
+        -- Collaboration
+        team_members INTEGER DEFAULT 1,
+        role_based_access BOOLEAN DEFAULT false,
         
         -- PAYG Pricing (NULL for non-PAYG plans)
-        payg_storage_rate DECIMAL(10, 4), -- per GB/month
-        payg_bandwidth_rate DECIMAL(10, 4), -- per GB
-        payg_meta_ops_rate DECIMAL(10, 4), -- per 10k requests
-        payg_access_ops_rate DECIMAL(10, 4), -- per 1k requests
+        payg_storage_rate DECIMAL(10, 4),
+        payg_bandwidth_rate DECIMAL(10, 4),
+        payg_request_rate DECIMAL(10, 6),
+        
+        -- Support Level
+        support_level VARCHAR(50) DEFAULT 'community',
+        sla_uptime DECIMAL(5, 2) DEFAULT 99.0,
         
         -- Payment Settings
-        payment_mode VARCHAR(20) DEFAULT 'manual', -- 'auto' or 'manual'
+        payment_mode VARCHAR(20) DEFAULT 'manual',
         credit_card_required BOOLEAN DEFAULT false,
+        
+        -- Additional Features (JSONB for flexibility)
+        features JSONB DEFAULT '{}',
         
         -- Metadata
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Created new plans table');
+    console.log('✅ Created plans table');
 
-    // Insert Free plan
+    // Insert Free plan with realistic S3 limits
     await query(`
       INSERT INTO plans (
         id, name, type, price_usd, price_inr, billing_cycle, description,
-        storage_gb, bandwidth_gb, api_calls, team_members,
-        custom_domain, versioning, backup_retention_days, cdn_enabled,
-        credit_card_required, popular,
+        storage_gb, bandwidth_gb, api_calls, requests_per_second,
+        max_buckets, public_buckets_allowed, private_buckets_allowed, 
+        max_file_size_mb, max_multipart_file_size_gb,
+        signed_urls_enabled, presigned_post_enabled, cors_enabled,
+        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled,
+        cdn_enabled, custom_domain, bucket_policies_enabled, acl_enabled,
+        batch_operations_enabled, inventory_reports, analytics_enabled,
+        backup_retention_days, encryption_at_rest, encryption_in_transit,
+        audit_logs, access_logs, team_members, role_based_access,
+        support_level, sla_uptime, credit_card_required, popular,
         features
       ) VALUES (
         'free_forever',
@@ -523,26 +575,49 @@ const createTables = async () => {
         0, 0,
         'Forever (no expiry)',
         'Perfect for testing and small projects. No card needed, no hidden fees.',
-        1, 3, 50000, 1,
-        false, false, 0, false,
-        false, false,
+        1, 3, 50000, 5,
+        3, true, false,
+        100, 0,
+        false, false, true,
+        false, false, false,
+        false, false, false, false,
+        false, false, false,
+        0, true, true,
+        false, false, 1, false,
+        'community', 99.0, false, false,
         '{
-          "support": "Community support",
-          "uploads": "Free",
-          "downloads": "Within 3 GB/month limit",
-          "exceed_behavior": "Uploads and downloads temporarily paused until next reset or upgrade"
+          "support": "Community forum support",
+          "rate_limit": "5 requests/second",
+          "max_upload_size": "100MB per file",
+          "storage_class": "STANDARD only",
+          "exceed_behavior": "Service paused until next reset or upgrade"
         }'::jsonb
       )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted Free plan');
+    console.log('✅ Inserted/Updated Free plan');
 
-    // Insert Pro plan
+    // Insert Pro plan with advanced S3 features
     await query(`
       INSERT INTO plans (
         id, name, type, price_usd, price_inr, billing_cycle, description,
-        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, team_members,
-        custom_domain, versioning, backup_retention_days, cdn_enabled,
-        credit_card_required, popular,
+        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
+        max_buckets, public_buckets_allowed, private_buckets_allowed,
+        max_file_size_mb, max_multipart_file_size_gb,
+        signed_urls_enabled, presigned_post_enabled, cors_enabled,
+        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled, replication_enabled,
+        cdn_enabled, custom_domain, ssl_certificates,
+        storage_classes, intelligent_tiering,
+        bucket_policies_enabled, acl_enabled, iam_policies_enabled,
+        batch_operations_enabled, inventory_reports, analytics_enabled, cloudwatch_metrics,
+        backup_retention_days, point_in_time_recovery, cross_region_replication,
+        encryption_at_rest, encryption_in_transit, kms_encryption,
+        audit_logs, access_logs, compliance_mode,
+        team_members, role_based_access,
+        support_level, sla_uptime, credit_card_required, popular,
         features
       ) VALUES (
         'pro_monthly',
@@ -550,29 +625,56 @@ const createTables = async () => {
         'pro',
         5, 399,
         'Monthly',
-        'For creators, students, and developers who want more space, faster access, and advanced team collaboration.',
-        100, 200, 2, 2000000, 5,
-        true, true, 30, true,
-        true, true,
+        'For creators and developers. Advanced S3-compatible features with unlimited storage.',
+        100, 200, 2, 2000000, 50,
+        0, true, true,
+        5120, 5,
+        true, true, true,
+        true, false, true, false,
+        true, true, true,
+        ARRAY['STANDARD', 'INTELLIGENT_TIERING'], true,
+        true, true, false,
+        true, true, true, false,
+        30, false, false,
+        true, true, false,
+        true, true, false,
+        5, true,
+        'priority', 99.9, true, true,
         '{
-          "priority_support": "Email + Chat (24/7)",
-          "uploads": "Unlimited",
-          "downloads": "After free bandwidth, standard pay-as-you-go rates apply",
-          "signed_urls": true,
-          "free_bandwidth_policy": "2× of stored data each month included"
+          "support": "24/7 Email + Chat support",
+          "rate_limit": "50 requests/second",
+          "max_upload_size": "5GB per file (multipart supported)",
+          "storage_classes": "STANDARD, INTELLIGENT_TIERING",
+          "s3_compatibility": "Full S3 API compatibility",
+          "uptime_sla": "99.9% uptime guarantee"
         }'::jsonb
       )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted Pro plan');
+    console.log('✅ Inserted/Updated Pro plan');
 
-    // Insert PAYG plan
+    // Insert PAYG plan with enterprise-grade S3 features
     await query(`
       INSERT INTO plans (
         id, name, type, price_usd, price_inr, billing_cycle, description,
-        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, team_members,
-        custom_domain, versioning, backup_retention_days, cdn_enabled,
-        payg_storage_rate, payg_bandwidth_rate, payg_meta_ops_rate, payg_access_ops_rate,
-        payment_mode, credit_card_required, popular,
+        storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
+        max_buckets, public_buckets_allowed, private_buckets_allowed,
+        max_file_size_mb, max_multipart_file_size_gb,
+        signed_urls_enabled, presigned_post_enabled, cors_enabled,
+        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled, replication_enabled,
+        cdn_enabled, custom_domain, ssl_certificates,
+        storage_classes, intelligent_tiering,
+        bucket_policies_enabled, acl_enabled, iam_policies_enabled,
+        batch_operations_enabled, inventory_reports, analytics_enabled, cloudwatch_metrics,
+        backup_retention_days, point_in_time_recovery, cross_region_replication,
+        encryption_at_rest, encryption_in_transit, kms_encryption,
+        audit_logs, access_logs, compliance_mode,
+        team_members, role_based_access,
+        payg_storage_rate, payg_bandwidth_rate, payg_request_rate,
+        support_level, sla_uptime, payment_mode, credit_card_required, popular,
         features
       ) VALUES (
         'payg_usage',
@@ -580,24 +682,40 @@ const createTables = async () => {
         'payg',
         0, 0,
         'Monthly (auto or manual)',
-        'Scale without limits. You pay only for what you use, billed automatically or manually as per your choice.',
-        0, 0, 2, 0, 10,
-        true, true, 30, true,
-        0.015, 0.05, 0.0002, 0.03,
-        'manual', true, false,
+        'Enterprise-grade. Truly unlimited everything. Pay only for what you use.',
+        0, 0, 2, 0, 200,
+        0, true, true,
+        0, 0,
+        true, true, true,
+        true, true, true, true,
+        true, true, true,
+        ARRAY['STANDARD', 'INTELLIGENT_TIERING', 'GLACIER', 'DEEP_ARCHIVE'], true,
+        true, true, true,
+        true, true, true, true,
+        90, true, true,
+        true, true, true,
+        true, true, true,
+        0, true,
+        0.015, 0.05, 0.000001,
+        'enterprise', 99.99, 'manual', true, false,
         '{
-          "write_operations": "Free (uploads, deletes, creates)",
-          "uploads": "Always free",
-          "private_public_buckets": true,
-          "encryption": "AES-256 server-side",
-          "free_bandwidth_policy": "2× of storage each month is free egress",
-          "billing_auto": "Charges automatically deducted from linked payment card",
-          "billing_manual": "User receives notifications 5 days before and on last day",
-          "minimum_bill": "No minimum — pay only for actual usage"
+          "support": "24/7 Enterprise support with dedicated engineer",
+          "rate_limit": "200 requests/second (burstable to 1000)",
+          "max_upload_size": "Unlimited (5TB multipart supported)",
+          "storage_classes": "All classes: STANDARD, INTELLIGENT_TIERING, GLACIER, DEEP_ARCHIVE",
+          "s3_compatibility": "100% S3 API compatible",
+          "uptime_sla": "99.99% uptime guarantee",
+          "enterprise_features": "Object Lock, Cross-region replication, Compliance mode",
+          "pricing": "$0.015/GB storage, $0.05/GB bandwidth, $0.000001 per request",
+          "billing": "No minimums, pay only for usage"
         }'::jsonb
       )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted PAYG plan');
+    console.log('✅ Inserted/Updated PAYG plan');
 
     // Add backup_files table for 30-day retention
     await query(`

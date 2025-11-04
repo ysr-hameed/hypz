@@ -26,12 +26,11 @@ def main():
         with open(test_file, 'w') as f:
             f.write('Important document content')
         
-        # Upload with comprehensive metadata
+        # Upload with comprehensive metadata (visibility matches bucket)
         print("\n2. Uploading file with metadata...")
         file = client.files.upload(
             bucket_id=bucket['id'],
             file_path=test_file,
-            is_public=False,
             tags=['document', 'important', 'q4-2024'],
             metadata={
                 'department': 'Engineering',

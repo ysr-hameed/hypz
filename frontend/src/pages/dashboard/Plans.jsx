@@ -56,40 +56,167 @@ const Plans = () => {
     
     const features = [];
     
+    // Storage
     if (plan.storage_gb) {
       features.push(`${plan.storage_gb} GB Storage`);
     } else if (plan.payg_storage_rate) {
       features.push(`$${plan.payg_storage_rate}/GB Storage`);
     }
     
+    // Bandwidth
     if (plan.bandwidth_gb) {
       features.push(`${plan.bandwidth_gb} GB Bandwidth/month`);
     } else if (plan.payg_bandwidth_rate) {
       features.push(`$${plan.payg_bandwidth_rate}/GB Bandwidth`);
     }
     
-    if (plan.api_calls) {
+    // API Calls
+    if (plan.api_calls > 0) {
       features.push(`${plan.api_calls.toLocaleString()} API Calls/month`);
+    } else if (plan.type === 'payg') {
+      features.push('Unlimited API Calls');
+    }
+    
+    // Buckets
+    if (plan.max_buckets > 0) {
+      features.push(`Up to ${plan.max_buckets} Buckets`);
+    } else if (plan.max_buckets === 0) {
+      features.push('Unlimited Buckets');
+    }
+    
+    // Bucket types
+    const bucketTypes = [];
+    if (plan.public_buckets_allowed) bucketTypes.push('Public');
+    if (plan.private_buckets_allowed) bucketTypes.push('Private');
+    if (bucketTypes.length > 0) {
+      features.push(`${bucketTypes.join(' & ')} Buckets`);
+    }
+    
+    // File size limit
+    if (plan.max_file_size_mb > 0) {
+      const sizeGB = plan.max_file_size_mb >= 1024 ? (plan.max_file_size_mb / 1024).toFixed(0) + 'GB' : plan.max_file_size_mb + 'MB';
+      features.push(`Up to ${sizeGB} per file`);
+    } else if (plan.max_file_size_mb === 0 && plan.type !== 'free') {
+      features.push('Unlimited file size');
+    }
+    
+    // Rate Limit
+    if (plan.requests_per_second) {
+      features.push(`${plan.requests_per_second} req/sec`);
+    }
+    
+    // S3 Features
+    if (plan.signed_urls_enabled) {
+      features.push('Signed URLs');
+    }
+    
+    if (plan.presigned_post_enabled) {
+      features.push('Presigned POST');
+    }
+    
+    if (plan.versioning_enabled) {
+      features.push('Object Versioning');
+    }
+    
+    if (plan.lifecycle_policies_enabled) {
+      features.push('Lifecycle Policies');
+    }
+    
+    if (plan.cors_enabled) {
+      features.push('CORS Configuration');
+    }
+    
+    if (plan.object_lock_enabled) {
+      features.push('Object Lock');
+    }
+    
+    if (plan.replication_enabled) {
+      features.push('Cross-Region Replication');
+    }
+    
+    // Storage Classes
+    if (plan.storage_classes && plan.storage_classes.length > 1) {
+      features.push(`${plan.storage_classes.length} Storage Classes`);
+    }
+    
+    if (plan.intelligent_tiering) {
+      features.push('Intelligent Tiering');
+    }
+    
+    // Access Control
+    if (plan.bucket_policies_enabled) {
+      features.push('Bucket Policies');
+    }
+    
+    if (plan.iam_policies_enabled) {
+      features.push('IAM Policies');
+    }
+    
+    if (plan.batch_operations_enabled) {
+      features.push('Batch Operations');
+    }
+    
+    if (plan.inventory_reports) {
+      features.push('Inventory Reports');
+    }
+    
+    if (plan.analytics_enabled) {
+      features.push('Storage Analytics');
     }
     
     if (plan.backup_retention_days > 0) {
-      features.push(`${plan.backup_retention_days}-Day Auto Backup`);
+      features.push(`${plan.backup_retention_days}-Day Backup`);
+    }
+    
+    if (plan.point_in_time_recovery) {
+      features.push('Point-in-Time Recovery');
+    }
+    
+    // Security
+    if (plan.kms_encryption) {
+      features.push('KMS Encryption');
+    }
+    
+    if (plan.audit_logs) {
+      features.push('Audit Logs');
+    }
+    
+    if (plan.compliance_mode) {
+      features.push('Compliance Mode');
     }
     
     if (plan.custom_domain) {
-      features.push('Custom Domain Support');
+      features.push('Custom Domain');
     }
     
-    if (plan.versioning) {
-      features.push('File Versioning');
+    if (plan.ssl_certificates) {
+      features.push('Free SSL Certificates');
     }
     
     if (plan.cdn_enabled) {
       features.push('Global CDN');
     }
     
-    if (plan.team_members) {
-      features.push(`${plan.team_members} Team Member${plan.team_members > 1 ? 's' : ''}`);
+    if (plan.team_members > 1) {
+      features.push(`${plan.team_members} Team Members`);
+    }
+    
+    if (plan.role_based_access) {
+      features.push('Role-Based Access Control');
+    }
+    
+    // Support & SLA
+    if (plan.support_level) {
+      const supportLabels = {
+        'community': 'Community Support',
+        'priority': '24/7 Priority Support',
+        'enterprise': 'Enterprise Support + Engineer'
+      };
+      features.push(supportLabels[plan.support_level] || plan.support_level);
+    }
+    
+    if (plan.sla_uptime && plan.sla_uptime > 99.0) {
+      features.push(`${plan.sla_uptime}% Uptime SLA`);
     }
     
     // Add JSONB features

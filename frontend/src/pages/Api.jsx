@@ -358,7 +358,6 @@ console.log('JWT Token:', token);`}</code></pre>
               <button
                 onClick={() => copyToClipboard(`const formData = new FormData();
 formData.append('file', fileInput.files[0]);
-formData.append('isPublic', 'true');
 formData.append('tags', JSON.stringify(['image', 'profile']));
 
 const response = await fetch('${apiConfig.baseUrl}/files/BUCKET_ID/upload', {
@@ -370,7 +369,8 @@ const response = await fetch('${apiConfig.baseUrl}/files/BUCKET_ID/upload', {
 });
 
 const data = await response.json();
-console.log('File uploaded:', data.data.url);`, 'upload')}
+console.log('File uploaded:', data.data.url);
+// Note: File visibility automatically matches bucket visibility`, 'upload')}
                 className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition"
               >
                 {copiedCode === 'upload' ? <CheckCircle size={16} /> : <Copy size={16} />}
@@ -378,7 +378,6 @@ console.log('File uploaded:', data.data.url);`, 'upload')}
               <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
                 <pre className="text-sm"><code className="text-gray-300 font-mono">{`const formData = new FormData();
 formData.append('file', fileInput.files[0]);
-formData.append('isPublic', 'true');
 formData.append('tags', JSON.stringify(['image', 'profile']));
 
 const response = await fetch('${apiConfig.baseUrl}/files/BUCKET_ID/upload', {

@@ -9,7 +9,7 @@ import {
   getBucketStats
 } from '../controllers/bucketController.js';
 import { authenticate, authenticateApiKey, requirePermission, requireOwnership } from '../middleware/auth.js';
-import { validate } from '../middleware/validator.js';
+import { validate, validateBucketName, validatePagination } from '../middleware/validator.js';
 
 const router = express.Router();
 
@@ -55,15 +55,17 @@ const updateBucketValidation = [
   body('description').optional().isString(),
   body('corsEnabled').optional().isBoolean(),
   body('corsOrigins').optional().isArray(),
+  validateBucketName,
   validate
 ];
 
 // Routes - Support both JWT and API key authentication
 router.post('/', authMiddleware, requirePermission('buckets:write'), createBucketValidation, createBucket);
-router.get('/', authMiddleware, requirePermission('buckets:read'), getBuckets);
+router.get('/', authMiddleware, requirePermission('buckets:read'), validatePagination, getBuckets);
 router.get('/:bucketId', authMiddleware, requirePermission('buckets:read'), requireOwnership('bucket'), getBucket);
 router.put('/:bucketId', authMiddleware, requirePermission('buckets:write'), requireOwnership('bucket'), updateBucketValidation, updateBucket);
 router.delete('/:bucketId', authMiddleware, requirePermission('buckets:write'), requireOwnership('bucket'), deleteBucket);
 router.get('/:bucketId/stats', authMiddleware, requirePermission('buckets:read'), requireOwnership('bucket'), getBucketStats);
 
 export default router;
+

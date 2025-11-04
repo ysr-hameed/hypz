@@ -130,13 +130,13 @@ await hypz.files.upload(bucketId, fs.createReadStream('/tmp/photo.jpg'), { filen
 await hypz.files.upload(bucketId, '/tmp/report.pdf', { filename: 'report.pdf', metadata: { year: 2025 } });
 
 // With tags and metadata
+// Note: File visibility automatically matches bucket visibility
 await hypz.files.upload({
   bucketId,
   file: Buffer.from('content'),
   fileName: 'data.json',
   tags: ['analytics', 'q4'],
-  metadata: { owner: 'ops' },
-  isPublic: false
+  metadata: { owner: 'ops' }
 });
 ```
 
@@ -145,7 +145,7 @@ await hypz.files.upload({
 ```js
 const files = await hypz.files.list(bucketId, { page: 1, limit: 50 });
 const file = await hypz.files.get(fileId);
-await hypz.files.update(fileId, { isPublic: true, tags: ['public'] });
+await hypz.files.update(fileId, { tags: ['public'] });
 await hypz.files.delete(fileId);
 ```
 
@@ -180,9 +180,9 @@ console.log(`Freed ${result.data.totalSize} bytes`);
 ### Bulk Update (up to 100 files)
 
 ```js
+// Note: File visibility is inherited from bucket and cannot be changed
 const result = await hypz.files.bulkUpdate({
   fileIds: [fileId1, fileId2, fileId3],
-  isPublic: true,
   tags: ['archived', '2024'],
   metadata: { processed: true }
 });
@@ -213,6 +213,7 @@ console.log(`Moved ${result.data.movedCount} files`);
 ```js
 const fs = require('fs');
 
+// Note: File visibility automatically matches bucket visibility
 const result = await hypz.files.bulkUpload({
   bucketId: 'your-bucket-id',
   files: [
@@ -220,7 +221,6 @@ const result = await hypz.files.bulkUpload({
     { file: fs.createReadStream('./photo2.jpg'), filename: 'photo2.jpg' },
     { file: Buffer.from('content'), filename: 'data.txt' }
   ],
-  isPublic: false,
   tags: ['batch-upload', '2024'],
   metadata: { source: 'bulk-import' }
 });
@@ -315,7 +315,7 @@ const hypz = new HypzSDK({ apiKey: 'sk_live...', baseURL: 'http://localhost:5000
 
 Key types include:
 - Bucket payloads (create/update)
-- File upload options (filename, tags, metadata, isPublic)
+- File upload options (filename, tags, metadata)
 - Usage responses
 
 ---
@@ -427,7 +427,7 @@ const hypz = new HypzSDK({
 ```javascript
 const bucket = await hypz.buckets.create({
   name: 'my-bucket',
-  isPublic: true
+  isPublicBucket: true
 });
 ```
 
@@ -445,7 +445,7 @@ const bucket = await hypz.buckets.get(bucketId);
 ```javascript
 const updated = await hypz.buckets.update(bucketId, {
   name: 'new-name',
-  isPublic: false
+  isPublicBucket: false
 });
 ```
 
@@ -582,10 +582,10 @@ for (const fileName of files) {
 // Create public bucket
 const gallery = await hypz.buckets.create({
   name: 'photo-gallery',
-  isPublic: true
+  isPublicBucket: true
 });
 
-// Upload images
+// Upload images (automatically public since bucket is public)
 const images = ['photo1.jpg', 'photo2.jpg', 'photo3.jpg'];
 const uploadedFiles = [];
 

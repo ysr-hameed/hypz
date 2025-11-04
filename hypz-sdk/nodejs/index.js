@@ -250,10 +250,7 @@ class FileManager {
       throw new Error('Invalid file input');
     }
     
-    // Add options
-    if (options.isPublic !== undefined) {
-      formData.append('isPublic', String(options.isPublic));
-    }
+    // Add options (note: isPublic is deprecated - file visibility matches bucket)
     if (options.tags) {
       formData.append('tags', JSON.stringify(options.tags));
     }
@@ -294,6 +291,12 @@ class FileManager {
   
   /**
    * Update file metadata
+   */
+  /**
+   * Update file metadata
+   * Note: Cannot change isPublic - file visibility is inherited from bucket
+   * @param {string} fileId - File ID
+   * @param {object} data - Update data (tags, metadata only)
    */
   async update(fileId, data) {
     return this.sdk._request('PATCH', `/files/file/${fileId}`, data);
@@ -377,16 +380,17 @@ class FileManager {
 
   /**
    * Bulk update files (up to 100 files)
+   * Note: Cannot change isPublic - file visibility is inherited from bucket
    */
   async bulkUpdate(data) {
-    const { fileIds, isPublic, tags, metadata } = data;
+    const { fileIds, tags, metadata } = data;
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       throw new Error('fileIds must be a non-empty array');
     }
     if (fileIds.length > 100) {
       throw new Error('Maximum 100 files can be updated at once');
     }
-    return this.sdk._request('POST', '/files/bulk/update', { fileIds, isPublic, tags, metadata });
+    return this.sdk._request('POST', '/files/bulk/update', { fileIds, tags, metadata });
   }
 
   /**
@@ -460,10 +464,7 @@ class FileManager {
       }
     });
 
-    // Add common options
-    if (isPublic !== undefined) {
-      formData.append('isPublic', String(isPublic));
-    }
+    // Add common options (note: isPublic is deprecated - file visibility matches bucket)
     if (tags) {
       formData.append('tags', JSON.stringify(tags));
     }

@@ -30,7 +30,42 @@ export const uploadFile = asyncHandler(async (req, res) => {
 
   const { bucketId } = req.params;
   const userId = req.user.id;
-  const { isPublic = false, tags = [], metadata = {} } = req.body;
+  const { tags = [], metadata = {} } = req.body;
+
+  // Reject if isPublic parameter is sent
+  if (req.body.isPublic !== undefined) {
+    return errorResponse(
+      res, 
+      'The isPublic parameter is not supported. File visibility is automatically inherited from the bucket. Upload to a public bucket to make files public.', 
+      400
+    );
+  }
+
+  // Get user's plan to check file size limit
+  const userPlanResult = await query(
+    `SELECT p.* FROM users u
+     JOIN plans p ON u.plan_id = p.id
+     WHERE u.id = $1`,
+    [userId]
+  );
+
+  if (userPlanResult.rows.length === 0) {
+    return errorResponse(res, 'User plan not found', 404);
+  }
+
+  const plan = userPlanResult.rows[0];
+
+  // Check file size limit (0 or null means unlimited)
+  if (plan.max_file_size_mb > 0) {
+    const fileSizeMB = req.file.size / (1024 * 1024);
+    if (fileSizeMB > plan.max_file_size_mb) {
+      return errorResponse(
+        res,
+        `File size (${fileSizeMB.toFixed(2)}MB) exceeds your plan limit of ${plan.max_file_size_mb}MB. Please upgrade your plan to upload larger files.`,
+        413
+      );
+    }
+  }
 
   // Verify bucket ownership
   const bucket = await query(
@@ -44,6 +79,10 @@ export const uploadFile = asyncHandler(async (req, res) => {
 
   const bucketVisibility = bucket.rows[0].visibility;
   const isPublicBucket = bucketVisibility === 'public';
+  
+  // File's isPublic flag MUST match bucket visibility
+  // This ensures consistency between B2 storage location and database
+  const isPublic = isPublicBucket;
 
   let fileUrl, cdnUrl, filePath, b2FileId;
 
@@ -323,6 +362,28 @@ export const createSignedUrl = asyncHandler(async (req, res) => {
   const MAX_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days (604800 seconds)
   const DEFAULT_EXPIRY_SECONDS = 3600; // 1 hour
   
+  // Check if user's plan allows signed URLs
+  const userPlanResult = await query(
+    `SELECT p.* FROM users u
+     JOIN plans p ON u.plan_id = p.id
+     WHERE u.id = $1`,
+    [userId]
+  );
+
+  if (userPlanResult.rows.length === 0) {
+    return errorResponse(res, 'User plan not found', 404);
+  }
+
+  const plan = userPlanResult.rows[0];
+
+  if (!plan.signed_urls_enabled) {
+    return errorResponse(
+      res,
+      `Signed URLs are not available on your plan (${plan.name}). Please upgrade to Pro or Pay-As-You-Go plan to use this feature.`,
+      403
+    );
+  }
+  
   let { expiresIn } = req.body;
   let seconds = parseInt(expiresIn || DEFAULT_EXPIRY_SECONDS, 10);
   
@@ -498,14 +559,19 @@ export const updateFile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { isPublic, tags, metadata } = req.body;
 
+  // Reject if isPublic parameter is sent
+  if (isPublic !== undefined) {
+    return errorResponse(
+      res,
+      'Cannot change file visibility. File visibility is automatically inherited from the bucket. Move the file to a different bucket type to change visibility.',
+      400
+    );
+  }
+
   const updates = [];
   const params = [fileId, userId];
   let paramIndex = 3;
 
-  if (isPublic !== undefined) {
-    updates.push(`is_public = $${paramIndex++}`);
-    params.push(isPublic);
-  }
   if (tags !== undefined) {
     updates.push(`tags = $${paramIndex++}`);
     params.push(Array.isArray(tags) ? tags : []);
@@ -674,14 +740,19 @@ export const bulkUpdateFiles = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Cannot update more than 100 files at once', 400);
   }
 
+  // Reject if isPublic parameter is sent
+  if (isPublic !== undefined) {
+    return errorResponse(
+      res,
+      'Cannot change file visibility. File visibility is automatically inherited from the bucket.',
+      400
+    );
+  }
+
   const updates = [];
   const params = [userId];
   let paramIndex = 2;
 
-  if (isPublic !== undefined) {
-    updates.push(`is_public = $${paramIndex++}`);
-    params.push(isPublic);
-  }
   if (tags !== undefined) {
     updates.push(`tags = $${paramIndex++}`);
     params.push(Array.isArray(tags) ? tags : []);
@@ -844,6 +915,15 @@ export const bulkUploadFiles = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Cannot upload more than 20 files at once', 400);
   }
 
+  // Reject if isPublic parameter is sent
+  if (req.body.isPublic !== undefined) {
+    return errorResponse(
+      res,
+      'The isPublic parameter is not supported. File visibility is automatically inherited from the bucket.',
+      400
+    );
+  }
+
   // Verify bucket ownership
   const bucket = await query(
     'SELECT id, name, visibility FROM buckets WHERE id = $1 AND user_id = $2',
@@ -857,6 +937,9 @@ export const bulkUploadFiles = asyncHandler(async (req, res) => {
   const bucketVisibility = bucket.rows[0].visibility;
   const isPublicBucket = bucketVisibility === 'public';
   
+  // File visibility MUST match bucket
+  const isPublic = isPublicBucket;
+  
   const uploadedFiles = [];
   const errors = [];
   let totalSize = 0;
@@ -864,7 +947,7 @@ export const bulkUploadFiles = asyncHandler(async (req, res) => {
   // Process each file
   for (const file of req.files) {
     try {
-      const { isPublic = false, tags = [], metadata = {} } = req.body;
+      const { tags = [], metadata = {} } = req.body;
       const uniqueFilename = generateUniqueFilename(file.originalname);
 
       let fileUrl, cdnUrl, filePath, b2FileId;

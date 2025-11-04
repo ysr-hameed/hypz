@@ -168,7 +168,7 @@ for file in files:
 file = client.files.get(file_id)
 print(f"File: {file['filename']}")
 print(f"Size: {file['size']} bytes")
-print(f"Public: {file['isPublic']}")
+print(f"Public: {file['isPublic']}")  # Reflects bucket visibility
 ```
 
 #### Download File
@@ -189,9 +189,9 @@ client.files.download_to(file_id, dest_path="downloads/document.pdf")
 #### Update File
 
 ```python
+# Note: File visibility is inherited from bucket and cannot be changed
 updated = client.files.update(
     file_id,
-    is_public=True,
     tags=["public", "updated"]
 )
 ```

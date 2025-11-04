@@ -284,17 +284,21 @@ console.log('Total downloads:', stats.data.total_downloads);
 console.log('File types:', stats.data.typeDistribution);`,
 
       uploadFile: `// Upload a file
+// Note: File visibility automatically matches bucket visibility
+// - Public bucket → file is public
+// - Private bucket → file is private (requires auth or signed URL)
+
 const file = await hypz.files.upload({
   bucketId: bucketId,
   file: fileBuffer, // File buffer or stream
   fileName: 'image.jpg',
-  isPublic: false,
   tags: ['profile', 'avatar'],
   metadata: { userId: '123', category: 'images' }
 });
 
 console.log('File uploaded:', file.data.url);
-console.log('CDN URL:', file.data.cdn_url);`,
+console.log('CDN URL:', file.data.cdn_url);
+console.log('Is public:', file.data.is_public); // Matches bucket visibility`,
 
       listFiles: `// List files in bucket
 const { files, pagination } = await hypz.files.list(bucketId, {
@@ -327,8 +331,10 @@ require('fs').writeFileSync('downloaded-file.jpg', fileData);
 // by the SDK using your API key. Public files don't require authentication.`,
 
       updateFile: `// Update file metadata
+// Note: Cannot change file visibility directly
+// To change visibility, move file to a different bucket type
+
 const updated = await hypz.files.update(fileId, {
-  isPublic: true,
   tags: ['featured', 'homepage'],
   metadata: { priority: 'high' }
 });`,
@@ -347,7 +353,6 @@ console.log(\`Freed \${result.data.totalSize} bytes\`);`,
       bulkUpdate: `// Update multiple files at once
 const result = await hypz.files.bulkUpdate({
   fileIds: [123, 456, 789],
-  isPublic: true,
   tags: ['archived', '2024'],
   metadata: { processed: true }
 });
@@ -370,6 +375,7 @@ const result = await hypz.files.bulkMove({
 console.log(\`Moved \${result.data.movedCount} files\`);`,
 
       bulkUpload: `// Upload multiple files at once (up to 20 files)
+// File visibility matches bucket visibility
 const fs = require('fs');
 
 const result = await hypz.files.bulkUpload({
@@ -379,7 +385,6 @@ const result = await hypz.files.bulkUpload({
     { file: fs.createReadStream('./photo2.jpg'), filename: 'photo2.jpg' },
     { file: Buffer.from('content'), filename: 'data.txt' }
   ],
-  isPublic: false,
   tags: ['batch-upload', '2024'],
   metadata: { source: 'bulk-import' }
 });
@@ -431,11 +436,19 @@ const maxExpiryUrl = await hypz.files.getSignedURL(fileId, 604800);
 const cappedUrl = await hypz.files.getSignedURL(fileId, 2592000); // 30 days requested
 console.log('Actual expiry:', cappedUrl.data.expiresIn, 'seconds'); // Will be 604800`,
 
-      publicFiles: `// Make a file publicly accessible
-await hypz.files.update(fileId, { isPublic: true });
+      publicFiles: `// Public files are automatically accessible without auth
+// File visibility is determined by bucket type:
+// - Files in public buckets → public (no auth needed)
+// - Files in private buckets → private (auth or signed URL required)
 
-// Get public download URL (no auth required)
-const publicUrl = \`https://api.hypz.io/api/v1/files/public/\${fileId}/download\`;`,
+// Get public download URL for files in public buckets
+const publicUrl = \`https://api.hypz.io/api/v1/files/public/\${fileId}/download\`;
+
+// To make files public, upload them to a public bucket:
+const publicBucket = await hypz.buckets.create({
+  name: 'public-assets',
+  visibility: 'public'
+});`,
 
       cors: `// Enable CORS for a bucket
 await hypz.buckets.update(bucketId, {
@@ -531,17 +544,18 @@ print(f'Total downloads: {stats["total_downloads"]}')
 print(f'File types: {stats["typeDistribution"]}')`,
 
       uploadFile: `# Upload a file
+# Note: File visibility automatically matches bucket visibility
 with open('image.jpg', 'rb') as f:
     file = hypz.files.upload(bucket_id,
         file=f,
         filename='image.jpg',
-        is_public=False,
         tags=['profile', 'avatar'],
         metadata={'user_id': '123', 'category': 'images'}
     )
 
 print(f'File uploaded: {file["url"]}')
-print(f'CDN URL: {file["cdn_url"]}')`,
+print(f'CDN URL: {file["cdn_url"]}')
+print(f'Is public: {file["is_public"]}')  # Matches bucket visibility`,
 
       listFiles: `# List files in bucket
 response = hypz.files.list(bucket_id,
@@ -574,8 +588,8 @@ with open('downloaded-file.jpg', 'wb') as f:
 # by the SDK using your API key. Public files don't require authentication.`,
 
       updateFile: `# Update file metadata
+# Note: Cannot change file visibility directly
 updated = hypz.files.update(file_id,
-    is_public=True,
     tags=['featured', 'homepage'],
     metadata={'priority': 'high'}
 )`,
@@ -595,7 +609,6 @@ print(f'Freed {result["totalSize"]} bytes')`,
       bulkUpdate: `# Update multiple files at once
 result = hypz.files.bulk_update(
     file_ids=[123, 456, 789],
-    is_public=True,
     tags=['archived', '2024'],
     metadata={'processed': True}
 )
@@ -627,7 +640,6 @@ with open('photo1.jpg', 'rb') as f1, open('photo2.jpg', 'rb') as f2:
             ('photo2.jpg', f2),
             ('data.txt', b'content')
         ],
-        is_public=False,
         tags=['batch-upload', '2024'],
         metadata={'source': 'bulk-import'}
     )
@@ -679,9 +691,14 @@ max_expiry_url = hypz.files.create_signed_url(file_id, expires_in=604800)
 capped_url = hypz.files.create_signed_url(file_id, expires_in=2592000)  # 30 days
 print(f'Actual expiry: {capped_url["expiresIn"]} seconds')  # Will be 604800`,
 
-      publicFiles: `# Make a file publicly accessible
-hypz.files.update(file_id, is_public=True)
+      publicFiles: `# Public files determined by bucket visibility
+# Create a public bucket for public files
+public_bucket = hypz.buckets.create(
+    name='public-assets',
+    visibility='public'
+)
 
+# Files uploaded to public buckets are automatically public
 # Get public download URL (no auth required)
 public_url = f'https://api.hypz.io/api/files/public/{file_id}/download'`,
 
@@ -785,18 +802,19 @@ System.out.println("Total size: " + stats.getTotalSize());
 System.out.println("Total downloads: " + stats.getTotalDownloads());`,
 
       uploadFile: `// Upload a file
+// Note: File visibility automatically matches bucket visibility
 File localFile = new File("image.jpg");
 FileUpload file = hypz.files().upload(bucketId,
     new UploadFileRequest()
         .file(localFile)
         .filename("image.jpg")
-        .isPublic(false)
         .tags(Arrays.asList("profile", "avatar"))
         .metadata(Map.of("userId", "123", "category", "images"))
 );
 
 System.out.println("File uploaded: " + file.getUrl());
-System.out.println("CDN URL: " + file.getCdnUrl());`,
+System.out.println("CDN URL: " + file.getCdnUrl());
+System.out.println("Is public: " + file.isPublic());`,
 
       listFiles: `// List files in bucket
 FileListResponse response = hypz.files().list(bucketId,
@@ -831,9 +849,9 @@ Files.write(Paths.get("downloaded-file.jpg"), fileData);
 // by the SDK using your API key. Public files don't require authentication.`,
 
       updateFile: `// Update file metadata
+// Note: Cannot change file visibility directly
 FileInfo updated = hypz.files().update(fileId,
     new UpdateFileRequest()
-        .isPublic(true)
         .tags(Arrays.asList("featured", "homepage"))
         .metadata(Map.of("priority", "high"))
 );`,
@@ -855,7 +873,6 @@ System.out.println("Freed " + result.getTotalSize() + " bytes");`,
 BulkUpdateResponse result = hypz.files().bulkUpdate(
     new BulkUpdateRequest()
         .fileIds(Arrays.asList(123, 456, 789))
-        .isPublic(true)
         .tags(Arrays.asList("archived", "2024"))
         .metadata(Map.of("processed", true))
 );
@@ -883,6 +900,7 @@ BulkMoveResponse result = hypz.files().bulkMove(
 System.out.println("Moved " + result.getMovedCount() + " files");`,
 
       bulkUpload: `// Upload multiple files at once (up to 20 files)
+// File visibility matches bucket visibility
 import java.io.File;
 
 BulkUploadResponse result = hypz.files().bulkUpload(
@@ -891,7 +909,6 @@ BulkUploadResponse result = hypz.files().bulkUpload(
         .addFile(new File("photo1.jpg"))
         .addFile(new File("photo2.jpg"))
         .addFile("data.txt", "content".getBytes())
-        .isPublic(false)
         .tags(Arrays.asList("batch-upload", "2024"))
         .metadata(Map.of("source", "bulk-import"))
 );
@@ -954,9 +971,14 @@ SignedUrl cappedUrl = hypz.files().createSignedUrl(fileId,
 );
 System.out.println("Actual expiry: " + cappedUrl.getExpiresIn() + " seconds"); // Will be 604800`,
 
-      publicFiles: `// Make a file publicly accessible
-hypz.files().update(fileId, 
-    new UpdateFileRequest().isPublic(true)
+      publicFiles: `// Public files determined by bucket visibility
+// Upload to public bucket for public access
+
+// Create a public bucket
+Bucket publicBucket = hypz.buckets().create(
+    new CreateBucketRequest()
+        .name("public-assets")
+        .visibility("public")
 );
 
 // Get public download URL (no auth required)
@@ -1046,10 +1068,10 @@ curl -X GET https://api.hypz.io/api/buckets/{bucketId}/stats \\
   -H "x-api-key: your-api-key-here"`,
 
       uploadFile: `# Upload a file
+# Note: File visibility automatically matches bucket visibility
 curl -X POST https://api.hypz.io/api/files/{bucketId}/upload \\
   -H "x-api-key: your-api-key-here" \\
   -F "file=@/path/to/image.jpg" \\
-  -F "isPublic=false" \\
   -F "tags=profile,avatar" \\
   -F 'metadata={"userId":"123","category":"images"}'`,
 
@@ -1070,11 +1092,11 @@ curl -X GET https://api.hypz.io/api/files/file/{fileId}/download \\
 # Public files don't require authentication but including it still works.`,
 
       updateFile: `# Update file metadata
+# Note: File visibility is inherited from bucket and cannot be changed directly
 curl -X PATCH https://api.hypz.io/api/files/file/{fileId} \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "isPublic": true,
     "tags": ["featured", "homepage"],
     "metadata": {"priority": "high"}
   }'`,
@@ -1092,12 +1114,12 @@ curl -X POST https://api.hypz.io/api/files/bulk/delete \\
   }'`,
 
       bulkUpdate: `# Update multiple files at once
+# Note: File visibility is inherited from bucket and cannot be changed directly
 curl -X POST https://api.hypz.io/api/files/bulk/update \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
     "fileIds": [123, 456, 789],
-    "isPublic": true,
     "tags": ["archived", "2024"],
     "metadata": {"processed": true}
   }'`,
@@ -1120,12 +1142,12 @@ curl -X POST https://api.hypz.io/api/files/bulk/move \\
   }'`,
 
       bulkUpload: `# Upload multiple files at once (up to 20 files)
+# Note: File visibility automatically matches bucket visibility
 curl -X POST https://api.hypz.io/api/files/{bucketId}/bulk-upload \\
   -H "x-api-key: your-api-key-here" \\
   -F "files=@photo1.jpg" \\
   -F "files=@photo2.jpg" \\
   -F "files=@data.txt" \\
-  -F "isPublic=false" \\
   -F "tags=[\\"batch-upload\\",\\"2024\\"]" \\
   -F "metadata={\\"source\\":\\"bulk-import\\"}"
 
@@ -1180,11 +1202,20 @@ curl -X POST https://api.hypz.io/api/files/file/{fileId}/signed-url \\
 # Maximum expiry: 7 days (604800 seconds)
 # Exceeding this value will be automatically capped`,
 
-      publicFiles: `# Make a file publicly accessible
-curl -X PATCH https://api.hypz.io/api/files/file/{fileId} \\
+      publicFiles: `# To make files publicly accessible, upload them to a public bucket
+# First, create a public bucket:
+curl -X POST https://api.hypz.io/api/buckets \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
-  -d '{"isPublic": true}'
+  -d '{
+    "name": "public-assets",
+    "isPublicBucket": true
+  }'
+
+# Then upload files - they will automatically be public:
+curl -X POST https://api.hypz.io/api/files/{bucketId}/upload \\
+  -H "x-api-key: your-api-key-here" \\
+  -F "file=@/path/to/image.jpg"
 
 # Download public file (no auth required)
 curl -X GET https://api.hypz.io/api/files/public/{fileId}/download \\

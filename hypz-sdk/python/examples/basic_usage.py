@@ -36,12 +36,11 @@ def main():
         with open(test_file_path, 'w') as f:
             f.write('Hello from Hypz Python SDK!')
         
-        # Upload file
+        # Upload file (visibility automatically matches bucket)
         print("\n3. Uploading file...")
         file = client.files.upload(
             bucket_id=bucket['id'],
             file_path=test_file_path,
-            is_public=False,
             tags=['demo', 'test'],
             metadata={'source': 'python_sdk_example'}
         )
