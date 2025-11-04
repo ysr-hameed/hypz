@@ -10,14 +10,17 @@ const CACHE_TTL = 60000; // 1 minute cache
 // Create PostgreSQL connection pool for better performance
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  max: 30, // Increased from 20 for better concurrency
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000, // 10 seconds connection timeout
+  max: 50, // Increased for better concurrency
+  min: 5, // Keep minimum connections alive
+  idleTimeoutMillis: 60000, // 60 seconds before closing idle connection
+  connectionTimeoutMillis: 15000, // 15 seconds connection timeout
   statement_timeout: 30000, // 30 second query timeout
   ssl: { rejectUnauthorized: false },
   // Performance optimizations
   keepAlive: true,
-  keepAliveInitialDelayMillis: 10000
+  keepAliveInitialDelayMillis: 10000,
+  // Retry logic
+  allowExitOnIdle: false
 });
 
 // Test database connection
@@ -101,5 +104,8 @@ export const transaction = async (callback) => {
 
 // Get a client from pool
 export const getClient = () => pool.connect();
+
+// Export pool for direct access
+export { pool };
 
 export default pool;

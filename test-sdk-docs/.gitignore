@@ -1,7 +1,0 @@
-node_modules/
-.env
-*.log
-*.tmp
-downloaded-*
-test-file-*
-.DS_Store

@@ -64,6 +64,8 @@ const createTables = async () => {
         cors_enabled BOOLEAN DEFAULT FALSE,
         cors_origins TEXT[],
         versioning_enabled BOOLEAN DEFAULT FALSE,
+        versioning_mfa_delete BOOLEAN DEFAULT FALSE,
+        default_storage_class VARCHAR(50) DEFAULT 'STANDARD',
         lifecycle_rules JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -92,6 +94,10 @@ const createTables = async () => {
         cdn_url TEXT,
         b2_file_id VARCHAR(255),
         version INTEGER DEFAULT 1,
+        version_id VARCHAR(255),
+        is_latest BOOLEAN DEFAULT TRUE,
+        is_delete_marker BOOLEAN DEFAULT FALSE,
+        storage_class VARCHAR(50) DEFAULT 'STANDARD',
         is_public BOOLEAN DEFAULT FALSE,
         metadata JSONB,
         tags TEXT[],
@@ -107,6 +113,286 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id);
       CREATE INDEX IF NOT EXISTS idx_files_filename ON files(bucket_id, filename);
       CREATE INDEX IF NOT EXISTS idx_files_b2_id ON files(b2_file_id);
+      CREATE INDEX IF NOT EXISTS idx_files_version ON files(bucket_id, filename, version_id);
+      CREATE INDEX IF NOT EXISTS idx_files_latest ON files(bucket_id, is_latest) WHERE is_latest = true;
+      CREATE INDEX IF NOT EXISTS idx_files_storage_class ON files(storage_class);
+    `);
+
+    // Storage Classes table
+    await query(`
+      CREATE TABLE IF NOT EXISTS storage_classes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(50) UNIQUE NOT NULL,
+        display_name VARCHAR(100) NOT NULL,
+        description TEXT,
+        cost_per_gb_month DECIMAL(10, 6) NOT NULL,
+        retrieval_cost_per_gb DECIMAL(10, 6) DEFAULT 0,
+        retrieval_time VARCHAR(50),
+        minimum_storage_days INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created storage_classes table');
+
+    // Insert default storage classes
+    await query(`
+      INSERT INTO storage_classes (name, display_name, description, cost_per_gb_month, retrieval_cost_per_gb, retrieval_time, minimum_storage_days)
+      VALUES 
+        ('STANDARD', 'Standard', 'Instant access, highest cost', 0.010, 0.000, 'Instant', 0),
+        ('INFREQUENT_ACCESS', 'Infrequent Access', 'Lower cost, quick access when needed', 0.005, 0.010, 'Instant', 30),
+        ('GLACIER', 'Glacier', 'Archive storage, 3-5 hour retrieval', 0.002, 0.030, '3-5 hours', 90),
+        ('DEEP_ARCHIVE', 'Deep Archive', 'Lowest cost, 12 hour retrieval', 0.001, 0.050, '12 hours', 180)
+      ON CONFLICT (name) DO NOTHING;
+    `);
+
+    // Storage class transitions table
+    await query(`
+      CREATE TABLE IF NOT EXISTS storage_class_transitions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        from_class VARCHAR(50) NOT NULL,
+        to_class VARCHAR(50) NOT NULL,
+        reason VARCHAR(100),
+        transitioned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created storage_class_transitions table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_transitions_file ON storage_class_transitions(file_id);
+      CREATE INDEX IF NOT EXISTS idx_transitions_date ON storage_class_transitions(transitioned_at);
+    `);
+
+    // Multipart uploads table
+    await query(`
+      CREATE TABLE IF NOT EXISTS multipart_uploads (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        upload_id VARCHAR(255) UNIQUE NOT NULL,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
+        filename VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(100),
+        total_size BIGINT,
+        storage_class VARCHAR(50) DEFAULT 'STANDARD',
+        metadata JSONB,
+        b2_file_id VARCHAR(255),
+        b2_upload_id VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'initiated',
+        parts_count INTEGER DEFAULT 0,
+        completed_parts INTEGER DEFAULT 0,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        aborted_at TIMESTAMP
+      );
+    `);
+    console.log('✅ Created multipart_uploads table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_multipart_user ON multipart_uploads(user_id);
+      CREATE INDEX IF NOT EXISTS idx_multipart_bucket ON multipart_uploads(bucket_id);
+      CREATE INDEX IF NOT EXISTS idx_multipart_upload_id ON multipart_uploads(upload_id);
+      CREATE INDEX IF NOT EXISTS idx_multipart_status ON multipart_uploads(status);
+      CREATE INDEX IF NOT EXISTS idx_multipart_expires ON multipart_uploads(expires_at);
+    `);
+
+    // Upload parts table
+    await query(`
+      CREATE TABLE IF NOT EXISTS upload_parts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        multipart_upload_id UUID NOT NULL REFERENCES multipart_uploads(id) ON DELETE CASCADE,
+        part_number INTEGER NOT NULL,
+        size BIGINT NOT NULL,
+        etag VARCHAR(255),
+        b2_file_id VARCHAR(255),
+        sha1_hash VARCHAR(255),
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(multipart_upload_id, part_number)
+      );
+    `);
+    console.log('✅ Created upload_parts table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_parts_upload ON upload_parts(multipart_upload_id);
+      CREATE INDEX IF NOT EXISTS idx_parts_number ON upload_parts(multipart_upload_id, part_number);
+    `);
+
+    // Lifecycle policies table
+    await query(`
+      CREATE TABLE IF NOT EXISTS lifecycle_policies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        enabled BOOLEAN DEFAULT true,
+        rules JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bucket_id, name)
+      );
+    `);
+    console.log('✅ Created lifecycle_policies table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_lifecycle_bucket ON lifecycle_policies(bucket_id);
+      CREATE INDEX IF NOT EXISTS idx_lifecycle_enabled ON lifecycle_policies(enabled);
+    `);
+
+    // Webhook/Event subscriptions table
+    await query(`
+      CREATE TABLE IF NOT EXISTS event_subscriptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID REFERENCES buckets(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        endpoint_url TEXT NOT NULL,
+        events TEXT[] NOT NULL,
+        filters JSONB,
+        secret VARCHAR(255),
+        enabled BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created event_subscriptions table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_event_subs_user ON event_subscriptions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_event_subs_bucket ON event_subscriptions(bucket_id);
+      CREATE INDEX IF NOT EXISTS idx_event_subs_enabled ON event_subscriptions(enabled);
+    `);
+
+    // Webhook deliveries (for tracking)
+    await query(`
+      CREATE TABLE IF NOT EXISTS webhook_deliveries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        subscription_id UUID NOT NULL REFERENCES event_subscriptions(id) ON DELETE CASCADE,
+        event_type VARCHAR(100) NOT NULL,
+        payload JSONB NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        response_code INTEGER,
+        response_body TEXT,
+        attempts INTEGER DEFAULT 0,
+        next_retry_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created webhook_deliveries table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_webhook_subscription ON webhook_deliveries(subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_webhook_status ON webhook_deliveries(status);
+      CREATE INDEX IF NOT EXISTS idx_webhook_retry ON webhook_deliveries(next_retry_at) WHERE status = 'pending';
+    `);
+
+    // CORS rules table
+    await query(`
+      CREATE TABLE IF NOT EXISTS cors_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
+        allowed_origins TEXT[] NOT NULL,
+        allowed_methods TEXT[] NOT NULL,
+        allowed_headers TEXT[],
+        expose_headers TEXT[],
+        max_age_seconds INTEGER DEFAULT 3600,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created cors_rules table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_cors_bucket ON cors_rules(bucket_id);
+    `);
+
+    // Bucket policies table (IAM-style)
+    await query(`
+      CREATE TABLE IF NOT EXISTS bucket_policies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        bucket_id UUID NOT NULL UNIQUE REFERENCES buckets(id) ON DELETE CASCADE,
+        policy JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created bucket_policies table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_bucket_policies_bucket ON bucket_policies(bucket_id);
+    `);
+
+    // Pre-signed POST policies
+    await query(`
+      CREATE TABLE IF NOT EXISTS presigned_post_policies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
+        policy JSONB NOT NULL,
+        signature VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        max_file_size BIGINT,
+        allowed_content_types TEXT[],
+        success_action_redirect TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created presigned_post_policies table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_presigned_user ON presigned_post_policies(user_id);
+      CREATE INDEX IF NOT EXISTS idx_presigned_bucket ON presigned_post_policies(bucket_id);
+      CREATE INDEX IF NOT EXISTS idx_presigned_expires ON presigned_post_policies(expires_at);
+    `);
+
+    // Batch operations tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS batch_jobs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bucket_id UUID REFERENCES buckets(id) ON DELETE CASCADE,
+        job_type VARCHAR(50) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        total_operations INTEGER DEFAULT 0,
+        completed_operations INTEGER DEFAULT 0,
+        failed_operations INTEGER DEFAULT 0,
+        filters JSONB,
+        priority INTEGER DEFAULT 0,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created batch_jobs table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_batch_jobs_user ON batch_jobs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_batch_jobs_status ON batch_jobs(status);
+      CREATE INDEX IF NOT EXISTS idx_batch_jobs_priority ON batch_jobs(priority);
+    `);
+
+    // Batch operations (individual operations within a job)
+    await query(`
+      CREATE TABLE IF NOT EXISTS batch_operations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id UUID NOT NULL REFERENCES batch_jobs(id) ON DELETE CASCADE,
+        file_id UUID REFERENCES files(id) ON DELETE SET NULL,
+        operation_type VARCHAR(50) NOT NULL,
+        operation_data JSONB,
+        status VARCHAR(50) DEFAULT 'pending',
+        error_message TEXT,
+        retries INTEGER DEFAULT 0,
+        executed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Created batch_operations table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_batch_ops_job ON batch_operations(job_id);
+      CREATE INDEX IF NOT EXISTS idx_batch_ops_status ON batch_operations(status);
+      CREATE INDEX IF NOT EXISTS idx_batch_ops_file ON batch_operations(file_id);
     `);
 
     // API Keys table
@@ -294,21 +580,26 @@ const createTables = async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS team_members (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        member_email VARCHAR(255) NOT NULL,
-        member_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        role VARCHAR(20) DEFAULT 'viewer',
-        permissions JSONB DEFAULT '{"read": true, "write": false, "delete": false}'::jsonb,
+        inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        email VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'member',
+        permissions JSONB DEFAULT '{}'::jsonb,
         status VARCHAR(20) DEFAULT 'pending',
-        invited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        joined_at TIMESTAMP,
-        UNIQUE(user_id, member_email)
+        invite_token VARCHAR(255),
+        invite_expires_at TIMESTAMP,
+        accepted_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(inviter_id, email)
       );
     `);
 
     await query(`
+      CREATE INDEX IF NOT EXISTS idx_team_members_inviter ON team_members(inviter_id);
       CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
-      CREATE INDEX IF NOT EXISTS idx_team_members_member ON team_members(member_user_id);
+      CREATE INDEX IF NOT EXISTS idx_team_members_token ON team_members(invite_token);
+      CREATE INDEX IF NOT EXISTS idx_team_members_status ON team_members(status);
     `);
 
     // Activity logs table
@@ -489,6 +780,9 @@ const createTables = async () => {
         lifecycle_policies_enabled BOOLEAN DEFAULT false,
         object_lock_enabled BOOLEAN DEFAULT false,
         versioning_enabled BOOLEAN DEFAULT false,
+        versioning_allowed BOOLEAN DEFAULT false,
+        storage_classes_allowed BOOLEAN DEFAULT false,
+        multipart_upload_allowed BOOLEAN DEFAULT false,
         replication_enabled BOOLEAN DEFAULT false,
         
         -- Advanced Features
@@ -553,6 +847,14 @@ const createTables = async () => {
     `);
     console.log('✅ Created plans table');
 
+    // Add new columns if they don't exist (for existing databases)
+    await query(`
+      ALTER TABLE plans 
+      ADD COLUMN IF NOT EXISTS versioning_allowed BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS storage_classes_allowed BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS multipart_upload_allowed BOOLEAN DEFAULT false;
+    `);
+
     // Insert Free plan with realistic S3 limits
     await query(`
       INSERT INTO plans (
@@ -562,6 +864,7 @@ const createTables = async () => {
         max_file_size_mb, max_multipart_file_size_gb,
         signed_urls_enabled, presigned_post_enabled, cors_enabled,
         lifecycle_policies_enabled, object_lock_enabled, versioning_enabled,
+        versioning_allowed, storage_classes_allowed, multipart_upload_allowed,
         cdn_enabled, custom_domain, bucket_policies_enabled, acl_enabled,
         batch_operations_enabled, inventory_reports, analytics_enabled,
         backup_retention_days, encryption_at_rest, encryption_in_transit,
@@ -579,6 +882,7 @@ const createTables = async () => {
         3, true, false,
         100, 0,
         false, false, true,
+        false, false, false,
         false, false, false,
         false, false, false, false,
         false, false, false,
@@ -608,7 +912,8 @@ const createTables = async () => {
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
         signed_urls_enabled, presigned_post_enabled, cors_enabled,
-        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled, replication_enabled,
+        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled,
+        versioning_allowed, storage_classes_allowed, multipart_upload_allowed, replication_enabled,
         cdn_enabled, custom_domain, ssl_certificates,
         storage_classes, intelligent_tiering,
         bucket_policies_enabled, acl_enabled, iam_policies_enabled,
@@ -630,7 +935,8 @@ const createTables = async () => {
         0, true, true,
         5120, 5,
         true, true, true,
-        true, false, true, false,
+        true, false, true,
+        true, true, true, false,
         true, true, true,
         ARRAY['STANDARD', 'INTELLIGENT_TIERING'], true,
         true, true, false,
@@ -664,7 +970,8 @@ const createTables = async () => {
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
         signed_urls_enabled, presigned_post_enabled, cors_enabled,
-        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled, replication_enabled,
+        lifecycle_policies_enabled, object_lock_enabled, versioning_enabled,
+        versioning_allowed, storage_classes_allowed, multipart_upload_allowed, replication_enabled,
         cdn_enabled, custom_domain, ssl_certificates,
         storage_classes, intelligent_tiering,
         bucket_policies_enabled, acl_enabled, iam_policies_enabled,
@@ -686,6 +993,7 @@ const createTables = async () => {
         0, 0, 2, 0, 200,
         0, true, true,
         0, 0,
+        true, true, true,
         true, true, true,
         true, true, true, true,
         true, true, true,

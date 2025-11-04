@@ -2,7 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import jwt from 'jsonwebtoken';
-import { query } from '../config/database.js';
+import { query, transaction } from '../config/database.js';
 import { generateUniqueFilename, formatBytes, successResponse, errorResponse, paginate, getPaginationMeta } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
 import { uploadToB2, deleteFromB2, isB2Available } from '../services/b2Service.js';
@@ -111,16 +111,38 @@ export const uploadFile = asyncHandler(async (req, res) => {
       cdnUrl = `${config.FRONTEND_URL}/cdn${fileUrl}`;
     }
 
-    // Use a transaction for database operations to speed things up
-    // const client = await query('BEGIN');  // Removed broken transaction
-    
-    // try {
+    // Use a transaction for versioning and database operations
+    const result = await transaction(async (client) => {
+      // Check if versioning is enabled and handle version creation
+      const bucketCheckResult = await client.query(
+        'SELECT versioning_enabled FROM buckets WHERE id = $1',
+        [bucketId]
+      );
+      
+      const versioningEnabled = bucketCheckResult.rows[0]?.versioning_enabled || false;
+      let versionId = 'null';
+      
+      if (versioningEnabled) {
+        // Mark existing file with same name as not latest
+        await client.query(
+          `UPDATE files
+           SET is_latest = false
+           WHERE bucket_id = $1 AND filename = $2 AND is_latest = true AND deleted_at IS NULL`,
+          [bucketId, uniqueFilename]
+        );
+        
+        // Generate new version ID
+        const crypto = await import('crypto');
+        versionId = crypto.randomUUID();
+      }
+      
       // Store file info in database
-      const result = await query(
+      const fileResult = await client.query(
         `INSERT INTO files (
           bucket_id, user_id, filename, original_name, path, size,
-          mime_type, extension, url, cdn_url, is_public, tags, metadata, b2_file_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          mime_type, extension, url, cdn_url, is_public, tags, metadata, b2_file_id,
+          version_id, is_latest
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, true)
         RETURNING *`,
         [
           bucketId,
@@ -136,12 +158,13 @@ export const uploadFile = asyncHandler(async (req, res) => {
           isPublic,
           Array.isArray(tags) ? tags : [],
           typeof metadata === 'object' ? metadata : {},
-          b2FileId || null
+          b2FileId || null,
+          versionId
         ]
       );
 
       // Update usage
-      await query(
+      await client.query(
         `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
          VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
          ON CONFLICT (user_id, date)
@@ -155,17 +178,18 @@ export const uploadFile = asyncHandler(async (req, res) => {
         [userId, req.file.size]
       );
 
-      // Log activity (non-blocking - we can make this async)
-      query(
+      // Log activity (within transaction)
+      await client.query(
         'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
-        [userId, 'file_uploaded', 'file', result.rows[0].id, { filename: req.file.originalname, size: req.file.size }]
-      ).catch(err => console.error('Activity log error:', err));
-
-      // await query('COMMIT');  // Removed broken transaction
+        [userId, 'file_uploaded', 'file', fileResult.rows[0].id, { filename: req.file.originalname, size: req.file.size, versionId }]
+      );
+      
+      return fileResult.rows[0];
+    });
 
       successResponse(res, {
-        ...result.rows[0],
-        formattedSize: formatBytes(result.rows[0].size)
+        ...result,
+        formattedSize: formatBytes(result.size)
       }, 'File uploaded successfully', 201);
     // } catch (dbError) {
     //   await query('ROLLBACK');

@@ -33,6 +33,16 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import versioningRoutes from './routes/versioningRoutes.js';
+import storageClassRoutes from './routes/storageClassRoutes.js';
+import multipartRoutes from './routes/multipartRoutes.js';
+import lifecycleRoutes from './routes/lifecycleRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
+import corsRoutes from './routes/corsRoutes.js';
+import policyRoutes from './routes/policyRoutes.js';
+import presignedRoutes from './routes/presignedRoutes.js';
+import batchRoutes from './routes/batchRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
 
 // Services
 import { startBillingScheduler } from './services/billingCron.js';
@@ -115,6 +125,16 @@ app.use(`/api/${config.API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${config.API_VERSION}/subscriptions`, subscriptionRoutes);
 app.use(`/api/${config.API_VERSION}/user`, planBasedRateLimit, userRoutes);
 app.use(`/api/${config.API_VERSION}/notifications`, planBasedRateLimit, notificationRoutes);
+app.use(`/api/${config.API_VERSION}/versioning`, planBasedRateLimit, versioningRoutes);
+app.use(`/api/${config.API_VERSION}/storage-classes`, planBasedRateLimit, storageClassRoutes);
+app.use(`/api/${config.API_VERSION}/multipart`, planBasedRateLimit, multipartRoutes);
+app.use(`/api/${config.API_VERSION}/lifecycle`, planBasedRateLimit, lifecycleRoutes);
+app.use(`/api/${config.API_VERSION}/events`, planBasedRateLimit, eventRoutes);
+app.use(`/api/${config.API_VERSION}/cors`, planBasedRateLimit, corsRoutes);
+app.use(`/api/${config.API_VERSION}/policies`, planBasedRateLimit, policyRoutes);
+app.use(`/api/${config.API_VERSION}/presigned`, planBasedRateLimit, presignedRoutes);
+app.use(`/api/${config.API_VERSION}/batch`, planBasedRateLimit, batchRoutes);
+app.use(`/api/${config.API_VERSION}/team`, planBasedRateLimit, teamRoutes);
 
 // 404 handler
 app.use(notFound);
