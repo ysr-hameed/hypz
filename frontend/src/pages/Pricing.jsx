@@ -6,6 +6,7 @@ import { apiCache } from '../utils/apiCache';
 import { useUser } from '../context/UserContext';
 import PaymentModal from '../components/PaymentModal';
 import { toast } from 'react-hot-toast';
+import SEO from '../components/SEO';
 
 const Pricing = () => {
   const [plans, setPlans] = useState([]);
@@ -14,6 +15,40 @@ const Pricing = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const { isAuthenticated } = useUser();
   const navigate = useNavigate();
+
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'Hypz Object Storage Plans',
+    description: 'Flexible pricing plans for object storage - from free tier to enterprise solutions',
+    brand: {
+      '@type': 'Brand',
+      name: 'Hypz'
+    },
+    offers: [
+      {
+        '@type': 'Offer',
+        name: 'Free Plan',
+        price: '0',
+        priceCurrency: 'USD',
+        description: '500MB storage, 1GB bandwidth, perfect for testing'
+      },
+      {
+        '@type': 'Offer',
+        name: 'Pay-As-You-Go',
+        price: '0.005',
+        priceCurrency: 'USD',
+        description: 'Only pay for what you use, no commitments'
+      },
+      {
+        '@type': 'Offer',
+        name: 'Pro Plan',
+        price: '49',
+        priceCurrency: 'USD',
+        description: '1TB storage, 5TB bandwidth, priority support'
+      }
+    ]
+  };
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -280,6 +315,13 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <SEO
+        title="Pricing - Hypz Object Storage | Simple & Transparent Plans"
+        description="Flexible object storage pricing from $0/month. Free 500MB plan, pay-as-you-go, or fixed plans. Up to 70% cheaper than AWS S3, Azure, and Google Cloud. No hidden fees."
+        keywords="object storage pricing, cloud storage cost, s3 pricing comparison, affordable storage, pay as you go storage, cheap cloud storage"
+        url="/pricing"
+        structuredData={structuredData}
+      />
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-primary-600 via-purple-600 to-pink-600 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

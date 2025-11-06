@@ -1,9 +1,30 @@
 import { Link } from 'react-router-dom';
 import { Users, Target, Heart, Zap, Award, Globe } from 'lucide-react';
+import SEO from '../../components/SEO';
 
 const About = () => {
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: 'About Hypz',
+    description: 'Learn about Hypz - modern, affordable cloud storage for everyone',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'Hypz',
+      description: 'Cloud object storage provider',
+      url: 'https://hypz.io'
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+      <SEO
+        title="About Us - Hypz | Modern Cloud Storage Company"
+        description="Learn about Hypz's mission to provide fast, reliable, and affordable cloud storage for everyone. Discover our values, team, and commitment to innovation."
+        keywords="about hypz, cloud storage company, our mission, our values, about us"
+        url="/about"
+        structuredData={structuredData}
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">

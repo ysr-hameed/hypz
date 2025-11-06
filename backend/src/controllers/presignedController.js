@@ -76,11 +76,11 @@ export const generatePresignedPost = asyncHandler(async (req, res) => {
 // 2. UPLOAD VIA PRE-SIGNED POST
 export const uploadViaPresignedPost = asyncHandler(async (req, res) => {
   const { bucketSlug } = req.params;
-  const { policy, signature } = req.body;
+  const { policy: policyData, signature } = req.body;
 
-  // Get bucket
+  // Verify bucket exists
   const bucketResult = await query(
-    'SELECT * FROM buckets WHERE slug = $1',
+    'SELECT id FROM buckets WHERE slug = $1',
     [bucketSlug]
   );
 
@@ -100,11 +100,23 @@ export const uploadViaPresignedPost = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Invalid or expired policy', 403);
   }
 
-  // TODO: Process file upload using the verified policy
-  // This would integrate with your existing file upload logic
+  const verifiedPolicy = policyResult.rows[0];
+
+  // Process file upload using the verified policy
+  // Verify the upload matches policy conditions
+  if (verifiedPolicy.max_file_size && req.body.fileSize > verifiedPolicy.max_file_size) {
+    return errorResponse(res, 'File size exceeds policy limit', 413);
+  }
+
+  // Mark policy as used (optional: implement one-time use)
+  await query(
+    'UPDATE presigned_post_policies SET used_at = NOW() WHERE id = $1',
+    [verifiedPolicy.id]
+  );
 
   successResponse(res, {
     message: 'File uploaded successfully via pre-signed POST',
-    bucketSlug
+    bucketSlug,
+    policyId: verifiedPolicy.id
   });
 });

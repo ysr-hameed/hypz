@@ -62,8 +62,14 @@ export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid signature' });
   }
 
-  const event = req.body.meta.event_name;
-  const data = req.body.data;
+  // Safely extract event data with null checks
+  const event = req.body?.meta?.event_name;
+  const data = req.body?.data;
+  
+  if (!event || !data) {
+    console.error('Invalid webhook payload: missing event or data');
+    return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+  }
 
   if (event === 'order_created' || event === 'subscription_created') {
     const customData = data.attributes.custom_data;

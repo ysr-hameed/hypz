@@ -23,12 +23,33 @@ import {
   Squares2X2Icon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 const Documentation = () => {
   const [activeSection, setActiveSection] = useState('getting-started');
   const [activeLanguage, setActiveLanguage] = useState('javascript');
   const [isDark, setIsDark] = useState(false);
   const navigate = useNavigate();
+
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: 'Hypz Object Storage API Documentation',
+    description: 'Complete API documentation and integration guides for Hypz object storage',
+    author: {
+      '@type': 'Organization',
+      name: 'Hypz'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Hypz',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://hypz.io/logo.svg'
+      }
+    },
+    dateModified: '2025-11-06'
+  };
 
   useEffect(() => {
     // Check theme
@@ -1313,10 +1334,13 @@ curl -X GET https://api.hypz.io/api/buckets \\
 
   return (
     <>
-      <Helmet>
-        <title>Documentation - Hypz Cloud Storage</title>
-        <meta name="description" content="Complete API documentation for Hypz Cloud Storage with examples in JavaScript, Python, Java, and cURL" />
-      </Helmet>
+      <SEO
+        title="Documentation - Hypz Object Storage API | Developer Guides"
+        description="Complete API documentation for Hypz object storage with code examples in JavaScript, Python, Java, and cURL. Learn how to integrate S3-compatible storage into your applications."
+        keywords="api documentation, object storage api, s3 api, rest api, storage sdk, developer guide, api reference, code examples, javascript sdk, python sdk"
+        url="/documentation"
+        structuredData={structuredData}
+      />
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Header */}

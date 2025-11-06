@@ -1,4 +1,6 @@
 import { query, transaction } from '../config/database.js';
+import { lemonSqueezyService } from './lemonSqueezyService.js';
+import { sendInvoiceEmail, sendPaymentFailedEmail, sendManualInvoiceEmail, sendServiceSuspensionEmail } from '../utils/email.js';
 import cron from 'node-cron';
 
 /**
@@ -184,7 +186,14 @@ const processBillingCycle = async () => {
             console.log('✅ Payment successful');
           });
           
-          // TODO: Send invoice email
+          // Send invoice email
+          await sendInvoiceEmail(
+            user.email,
+            user.first_name,
+            billing.total_cost,
+            billingPeriod,
+            billing.id
+          ).catch(err => console.error('Failed to send invoice email:', err));
           
         } catch (error) {
           console.error('❌ Payment failed:', error.message);
@@ -209,7 +218,15 @@ const processBillingCycle = async () => {
             [gracePeriodEnd.toISOString().split('T')[0], user.id]
           );
           
-          // TODO: Send payment failed email with grace period notice
+          // Send payment failed email with grace period notice
+          await sendPaymentFailedEmail(
+            user.email,
+            user.first_name,
+            billing.total_cost,
+            error.message,
+            gracePeriodEnd.toLocaleDateString()
+          ).catch(err => console.error('Failed to send payment failed email:', err));
+          
           console.log(`⏰ Grace period set until ${gracePeriodEnd.toISOString().split('T')[0]}`);
         }
         
@@ -225,7 +242,18 @@ const processBillingCycle = async () => {
           [billing.id]
         );
         
-        // TODO: Send manual invoice email
+        // Send manual invoice email
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 14); // 14 days to pay
+        
+        await sendManualInvoiceEmail(
+          user.email,
+          user.first_name,
+          billing.total_cost,
+          billingPeriod,
+          dueDate.toLocaleDateString()
+        ).catch(err => console.error('Failed to send manual invoice email:', err));
+        
         console.log('✅ Manual invoice created');
       }
     }
@@ -272,7 +300,14 @@ const checkOverduePayments = async () => {
         );
       });
       
-      // TODO: Send service suspension email
+      // Send service suspension email
+      await sendServiceSuspensionEmail(
+        user.email,
+        user.first_name || 'User',
+        'Payment overdue',
+        user.total_cost
+      ).catch(err => console.error('Failed to send suspension email:', err));
+      
       console.log('✅ Services suspended');
     }
     

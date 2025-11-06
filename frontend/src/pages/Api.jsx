@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Code, Book, Zap, Key, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
+import SEO from '../components/SEO';
 
 const Api = () => {
   const [copiedCode, setCopiedCode] = useState(null);
@@ -16,8 +17,27 @@ const Api = () => {
     productionUrl: 'https://api.hypz.io/v1'
   };
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'APIReference',
+    name: 'Hypz API',
+    description: 'RESTful API for object storage operations',
+    url: 'https://hypz.io/api',
+    provider: {
+      '@type': 'Organization',
+      name: 'Hypz'
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+      <SEO
+        title="API Reference - Hypz Object Storage | REST API Endpoints"
+        description="Complete REST API reference for Hypz object storage. Learn about authentication, endpoints, request/response formats, and error handling."
+        keywords="rest api, api reference, api endpoints, storage api, http api, api authentication, api documentation"
+        url="/api"
+        structuredData={structuredData}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">

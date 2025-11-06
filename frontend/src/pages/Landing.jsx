@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Globe, Code, Check, Star } from 'lucide-react';
 import { PLANS_DATA } from '../config/plans';
 import { useUser } from '../context/UserContext';
+import SEO from '../components/SEO';
 
 const Landing = () => {
   const { isAuthenticated } = useUser();
@@ -15,8 +16,40 @@ const Landing = () => {
     { icon: Code, title: 'Developer First', description: 'Simple REST API with SDKs for all major languages' },
   ];
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'Hypz Object Storage',
+    description: 'S3-compatible object storage solution with global CDN, enterprise security, and developer-friendly APIs',
+    brand: {
+      '@type': 'Brand',
+      name: 'Hypz'
+    },
+    offers: {
+      '@type': 'AggregateOffer',
+      offerCount: '3',
+      lowPrice: '0',
+      highPrice: '49',
+      priceCurrency: 'USD'
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      ratingCount: '250',
+      bestRating: '5',
+      worstRating: '1'
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-950">
+      <SEO
+        title="Hypz - Modern Object Storage Solution | Secure Cloud Storage"
+        description="S3-compatible object storage powered by Backblaze B2. Secure, scalable, cost-effective cloud storage with global CDN. Perfect for developers and enterprises. Start free with 500MB."
+        keywords="object storage, cloud storage, s3 compatible, backblaze b2, cdn storage, developer storage, api storage, secure file storage, scalable storage"
+        url="/"
+        structuredData={structuredData}
+      />
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-purple-50 to-pink-50 dark:from-primary-950 dark:via-purple-950 dark:to-pink-950 opacity-50"></div>

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
+import { sendWebhookNotificationEmail } from '../utils/email.js';
 import config from '../config/config.js';
 
 /**
@@ -375,7 +376,22 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
   });
 
   console.log('⚠️  Payment failed, grace period set');
-  // TODO: Send email notification
+  
+  // Send email notification
+  const userResult = await query(
+    'SELECT email, first_name FROM users WHERE id = $1',
+    [user_id]
+  );
+  
+  if (userResult.rows.length > 0) {
+    const { email, first_name } = userResult.rows[0];
+    await sendWebhookNotificationEmail(
+      email,
+      'Payment Failed',
+      { subscriptionId, gracePeriodEnd: gracePeriodEnd.toLocaleDateString(), status: 'grace_period' },
+      new Date().toISOString()
+    ).catch(err => console.error('Failed to send webhook notification:', err));
+  }
 };
 
 // Handle subscription cancelled

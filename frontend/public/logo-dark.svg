@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dark theme version -->
+  <defs>
+    <linearGradient id="hypzGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60A5FA;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F472B6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <path d="M256 32L432 128V288L256 384L80 288V128L256 32Z" fill="url(#hypzGradientDark)" opacity="0.2"/>
+  <path d="M256 32L432 128V288L256 384L80 288V128L256 32Z" stroke="url(#hypzGradientDark)" stroke-width="8" fill="none"/>
+  
+  <g>
+    <rect x="140" y="140" width="40" height="232" rx="8" fill="url(#hypzGradientDark)"/>
+    <rect x="332" y="140" width="40" height="232" rx="8" fill="url(#hypzGradientDark)"/>
+    <rect x="140" y="236" width="232" height="40" rx="8" fill="url(#hypzGradientDark)"/>
+    
+    <circle cx="256" cy="256" r="48" fill="#1F2937" opacity="0.3"/>
+    <circle cx="256" cy="256" r="32" fill="#374151" opacity="0.5"/>
+    <circle cx="256" cy="256" r="16" fill="#4B5563" opacity="0.8"/>
+  </g>
+  
+  <circle cx="200" cy="100" r="6" fill="url(#hypzGradientDark)" opacity="0.8"/>
+  <circle cx="312" cy="100" r="6" fill="url(#hypzGradientDark)" opacity="0.8"/>
+  <circle cx="200" cy="412" r="6" fill="url(#hypzGradientDark)" opacity="0.8"/>
+  <circle cx="312" cy="412" r="6" fill="url(#hypzGradientDark)" opacity="0.8"/>
+</svg>

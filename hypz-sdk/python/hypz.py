@@ -345,6 +345,282 @@ class FileManager:
         """
         response = self.client._request('PATCH', f'/files/file/{file_id}', json=kwargs)
         return response.get('data', response)
+    
+    def create_signed_url(self, file_id: str, expires_in: int = 3600) -> Dict[str, Any]:
+        """
+        Generate a signed URL for temporary file access (max 7 days = 604800 seconds).
+        
+        Args:
+            file_id: File ID
+            expires_in: Expiry time in seconds (max 604800 = 7 days)
+            
+        Returns:
+            Signed URL data with url, expiresAt, expiresIn
+        """
+        # Cap at 7 days
+        expires_in = min(max(1, int(expires_in)), 604800)
+        response = self.client._request(
+            'POST',
+            f'/files/file/{file_id}/signed-url',
+            json={'expiresIn': expires_in}
+        )
+        return response.get('data', response)
+    
+    def bulk_delete(self, file_ids: List[Union[int, str]]) -> Dict[str, Any]:
+        """
+        Delete multiple files at once (max 100 files).
+        
+        Args:
+            file_ids: List of file IDs
+            
+        Returns:
+            Result with deletedCount, totalSize, etc.
+        """
+        if not file_ids or not isinstance(file_ids, list):
+            raise ValueError("file_ids must be a non-empty list")
+        if len(file_ids) > 100:
+            raise ValueError("Maximum 100 files can be deleted at once")
+        
+        response = self.client._request('POST', '/files/bulk/delete', json={'fileIds': file_ids})
+        return response.get('data', response)
+    
+    def bulk_update(self, file_ids: List[Union[int, str]], tags: Optional[List[str]] = None, 
+                    metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Update multiple files at once (max 100 files).
+        Note: Cannot change file visibility - it's inherited from bucket.
+        
+        Args:
+            file_ids: List of file IDs
+            tags: Tags to set for all files
+            metadata: Metadata to set for all files
+            
+        Returns:
+            Result with updatedCount
+        """
+        if not file_ids or not isinstance(file_ids, list):
+            raise ValueError("file_ids must be a non-empty list")
+        if len(file_ids) > 100:
+            raise ValueError("Maximum 100 files can be updated at once")
+        
+        data = {'fileIds': file_ids}
+        if tags:
+            data['tags'] = tags
+        if metadata:
+            data['metadata'] = metadata
+            
+        response = self.client._request('POST', '/files/bulk/update', json=data)
+        return response.get('data', response)
+    
+    def bulk_download(self, file_ids: List[Union[int, str]]) -> Dict[str, Any]:
+        """
+        Get download URLs for multiple files (max 50 files).
+        
+        Args:
+            file_ids: List of file IDs
+            
+        Returns:
+            Result with files list containing download URLs
+        """
+        if not file_ids or not isinstance(file_ids, list):
+            raise ValueError("file_ids must be a non-empty list")
+        if len(file_ids) > 50:
+            raise ValueError("Maximum 50 files can be downloaded at once")
+        
+        response = self.client._request('POST', '/files/bulk/download', json={'fileIds': file_ids})
+        return response.get('data', response)
+    
+    def bulk_move(self, file_ids: List[Union[int, str]], target_bucket_id: str) -> Dict[str, Any]:
+        """
+        Move multiple files to another bucket (max 100 files).
+        
+        Args:
+            file_ids: List of file IDs
+            target_bucket_id: Target bucket ID
+            
+        Returns:
+            Result with movedCount
+        """
+        if not file_ids or not isinstance(file_ids, list):
+            raise ValueError("file_ids must be a non-empty list")
+        if not target_bucket_id:
+            raise ValueError("target_bucket_id is required")
+        if len(file_ids) > 100:
+            raise ValueError("Maximum 100 files can be moved at once")
+        
+        response = self.client._request('POST', '/files/bulk/move', 
+                                        json={'fileIds': file_ids, 'targetBucketId': target_bucket_id})
+        return response.get('data', response)
+
+
+class APIKeyManager:
+    """Manager for API key operations."""
+    
+    def __init__(self, client: HypzClient):
+        self.client = client
+    
+    def create(self, name: str, permissions: List[str], expires_at: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new API key.
+        
+        Args:
+            name: API key name
+            permissions: List of permissions (e.g., ['files:read', 'files:write'])
+            expires_at: Optional expiry date (ISO format)
+            
+        Returns:
+            Created API key data
+        """
+        data = {'name': name, 'permissions': permissions}
+        if expires_at:
+            data['expiresAt'] = expires_at
+        response = self.client._request('POST', '/api-keys', json=data)
+        return response.get('data', response)
+    
+    def list(self) -> List[Dict[str, Any]]:
+        """List all API keys."""
+        response = self.client._request('GET', '/api-keys')
+        return response.get('data', [])
+    
+    def get(self, key_id: str) -> Dict[str, Any]:
+        """Get API key details."""
+        response = self.client._request('GET', f'/api-keys/{key_id}')
+        return response.get('data', response)
+    
+    def update(self, key_id: str, **kwargs) -> Dict[str, Any]:
+        """Update API key."""
+        response = self.client._request('PUT', f'/api-keys/{key_id}', json=kwargs)
+        return response.get('data', response)
+    
+    def delete(self, key_id: str) -> bool:
+        """Delete/revoke API key."""
+        self.client._request('DELETE', f'/api-keys/{key_id}')
+        return True
+    
+    def revoke(self, key_id: str) -> bool:
+        """Revoke API key (alias for delete)."""
+        return self.delete(key_id)
+    
+    def regenerate(self, key_id: str) -> Dict[str, Any]:
+        """Regenerate API key."""
+        response = self.client._request('POST', f'/api-keys/{key_id}/regenerate')
+        return response.get('data', response)
+
+
+class UsageManager:
+    """Manager for usage tracking and analytics."""
+    
+    def __init__(self, client: HypzClient):
+        self.client = client
+    
+    def current(self) -> Dict[str, Any]:
+        """Get current usage statistics."""
+        response = self.client._request('GET', '/usage/current')
+        return response.get('data', response)
+    
+    def history(self, days: Optional[int] = None) -> Dict[str, Any]:
+        """Get usage history."""
+        params = {'days': days} if days else {}
+        response = self.client._request('GET', '/usage/history', params=params)
+        return response.get('data', response)
+    
+    def analytics(self) -> Dict[str, Any]:
+        """Get usage analytics."""
+        response = self.client._request('GET', '/usage/analytics')
+        return response.get('data', response)
+
+
+class PlanManager:
+    """Manager for subscription plans."""
+    
+    def __init__(self, client: HypzClient):
+        self.client = client
+    
+    def list(self) -> List[Dict[str, Any]]:
+        """List all available plans."""
+        response = self.client._request('GET', '/plans')
+        return response.get('data', [])
+    
+    def get(self, plan_id: str) -> Dict[str, Any]:
+        """Get plan details."""
+        response = self.client._request('GET', f'/plans/{plan_id}')
+        return response.get('data', response)
+    
+    def get_user_plan(self) -> Dict[str, Any]:
+        """Get current user's plan."""
+        response = self.client._request('GET', '/plans/user/current')
+        return response.get('data', response)
+    
+    def update_user_plan(self, plan_id: str) -> Dict[str, Any]:
+        """Update user's plan."""
+        response = self.client._request('PUT', '/plans/user/update', json={'planId': plan_id})
+        return response.get('data', response)
+
+
+class NotificationManager:
+    """Manager for notifications."""
+    
+    def __init__(self, client: HypzClient):
+        self.client = client
+    
+    def list(self, page: int = 1, limit: int = 20) -> List[Dict[str, Any]]:
+        """List user notifications."""
+        params = {'page': page, 'limit': limit}
+        response = self.client._request('GET', '/notifications', params=params)
+        return response.get('data', [])
+    
+    def mark_as_read(self, notification_id: str) -> bool:
+        """Mark notification as read."""
+        self.client._request('PUT', f'/notifications/{notification_id}/read')
+        return True
+    
+    def mark_all_as_read(self) -> bool:
+        """Mark all notifications as read."""
+        self.client._request('PUT', '/notifications/read-all')
+        return True
+    
+    def delete(self, notification_id: str) -> bool:
+        """Delete notification."""
+        self.client._request('DELETE', f'/notifications/{notification_id}')
+        return True
+
+
+class UserManager:
+    """Manager for user profile operations."""
+    
+    def __init__(self, client: HypzClient):
+        self.client = client
+    
+    def get_profile(self) -> Dict[str, Any]:
+        """Get user profile."""
+        response = self.client._request('GET', '/user/profile')
+        return response.get('data', response)
+    
+    def update_profile(self, **kwargs) -> Dict[str, Any]:
+        """Update user profile."""
+        response = self.client._request('PUT', '/user/profile', json=kwargs)
+        return response.get('data', response)
+    
+    def change_password(self, current_password: str, new_password: str) -> bool:
+        """Change password."""
+        self.client._request('PUT', '/user/change-password', 
+                           json={'currentPassword': current_password, 'newPassword': new_password})
+        return True
+    
+    def get_notification_preferences(self) -> Dict[str, Any]:
+        """Get notification preferences."""
+        response = self.client._request('GET', '/user/notifications')
+        return response.get('data', response)
+    
+    def update_notification_preferences(self, **kwargs) -> Dict[str, Any]:
+        """Update notification preferences."""
+        response = self.client._request('PUT', '/user/notifications', json=kwargs)
+        return response.get('data', response)
+    
+    def delete_account(self, password: str) -> bool:
+        """Delete user account."""
+        self.client._request('DELETE', '/user/account', json={'password': password})
+        return True
 
 
 # Convenience functions

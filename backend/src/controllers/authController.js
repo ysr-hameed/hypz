@@ -27,16 +27,68 @@ export const register = asyncHandler(async (req, res) => {
     return errorResponse(res, 'User with this email already exists', 400);
   }
 
+  // Resolve default plan (fallback to first available plan)
+  let planId = null;
+  let planBillingCycle = null;
+
+  const defaultPlanResult = await query(
+    `SELECT id, billing_cycle, type
+     FROM plans
+     WHERE type = 'free'
+     ORDER BY created_at ASC
+     LIMIT 1`
+  );
+
+  if (defaultPlanResult.rows.length > 0) {
+    planId = defaultPlanResult.rows[0].id;
+    planBillingCycle = defaultPlanResult.rows[0].billing_cycle;
+  } else {
+    const fallbackPlanResult = await query(
+      `SELECT id, billing_cycle
+       FROM plans
+       ORDER BY price_usd::numeric NULLS FIRST, created_at ASC
+       LIMIT 1`
+    );
+
+    if (fallbackPlanResult.rows.length > 0) {
+      planId = fallbackPlanResult.rows[0].id;
+      planBillingCycle = fallbackPlanResult.rows[0].billing_cycle;
+    }
+  }
+
+  if (!planId) {
+    return errorResponse(res, 'No billing plans available. Please contact support.', 500);
+  }
+
+  const now = new Date();
+  let nextBillingDate = null;
+  if (planBillingCycle === 'monthly') {
+    nextBillingDate = new Date(now);
+    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+  } else if (planBillingCycle === 'yearly') {
+    nextBillingDate = new Date(now);
+    nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+  }
+
   // Hash password
   const hashedPassword = await hashPassword(password);
 
   // Create user (no email verification token needed with OTP system)
   const result = await query(
     `INSERT INTO users (
-      email, password, first_name, last_name
-    ) VALUES ($1, $2, $3, $4) 
-    RETURNING id, email, first_name, last_name, created_at`,
-    [email, hashedPassword, firstName, lastName]
+      email, password, first_name, last_name, plan_id, plan_start_date, billing_cycle_day, next_billing_date
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+    RETURNING id, email, first_name, last_name, created_at, plan_id`,
+    [
+      email,
+      hashedPassword,
+      firstName,
+      lastName,
+      planId,
+      now,
+      now.getUTCDate(),
+      nextBillingDate
+    ]
   );
 
   const user = result.rows[0];

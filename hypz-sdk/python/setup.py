@@ -9,16 +9,21 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hypz-sdk",
-    version="1.0.1",
+    version="2.1.0",
     author="Hypz Team",
     author_email="support@hypz.io",
-    description="Python SDK for Hypz file storage API",
+    description="Official Python SDK for Hypz Cloud Storage - Store, manage, and serve files with a simple API",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ysr-hameed/hypz",
+    project_urls={
+        "Documentation": "https://hypz.io/docs",
+        "Source": "https://github.com/ysr-hameed/hypz",
+        "Tracker": "https://github.com/ysr-hameed/hypz/issues",
+    },
     py_modules=["hypz"],
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "License :: OSI Approved :: MIT License",
@@ -28,6 +33,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.7",
     install_requires=[
@@ -40,4 +46,6 @@ setup(
             "flake8>=3.9",
         ],
     },
+    keywords="hypz cloud-storage file-storage s3 cdn upload storage files api sdk backblaze b2",
+    license="MIT",
 )

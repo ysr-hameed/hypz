@@ -1,0 +1,64 @@
+# Hypz - Robots.txt Configuration
+# Optimized for maximum SEO visibility
+
+User-agent: *
+Allow: /
+
+# Disallow authenticated/private areas
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /buckets
+Disallow: /file-manager
+Disallow: /settings
+Disallow: /api-keys
+Disallow: /usage
+Disallow: /billing
+Disallow: /team
+
+# Disallow authentication pages (to avoid duplicate content issues)
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /auth/callback/
+
+# Allow important public pages
+Allow: /
+Allow: /pricing
+Allow: /documentation
+Allow: /docs
+Allow: /api
+Allow: /about
+Allow: /blog
+Allow: /careers
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /security
+Allow: /compliance
+Allow: /login
+Allow: /register
+
+# Sitemap location
+Sitemap: https://hypz.io/sitemap.xml
+
+# Crawl delay (optional, adjust as needed)
+# Crawl-delay: 1
+
+# Specific rules for major search engines
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 1
+
+# Block bad bots (optional)
+User-agent: AhrefsBot
+Crawl-delay: 2
+
+User-agent: SemrushBot
+Crawl-delay: 2
