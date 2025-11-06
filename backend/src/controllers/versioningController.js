@@ -3,6 +3,7 @@ import { query, transaction } from '../config/database.js';
 import { asyncHandler } from '../middleware/validator.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { deleteFromB2 } from '../services/b2Service.js';
+import logger from '../utils/logger.js';
 
 // 1. ENABLE/SUSPEND VERSIONING
 export const putBucketVersioning = asyncHandler(async (req, res) => {
@@ -223,11 +224,11 @@ export const deleteObjectVersion = asyncHandler(async (req, res) => {
     const file = fileResult.rows[0];
 
     // Delete from B2
-    if (file.b2_file_id) {
+      if (file.b2_file_id) {
       try {
         await deleteFromB2(file.b2_file_id, file.file_path);
       } catch (error) {
-        console.error('Error deleting from B2:', error);
+        logger.error('Error deleting from B2:', error);
         // Continue anyway - might already be deleted
       }
     }

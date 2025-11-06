@@ -30,7 +30,7 @@ const BucketDetails = () => {
       // Backend returns: { success, message, data: bucketObject }
       setBucket(response?.data || response);
     } catch (error) {
-      console.error('Failed to fetch bucket details:', error);
+      logger.error('Failed to fetch bucket details:', error);
       toast.error('Failed to load bucket details');
       if (error.response?.status === 404) {
         navigate('/buckets');
@@ -45,7 +45,7 @@ const BucketDetails = () => {
       // Backend returns: { success, message, data: { files: [], pagination: {} } }
       setFiles(response?.data?.files || []);
     } catch (error) {
-      console.error('Failed to fetch files:', error);
+      logger.error('Failed to fetch files:', error);
       toast.error('Failed to load files');
     } finally {
       setLoading(false);
@@ -115,7 +115,7 @@ const BucketDetails = () => {
       // Refresh data
       await Promise.all([fetchFiles(), fetchBucketDetails()]);
     } catch (error) {
-      console.error('Upload failed:', error);
+      logger.error('Upload failed:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to upload files';
       toast.error(errorMessage);
     } finally {
@@ -135,7 +135,7 @@ const BucketDetails = () => {
       fetchFiles();
       fetchBucketDetails();
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      logger.error('Failed to delete file:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete file';
       toast.error(errorMessage);
     }
@@ -156,7 +156,7 @@ const BucketDetails = () => {
       
       toast.success('Download started');
     } catch (error) {
-      console.error('Download failed:', error);
+      logger.error('Download failed:', error);
       toast.error('Failed to download file');
     }
   };

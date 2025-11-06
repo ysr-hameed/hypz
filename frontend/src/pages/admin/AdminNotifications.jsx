@@ -44,7 +44,7 @@ const AdminNotifications = () => {
       const response = await notificationAPI.getAllNotifications(params);
       setNotifications(response.data);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      logger.error('Failed to fetch notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const AdminNotifications = () => {
       const response = await notificationAPI.getStats();
       setStats(response.data);
     } catch (error) {
-      console.error('Failed to fetch stats:', error);
+      logger.error('Failed to fetch stats:', error);
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ const AdminNotifications = () => {
         expiresAt: ''
       });
     } catch (error) {
-      console.error('Failed to send notification:', error);
+      logger.error('Failed to send notification:', error);
       alert(error.response?.data?.message || 'Failed to send notification');
     } finally {
       setLoading(false);
@@ -138,7 +138,7 @@ const AdminNotifications = () => {
       fetchNotifications();
       alert('Notification deleted successfully');
     } catch (error) {
-      console.error('Failed to delete notification:', error);
+      logger.error('Failed to delete notification:', error);
       alert('Failed to delete notification');
     }
   };

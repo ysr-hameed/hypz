@@ -75,7 +75,7 @@ const Pricing = () => {
         
         setPlans(plansData);
       } catch (err) {
-        console.error('Failed to load plans:', err);
+        logger.error('Failed to load plans:', err);
         setError(err.message || 'Failed to load plans');
         setPlans([]); // Ensure plans is always an array
       } finally {

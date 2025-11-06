@@ -3,6 +3,8 @@
  * Tracks API response times and logs slow requests
  */
 
+import logger from '../utils/logger.js';
+
 export const performanceMonitor = (req, res, next) => {
   const start = process.hrtime();
 
@@ -13,7 +15,7 @@ export const performanceMonitor = (req, res, next) => {
 
     // NOTE: Do not set headers here; headers are already sent at 'finish'
     if (time > 500) {
-      console.warn(`⚠️  Slow request: ${req.method} ${req.originalUrl} - ${time.toFixed(2)}ms`);
+      logger.warn({ method: req.method, url: req.originalUrl, duration: time }, 'Slow request detected');
     }
   });
 

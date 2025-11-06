@@ -82,18 +82,18 @@ else
 fi
 
 # ============================================================================
-# Issue #2: Silent Error Handling - Replace console.error with proper logging
+# Issue #2: Silent Error Handling - Replace logger.error with proper logging
 # ============================================================================
 
 echo ""
 echo "🔧 Issue #2: Replacing silent error handlers..."
 echo ""
 
-# Count console.error occurrences
-error_count=$(grep -r "console.error" backend/src/controllers/ 2>/dev/null | wc -l)
-log_info "Found $error_count console.error() calls in controllers"
+# Count logger.error occurrences
+error_count=$(grep -r "logger.error" backend/src/controllers/ 2>/dev/null | wc -l)
+log_info "Found $error_count logger.error() calls in controllers"
 
-log_warning "MANUAL FIX REQUIRED: Replace console.error with proper error logging service"
+log_warning "MANUAL FIX REQUIRED: Replace logger.error with proper error logging service"
 echo "   Recommendation: Use winston, pino, or custom error logging"
 
 # ============================================================================
@@ -168,7 +168,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "6 critical issues identified:"
 echo "  1. ❌ Incomplete TODO comments (4 email notifications)"
-echo "  2. ❌ Silent error handling (8+ console.error calls)"
+echo "  2. ❌ Silent error handling (8+ logger.error calls)"
 echo "  3. ❌ Inconsistent error responses (37+ occurrences)"
 echo "  4. ❌ Missing query validation (3 controllers)"
 echo "  5. ❌ Webhook timing attack vulnerability"
@@ -339,7 +339,7 @@ echo "  4. Standardize error responses across all controllers"
 echo ""
 echo "THIS WEEK:"
 echo "  5. Add query parameter validation middleware"
-echo "  6. Replace console.error with proper logging service"
+echo "  6. Replace logger.error with proper logging service"
 echo "  7. Implement refresh token cleanup job"
 echo "  8. Resolve isPublic parameter inconsistency"
 echo "  9. Fix plan fallback logic"
@@ -432,7 +432,7 @@ cat > BUG-FIX-TRACKER.md << 'TRACKER_EOF'
 | 22 | Magic numbers (90 days, etc.) | 🔴 | - | - | Throughout backend |
 | 23 | Inconsistent naming (snake vs camel) | 🔴 | - | - | DB vs API responses |
 | 24 | Frontend array operations lack safety | 🔴 | - | - | Multiple pages |
-| 25 | No centralized error logging | 🔴 | - | - | Replace console.error |
+| 25 | No centralized error logging | 🔴 | - | - | Replace logger.error |
 
 ---
 

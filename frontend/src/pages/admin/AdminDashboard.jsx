@@ -59,7 +59,7 @@ const AdminDashboard = () => {
       const logsResponse = await adminAPI.getActivityLogs({ page: 1, limit: 5 });
       setActivityLogs(logsResponse.data.logs || []);
     } catch (error) {
-      console.error('Error fetching admin data:', error);
+      logger.error('Error fetching admin data:', error);
     } finally {
       setLoading(false);
     }

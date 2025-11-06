@@ -252,7 +252,7 @@ const hypz = new Hypz({
 
 // Test connection
 const user = await hypz.auth.getCurrentUser();
-console.log('Connected as:', user.data.email);`,
+logger.log('Connected as:', user.data.email);`,
 
       createBucket: `// Create a new bucket
 const bucket = await hypz.buckets.create({
@@ -262,7 +262,7 @@ const bucket = await hypz.buckets.create({
   region: 'us-east-1'
 });
 
-console.log('Bucket created:', bucket.data.slug);`,
+logger.log('Bucket created:', bucket.data.slug);`,
 
       listBuckets: `// List all buckets with pagination
 const { buckets, pagination } = await hypz.buckets.list({
@@ -272,15 +272,15 @@ const { buckets, pagination } = await hypz.buckets.list({
 });
 
 buckets.forEach(bucket => {
-  console.log(\`\${bucket.name}: \${bucket.file_count} files\`);
+  logger.log(\`\${bucket.name}: \${bucket.file_count} files\`);
 });`,
 
       getBucket: `// Get bucket details
 const bucket = await hypz.buckets.get(bucketId);
 
-console.log('Bucket:', bucket.data.name);
-console.log('Files:', bucket.data.file_count);
-console.log('Total size:', bucket.data.total_size);`,
+logger.log('Bucket:', bucket.data.name);
+logger.log('Files:', bucket.data.file_count);
+logger.log('Total size:', bucket.data.total_size);`,
 
       updateBucket: `// Update bucket settings
 const updated = await hypz.buckets.update(bucketId, {
@@ -299,10 +299,10 @@ await hypz.buckets.delete(bucketId, true);`,
       bucketStats: `// Get bucket statistics
 const stats = await hypz.buckets.getStats(bucketId);
 
-console.log('Total files:', stats.data.total_files);
-console.log('Total size:', stats.data.total_size);
-console.log('Total downloads:', stats.data.total_downloads);
-console.log('File types:', stats.data.typeDistribution);`,
+logger.log('Total files:', stats.data.total_files);
+logger.log('Total size:', stats.data.total_size);
+logger.log('Total downloads:', stats.data.total_downloads);
+logger.log('File types:', stats.data.typeDistribution);`,
 
       uploadFile: `// Upload a file
 // Note: File visibility automatically matches bucket visibility
@@ -317,9 +317,9 @@ const file = await hypz.files.upload({
   metadata: { userId: '123', category: 'images' }
 });
 
-console.log('File uploaded:', file.data.url);
-console.log('CDN URL:', file.data.cdn_url);
-console.log('Is public:', file.data.is_public); // Matches bucket visibility`,
+logger.log('File uploaded:', file.data.url);
+logger.log('CDN URL:', file.data.cdn_url);
+logger.log('Is public:', file.data.is_public); // Matches bucket visibility`,
 
       listFiles: `// List files in bucket
 const { files, pagination } = await hypz.files.list(bucketId, {
@@ -331,16 +331,16 @@ const { files, pagination } = await hypz.files.list(bucketId, {
 });
 
 files.forEach(file => {
-  console.log(\`\${file.original_name} - \${file.formattedSize}\`);
+  logger.log(\`\${file.original_name} - \${file.formattedSize}\`);
 });`,
 
       getFile: `// Get file details
 const file = await hypz.files.get(fileId);
 
-console.log('Filename:', file.data.original_name);
-console.log('Size:', file.data.size);
-console.log('Downloads:', file.data.downloads);
-console.log('URL:', file.data.url);`,
+logger.log('Filename:', file.data.original_name);
+logger.log('Size:', file.data.size);
+logger.log('Downloads:', file.data.downloads);
+logger.log('URL:', file.data.url);`,
 
       downloadFile: `// Download file (works for both public and private files)
 const fileData = await hypz.files.download(fileId);
@@ -363,13 +363,13 @@ const updated = await hypz.files.update(fileId, {
       deleteFile: `// Delete a file
 await hypz.files.delete(fileId);
 
-console.log('File deleted successfully');`,
+logger.log('File deleted successfully');`,
 
       bulkDelete: `// Delete multiple files at once
 const result = await hypz.files.bulkDelete([123, 456, 789]);
 
-console.log(\`Deleted \${result.data.deletedCount} files\`);
-console.log(\`Freed \${result.data.totalSize} bytes\`);`,
+logger.log(\`Deleted \${result.data.deletedCount} files\`);
+logger.log(\`Freed \${result.data.totalSize} bytes\`);`,
 
       bulkUpdate: `// Update multiple files at once
 const result = await hypz.files.bulkUpdate({
@@ -378,13 +378,13 @@ const result = await hypz.files.bulkUpdate({
   metadata: { processed: true }
 });
 
-console.log(\`Updated \${result.data.updatedCount} files\`);`,
+logger.log(\`Updated \${result.data.updatedCount} files\`);`,
 
       bulkDownload: `// Get download URLs for multiple files
 const result = await hypz.files.bulkDownload([123, 456, 789]);
 
 result.data.files.forEach(file => {
-  console.log(\`\${file.filename}: \${file.downloadUrl}\`);
+  logger.log(\`\${file.filename}: \${file.downloadUrl}\`);
 });`,
 
       bulkMove: `// Move multiple files to another bucket
@@ -393,7 +393,7 @@ const result = await hypz.files.bulkMove({
   targetBucketId: 42
 });
 
-console.log(\`Moved \${result.data.movedCount} files\`);`,
+logger.log(\`Moved \${result.data.movedCount} files\`);`,
 
       bulkUpload: `// Upload multiple files at once (up to 20 files)
 // File visibility matches bucket visibility
@@ -410,14 +410,14 @@ const result = await hypz.files.bulkUpload({
   metadata: { source: 'bulk-import' }
 });
 
-console.log(\`Uploaded \${result.data.uploadedCount} files\`);
-console.log(\`Total size: \${result.data.totalSize} bytes\`);
+logger.log(\`Uploaded \${result.data.uploadedCount} files\`);
+logger.log(\`Total size: \${result.data.totalSize} bytes\`);
 
 // Check for any errors
 if (result.data.errors && result.data.errors.length > 0) {
-  console.log(\`Errors: \${result.data.errorCount}\`);
+  logger.log(\`Errors: \${result.data.errorCount}\`);
   result.data.errors.forEach(err => {
-    console.log(\`  - \${err.filename}: \${err.error}\`);
+    logger.log(\`  - \${err.filename}: \${err.error}\`);
   });
 }`,
 
@@ -428,34 +428,34 @@ const apiKey = await hypz.apiKeys.create({
   expiresAt: '2025-12-31'
 });
 
-console.log('API Key:', apiKey.data.key);
-console.log('Keep this secure!');`,
+logger.log('API Key:', apiKey.data.key);
+logger.log('Keep this secure!');`,
 
       listApiKeys: `// List all API keys
 const apiKeys = await hypz.apiKeys.list();
 
 apiKeys.data.forEach(key => {
-  console.log(\`\${key.name}: \${key.last_used_at || 'Never used'}\`);
+  logger.log(\`\${key.name}: \${key.last_used_at || 'Never used'}\`);
 });`,
 
       revokeApiKey: `// Revoke an API key
 await hypz.apiKeys.revoke(apiKeyId);
 
-console.log('API key revoked');`,
+logger.log('API key revoked');`,
 
       signedUrls: `// Generate signed URL for temporary access (max 7 days = 604800 seconds)
 const signedUrl = await hypz.files.getSignedURL(fileId, 3600); // 1 hour
 
-console.log('Signed URL:', signedUrl.data.url);
-console.log('Expires at:', signedUrl.data.expiresAt);
-console.log('Expires in:', signedUrl.data.expiresIn, 'seconds');
+logger.log('Signed URL:', signedUrl.data.url);
+logger.log('Expires at:', signedUrl.data.expiresAt);
+logger.log('Expires in:', signedUrl.data.expiresIn, 'seconds');
 
 // Maximum expiry: 7 days
 const maxExpiryUrl = await hypz.files.getSignedURL(fileId, 604800);
 
 // Exceeding 7 days will be automatically capped
 const cappedUrl = await hypz.files.getSignedURL(fileId, 2592000); // 30 days requested
-console.log('Actual expiry:', cappedUrl.data.expiresIn, 'seconds'); // Will be 604800`,
+logger.log('Actual expiry:', cappedUrl.data.expiresIn, 'seconds'); // Will be 604800`,
 
       publicFiles: `// Public files are automatically accessible without auth
 // File visibility is determined by bucket type:
@@ -491,7 +491,7 @@ try {
   const file = await hypz.files.upload(bucketId, fileData);
 } catch (error) {
   if (error.code === 'RATE_LIMIT_EXCEEDED') {
-    console.log('Rate limit hit. Try again in:', error.retryAfter);
+    logger.log('Rate limit hit. Try again in:', error.retryAfter);
   }
 }`
     },

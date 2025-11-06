@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import config from './config/config.js';
 import pool from './config/database.js';
+import logger from './utils/logger.js';
 import {
   corsOptions,
   helmetConfig,
@@ -17,6 +18,7 @@ import {
 } from './middleware/security.js';
 import { performanceMonitor } from './middleware/performance.js';
 import { planBasedRateLimit, globalRateLimit } from './middleware/rateLimiter.js';
+import { responseNormalizer } from './middleware/responseNormalizer.js';
 
 // Routes
 import authRoutes from './routes/authRoutes.js';
@@ -53,6 +55,8 @@ const __dirname = path.dirname(__filename);
 // Initialize Express app
 const app = express();
 
+// Console override removed — use the centralized `logger` from `./utils/logger.js` directly.
+
 // Trust proxy (important for rate limiting and IP detection)
 app.set('trust proxy', 1);
 
@@ -80,6 +84,9 @@ if (config.NODE_ENV === 'development') {
 
 // Custom request logger
 app.use(requestLogger);
+
+// Normalize responses to a consistent API format
+app.use(responseNormalizer);
 
 // Static files (for uploaded files)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -149,53 +156,49 @@ const startServer = async () => {
   try {
     // Test database connection
     await pool.query('SELECT NOW()');
-    console.log('✅ Database connected successfully');
+  logger.info('Database connected successfully');
     
-    // Start billing scheduler
-    console.log('💰 Initializing billing scheduler...');
+  // Start billing scheduler
+  logger.info('Initializing billing scheduler...');
     startBillingScheduler();
 
     app.listen(PORT, () => {
-      console.log('');
-      console.log('🚀 ═══════════════════════════════════════════════════════════');
-      console.log(`🚀 Hypz Storage API Server Running`);
-      console.log('🚀 ═══════════════════════════════════════════════════════════');
-      console.log(`🌍 Environment: ${config.NODE_ENV}`);
-      console.log(`🔗 Server URL: http://localhost:${PORT}`);
-      console.log(`📡 API Version: ${config.API_VERSION}`);
-      console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-      console.log(`📚 API Endpoint: http://localhost:${PORT}/api/${config.API_VERSION}`);
-      console.log('🚀 ═══════════════════════════════════════════════════════════');
-      console.log('');
+      logger.info('Hypz Storage API Server Running', {
+        environment: config.NODE_ENV,
+        url: `http://localhost:${PORT}`,
+        apiVersion: config.API_VERSION,
+        health: `http://localhost:${PORT}/health`,
+        apiEndpoint: `/api/${config.API_VERSION}`
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 };
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Promise Rejection:', err);
+  logger.error({ err }, 'Unhandled Promise Rejection');
   // Close server & exit process
   process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
+  logger.error({ err }, 'Uncaught Exception');
   process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('👋 SIGTERM received. Shutting down gracefully...');
+  logger.info('SIGTERM received. Shutting down gracefully...');
   await pool.end();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('👋 SIGINT received. Shutting down gracefully...');
+  logger.info('SIGINT received. Shutting down gracefully...');
   await pool.end();
   process.exit(0);
 });

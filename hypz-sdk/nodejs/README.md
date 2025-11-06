@@ -63,7 +63,7 @@ const bucket = await hypz.buckets.create({ name: 'docs-demo', visibility: 'priva
 const buffer = Buffer.from('hello hypz');
 const file = await hypz.files.upload({ bucketId: bucket.id, file: buffer, fileName: 'hello.txt' });
 const url = await hypz.files.getSignedURL(file.id, 3600); // 1 hour (max 7 days)
-console.log('Shareable link:', url);
+logger.log('Shareable link:', url);
 ```
 
 ---
@@ -173,8 +173,8 @@ Perform operations on multiple files at once for better efficiency.
 
 ```js
 const result = await hypz.files.bulkDelete([fileId1, fileId2, fileId3]);
-console.log(`Deleted ${result.data.deletedCount} files`);
-console.log(`Freed ${result.data.totalSize} bytes`);
+logger.log(`Deleted ${result.data.deletedCount} files`);
+logger.log(`Freed ${result.data.totalSize} bytes`);
 ```
 
 ### Bulk Update (up to 100 files)
@@ -186,7 +186,7 @@ const result = await hypz.files.bulkUpdate({
   tags: ['archived', '2024'],
   metadata: { processed: true }
 });
-console.log(`Updated ${result.data.updatedCount} files`);
+logger.log(`Updated ${result.data.updatedCount} files`);
 ```
 
 ### Bulk Download URLs (up to 50 files)
@@ -194,7 +194,7 @@ console.log(`Updated ${result.data.updatedCount} files`);
 ```js
 const result = await hypz.files.bulkDownload([fileId1, fileId2, fileId3]);
 result.data.files.forEach(file => {
-  console.log(`${file.filename}: ${file.downloadUrl}`);
+  logger.log(`${file.filename}: ${file.downloadUrl}`);
 });
 ```
 
@@ -205,7 +205,7 @@ const result = await hypz.files.bulkMove({
   fileIds: [fileId1, fileId2, fileId3],
   targetBucketId: 'target-bucket-id'
 });
-console.log(`Moved ${result.data.movedCount} files`);
+logger.log(`Moved ${result.data.movedCount} files`);
 ```
 
 ### Bulk Upload (up to 20 files)
@@ -225,14 +225,14 @@ const result = await hypz.files.bulkUpload({
   metadata: { source: 'bulk-import' }
 });
 
-console.log(`Uploaded ${result.data.uploadedCount} files`);
-console.log(`Total size: ${result.data.totalSize} bytes`);
+logger.log(`Uploaded ${result.data.uploadedCount} files`);
+logger.log(`Total size: ${result.data.totalSize} bytes`);
 
 // Check for partial failures
 if (result.data.errors && result.data.errors.length > 0) {
-  console.log(`Errors: ${result.data.errorCount}`);
+  logger.log(`Errors: ${result.data.errorCount}`);
   result.data.errors.forEach(err => {
-    console.log(`  - ${err.filename}: ${err.error}`);
+    logger.log(`  - ${err.filename}: ${err.error}`);
   });
 }
 ```
@@ -278,7 +278,7 @@ try {
   await hypz.files.upload({ bucketId: 'bad-id', file: Buffer.from('x'), fileName: 'x.txt' });
 } catch (err) {
   if (err.name === 'HypzError') {
-    console.error(err.statusCode, err.message, err.data);
+    logger.error(err.statusCode, err.message, err.data);
   }
 }
 ```
@@ -348,7 +348,7 @@ exports.handler = async (event) => {
 #!/usr/bin/env node
 const [,, filePath] = process.argv;
 await hypz.files.upload(process.env.BUCKET_ID, filePath, { filename: path.basename(filePath) });
-console.log('Uploaded');
+logger.log('Uploaded');
 ```
 
 ---
@@ -517,8 +517,8 @@ await hypz.apiKeys.revoke(keyId);
 #### Get Current Usage
 ```javascript
 const usage = await hypz.usage.getCurrent();
-console.log('Storage used:', usage.storageUsed);
-console.log('Bandwidth used:', usage.bandwidthUsed);
+logger.log('Storage used:', usage.storageUsed);
+logger.log('Bandwidth used:', usage.bandwidthUsed);
 ```
 
 #### Get Usage History
@@ -541,11 +541,11 @@ try {
   });
 } catch (error) {
   if (error instanceof HypzError) {
-    console.error('API Error:', error.message);
-    console.error('Status Code:', error.statusCode);
-    console.error('Response:', error.response);
+    logger.error('API Error:', error.message);
+    logger.error('Status Code:', error.statusCode);
+    logger.error('Response:', error.response);
   } else {
-    console.error('Unexpected error:', error);
+    logger.error('Unexpected error:', error);
   }
 }
 ```
@@ -572,7 +572,7 @@ for (const fileName of files) {
     file: buffer,
     fileName
   });
-  console.log(`Uploaded: ${uploaded.url}`);
+  logger.log(`Uploaded: ${uploaded.url}`);
 }
 ```
 
@@ -599,7 +599,7 @@ for (const image of images) {
   uploadedFiles.push(file);
 }
 
-console.log('Gallery created:', uploadedFiles.map(f => f.url));
+logger.log('Gallery created:', uploadedFiles.map(f => f.url));
 ```
 
 ### Monitor Storage Usage
@@ -610,8 +610,8 @@ const checkUsage = async () => {
   const storageGB = (usage.storageUsed / 1024 / 1024 / 1024).toFixed(2);
   const bandwidthGB = (usage.bandwidthUsed / 1024 / 1024 / 1024).toFixed(2);
   
-  console.log(`Storage: ${storageGB} GB`);
-  console.log(`Bandwidth: ${bandwidthGB} GB`);
+  logger.log(`Storage: ${storageGB} GB`);
+  logger.log(`Bandwidth: ${bandwidthGB} GB`);
   
   if (usage.storageUsed > usage.storageLimit * 0.9) {
     console.warn('⚠️ Storage limit nearly reached!');

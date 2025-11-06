@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import config from '../config/config.js';
 import { query } from '../config/database.js';
+import logger from '../utils/logger.js';
+import { errorResponse } from '../utils/helpers.js';
 
 // Simple in-memory cache for user lookups
 const userCache = new Map();
@@ -82,13 +84,10 @@ export const authenticate = async (req, res, next) => {
         message: 'Invalid token'
       });
     }
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Authentication failed'
-    });
-  }
+    } catch (error) {
+      logger.error({ err: error }, 'Authentication error');
+      return errorResponse(res, 'Authentication failed', 500);
+    }
 };
 
 // API Key cache
@@ -121,8 +120,9 @@ export const authenticateApiKey = async (req, res, next) => {
         if (isMatch) {
           matchedKey = cached.data;
         }
-      } catch (err) {
+          } catch (err) {
         // Cache miss, continue to DB lookup
+        logger.error({ err: err }, 'Bcrypt compare error during API key cache check');
       }
     }
     
@@ -155,7 +155,7 @@ export const authenticateApiKey = async (req, res, next) => {
             break;
           }
         } catch (compareError) {
-          console.error('Bcrypt compare error:', compareError.message);
+          logger.error({ err: compareError }, 'Bcrypt compare error while matching API key');
         }
       }
     }
@@ -171,7 +171,7 @@ export const authenticateApiKey = async (req, res, next) => {
     query(
       'UPDATE api_keys SET last_used_at = NOW(), last_used_ip = $1 WHERE id = $2',
       [req.ip, matchedKey.id]
-    ).catch(err => console.error('Failed to update API key last_used:', err.message));
+    ).catch(err => logger.warn({ err }, 'Failed to update API key last_used'));
 
     // Attach user info to request
     req.user = {
@@ -184,14 +184,9 @@ export const authenticateApiKey = async (req, res, next) => {
     req.authMethod = 'api_key'; // Track authentication method
 
     next();
-  } catch (error) {
-    console.error('❌ API Key authentication error:', error);
-    console.error('Error stack:', error.stack);
-    return res.status(500).json({
-      success: false,
-      message: 'Authentication failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    } catch (error) {
+    logger.error({ err: error }, 'API Key authentication error');
+    return errorResponse(res, process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed', 500);
   }
 };
 
@@ -205,11 +200,8 @@ export const requirePermission = (requiredPermission) => {
 
     // Check if API key has the required permission
     if (!req.apiKey || !req.apiKey.permissions) {
-      console.log('❌ Permission check failed - API key missing permissions');
-      return res.status(403).json({
-        success: false,
-        message: 'API key missing permissions'
-      });
+      logger.warn('Permission check failed - API key missing permissions');
+      return errorResponse(res, 'API key missing permissions', 403);
     }
 
     // Parse permissions if it's a string (from DB)
@@ -218,23 +210,20 @@ export const requirePermission = (requiredPermission) => {
       try {
         permissions = JSON.parse(permissions);
       } catch (e) {
-        console.error('Error parsing permissions:', e);
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid API key permissions format'
-        });
+        logger.error({ err: e }, 'Error parsing API key permissions');
+        return errorResponse(res, 'Invalid API key permissions format', 403);
       }
     }
 
-    console.log('🔍 Checking permission:', requiredPermission, 'against:', permissions);
+    logger.debug({ requiredPermission, permissions }, 'Checking API key permissions');
 
     // Handle array-based permissions (e.g., ['files:write', 'buckets:read', '*'])
     if (Array.isArray(permissions)) {
       if (permissions.includes(requiredPermission)) {
-        // console.log('✅ Permission granted (array-based)');
+        logger.debug('Permission granted (array-based)');
         return next();
       }
-      // console.log('❌ Permission denied (array-based)');
+      logger.warn({ requiredPermission, permissions }, 'Permission denied (array-based)');
       return errorResponse(res, `Permission denied. Required: ${requiredPermission}`, 403);
     }
 
@@ -243,15 +232,15 @@ export const requirePermission = (requiredPermission) => {
       // Extract action from permission string (e.g., 'files:write' -> 'write', 'buckets:read' -> 'read')
       const action = requiredPermission.split(':')[1] || requiredPermission;
       
-      console.log('🔍 Extracted action:', action, 'from permission:', requiredPermission);
+      logger.debug({ action, requiredPermission }, 'Extracted action from permission');
       
       // Check if the action is allowed
       if (permissions[action] === true || permissions['*'] === true) {
-        console.log('✅ Permission granted (object-based)');
+        logger.debug('Permission granted (object-based)');
         return next();
       }
 
-      console.log('❌ Permission denied (object-based)');
+      logger.warn({ action, requiredPermission, permissions }, 'Permission denied (object-based)');
       return res.status(403).json({
         success: false,
         message: `API key missing required permission: ${requiredPermission}`,
@@ -260,12 +249,8 @@ export const requirePermission = (requiredPermission) => {
       });
     }
 
-    console.log('❌ Invalid permissions format');
-    return res.status(403).json({
-      success: false,
-      message: 'Invalid API key permissions format',
-      available: permissions
-    });
+    logger.warn('Invalid permissions format for API key');
+    return errorResponse(res, 'Invalid API key permissions format', 403, permissions);
   };
 };
 
@@ -309,27 +294,18 @@ export const requireOwnership = (resourceType) => {
       const result = await query(checkQuery, [resourceId]);
 
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found`
-        });
+        return errorResponse(res, `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found`, 404);
       }
 
       if (result.rows[0].user_id !== userId) {
-        console.warn(`⚠️  Unauthorized access attempt: User ${userId} tried to access ${resourceType} ${resourceId}`);
-        return res.status(403).json({
-          success: false,
-          message: `You don't have permission to access this ${resourceType}`
-        });
+        logger.warn({ userId, resourceType, resourceId }, 'Unauthorized access attempt');
+        return errorResponse(res, `You don't have permission to access this ${resourceType}`, 403);
       }
 
       next();
     } catch (error) {
-      console.error('Ownership check error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Authorization failed'
-      });
+      logger.error({ err: error }, 'Ownership check error');
+      return errorResponse(res, 'Authorization failed', 500);
     }
   };
 };

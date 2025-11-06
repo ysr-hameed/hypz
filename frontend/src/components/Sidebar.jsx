@@ -46,7 +46,7 @@ const Sidebar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
         setPlanName(planData?.name?.toUpperCase() || 'FREE PLAN');
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch storage data:', error);
+        logger.error('Failed to fetch storage data:', error);
         setLoading(false);
       }
     };

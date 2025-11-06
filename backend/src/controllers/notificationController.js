@@ -1,4 +1,6 @@
 import { query } from '../config/database.js';
+import logger from '../utils/logger.js';
+import { successResponse, errorResponse } from '../utils/helpers.js';
 
 // Get user notifications
 export const getUserNotifications = async (req, res) => {
@@ -27,17 +29,14 @@ export const getUserNotifications = async (req, res) => {
       [userId]
     );
 
-    res.json({
-      success: true,
-      data: {
-        notifications: result.rows,
-        unreadCount: parseInt(countResult.rows[0].unread_count),
-        total: result.rows.length
-      }
+    return successResponse(res, {
+      notifications: result.rows,
+      unreadCount: parseInt(countResult.rows[0].unread_count),
+      total: result.rows.length
     });
   } catch (error) {
-    console.error('Get notifications error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Get notifications error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -56,16 +55,13 @@ export const markNotificationRead = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Notification not found' });
+      return errorResponse(res, 'Notification not found', 404);
     }
 
-    res.json({
-      success: true,
-      data: result.rows[0]
-    });
+    return successResponse(res, result.rows[0]);
   } catch (error) {
-    console.error('Mark notification read error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Mark notification read error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -81,13 +77,10 @@ export const markAllNotificationsRead = async (req, res) => {
       [userId]
     );
 
-    res.json({
-      success: true,
-      message: 'All notifications marked as read'
-    });
+    return successResponse(res, null, 'All notifications marked as read');
   } catch (error) {
-    console.error('Mark all notifications read error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Mark all notifications read error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -105,16 +98,13 @@ export const deleteNotification = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Notification not found or cannot be deleted' });
+      return errorResponse(res, 'Notification not found or cannot be deleted', 404);
     }
 
-    res.json({
-      success: true,
-      message: 'Notification deleted'
-    });
+    return successResponse(res, null, 'Notification deleted');
   } catch (error) {
-    console.error('Delete notification error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Delete notification error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -135,7 +125,7 @@ export const createNotification = async (req, res) => {
     } = req.body;
 
     if (!title || !message) {
-      return res.status(400).json({ message: 'Title and message are required' });
+      return errorResponse(res, 'Title and message are required', 400);
     }
 
     let expiresAt = null;
@@ -159,15 +149,11 @@ export const createNotification = async (req, res) => {
         [req.user.id, 'notification_created', JSON.stringify({ type: 'global', notificationId: result.rows[0].id })]
       );
 
-      return res.json({
-        success: true,
-        data: result.rows[0],
-        message: 'Global notification created successfully'
-      });
+      return successResponse(res, result.rows[0], 'Global notification created successfully');
     }
 
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required for non-global notifications' });
+      return errorResponse(res, 'User ID is required for non-global notifications', 400);
     }
 
     const result = await query(
@@ -184,14 +170,10 @@ export const createNotification = async (req, res) => {
       [req.user.id, 'notification_created', JSON.stringify({ type: 'user', targetUserId: userId, notificationId: result.rows[0].id })]
     );
 
-    res.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Notification created successfully'
-    });
+    return successResponse(res, result.rows[0], 'Notification created successfully');
   } catch (error) {
-    console.error('Create notification error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Create notification error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -211,11 +193,11 @@ export const sendBulkNotification = async (req, res) => {
     } = req.body;
 
     if (!title || !message) {
-      return res.status(400).json({ message: 'Title and message are required' });
+      return errorResponse(res, 'Title and message are required', 400);
     }
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({ message: 'User IDs array is required' });
+      return errorResponse(res, 'User IDs array is required', 400);
     }
 
     let expiresAt = null;
@@ -242,17 +224,10 @@ export const sendBulkNotification = async (req, res) => {
       [req.user.id, 'bulk_notification_created', JSON.stringify({ count: userIds.length, userIds })]
     );
 
-    res.json({
-      success: true,
-      data: {
-        notifications,
-        count: notifications.length
-      },
-      message: `Notifications sent to ${notifications.length} users`
-    });
+    return successResponse(res, { notifications, count: notifications.length }, `Notifications sent to ${notifications.length} users`);
   } catch (error) {
-    console.error('Send bulk notification error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Send bulk notification error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -288,13 +263,10 @@ export const getAllNotifications = async (req, res) => {
 
     const result = await query(queryText, params);
 
-    res.json({
-      success: true,
-      data: result.rows
-    });
+    return successResponse(res, result.rows);
   } catch (error) {
-    console.error('Get all notifications error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Get all notifications error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -309,7 +281,7 @@ export const deleteNotificationAdmin = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Notification not found' });
+      return errorResponse(res, 'Notification not found', 404);
     }
 
     // Log activity
@@ -319,13 +291,10 @@ export const deleteNotificationAdmin = async (req, res) => {
       [req.user.id, 'notification_deleted', JSON.stringify({ notificationId })]
     );
 
-    res.json({
-      success: true,
-      message: 'Notification deleted'
-    });
+    return successResponse(res, null, 'Notification deleted');
   } catch (error) {
-    console.error('Delete notification admin error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Delete notification admin error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -342,12 +311,9 @@ export const getNotificationStats = async (req, res) => {
       FROM notifications
     `);
 
-    res.json({
-      success: true,
-      data: stats.rows[0]
-    });
+    return successResponse(res, stats.rows[0]);
   } catch (error) {
-    console.error('Get notification stats error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Get notification stats error');
+    return errorResponse(res, 'Server error', 500);
   }
 };

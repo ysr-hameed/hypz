@@ -16,7 +16,7 @@ const AdminActivityPage = () => {
       const response = await adminAPI.getActivityLogs({ limit: 50 });
       setLogs(response.data?.logs || []);
     } catch (error) {
-      console.error('Failed to fetch activity logs:', error);
+      logger.error('Failed to fetch activity logs:', error);
     } finally {
       setLoading(false);
     }

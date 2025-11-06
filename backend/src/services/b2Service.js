@@ -2,6 +2,7 @@ import B2 from 'backblaze-b2';
 import axios from 'axios';
 import config from '../config/config.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 let b2 = null;
 let authorizationToken = null;
@@ -11,7 +12,7 @@ let downloadUrl = null;
 // Initialize B2
 const initializeB2 = async () => {
   if (!config.B2_APPLICATION_KEY_ID || !config.B2_APPLICATION_KEY) {
-    console.warn('⚠️  Backblaze B2 credentials not configured. Using local storage.');
+  logger.warn('⚠️  Backblaze B2 credentials not configured. Using local storage.');
     return null;
   }
 
@@ -26,10 +27,10 @@ const initializeB2 = async () => {
     apiUrl = authResponse.data.apiUrl;
     downloadUrl = authResponse.data.downloadUrl;
 
-    console.log('✅ Backblaze B2 initialized successfully');
+  logger.info('✅ Backblaze B2 initialized successfully');
     return b2;
   } catch (error) {
-    console.error('❌ Failed to initialize Backblaze B2:', error.message);
+  logger.error('❌ Failed to initialize Backblaze B2:', error.message);
     return null;
   }
 };
@@ -100,7 +101,7 @@ export const uploadToB2 = async (fileBuffer, fileName, mimeType, isPublic = fals
       bucketName: bucketName
     };
   } catch (error) {
-    console.error('Error uploading to B2:', error);
+  logger.error('Error uploading to B2:', error);
     throw error;
   }
 };
@@ -118,7 +119,7 @@ export const downloadFromB2 = async (fileName, bucketName) => {
 
     // Use provided bucket name or default to private bucket
     const targetBucket = bucketName || config.B2_PRIVATE_BUCKET_NAME;
-    console.log('B2 download request:', { bucketName: targetBucket, fileName });
+  logger.info('B2 download request:', { bucketName: targetBucket, fileName });
 
     const response = await b2.downloadFileByName({
       bucketName: targetBucket,
@@ -127,7 +128,7 @@ export const downloadFromB2 = async (fileName, bucketName) => {
 
     return response.data;
   } catch (error) {
-    console.error('Error downloading from B2:', error?.response?.data || error?.message || error);
+  logger.error('Error downloading from B2:', error?.response?.data || error?.message || error);
     throw error;
   }
 };
@@ -142,11 +143,11 @@ export const downloadById = async (fileId) => {
     if (!b2) {
       throw new Error('Backblaze B2 not initialized');
     }
-    console.log('B2 download by ID:', { fileId });
+  logger.info('B2 download by ID:', { fileId });
     const response = await b2.downloadFileById({ fileId });
     return response.data;
   } catch (error) {
-    console.error('Error downloading by ID from B2:', error?.response?.data || error?.message || error);
+  logger.error('Error downloading by ID from B2:', error?.response?.data || error?.message || error);
     throw error;
   }
 };
@@ -161,14 +162,14 @@ export const streamById = async (fileId) => {
       throw new Error('Backblaze B2 not initialized');
     }
     const url = `${apiUrl}/b2api/v2/b2_download_file_by_id?fileId=${encodeURIComponent(fileId)}`;
-    console.log('B2 raw stream by ID:', { url });
+  logger.info('B2 raw stream by ID:', { url });
     const resp = await axios.get(url, {
       responseType: 'stream',
       headers: { Authorization: authorizationToken }
     });
     return resp.data; // stream
   } catch (error) {
-    console.error('Error streaming by ID from B2:', error?.response?.status, error?.response?.data || error?.message || error);
+  logger.error('Error streaming by ID from B2:', error?.response?.status, error?.response?.data || error?.message || error);
     throw error;
   }
 };
@@ -191,7 +192,7 @@ export const deleteFromB2 = async (fileId, fileName) => {
 
     return true;
   } catch (error) {
-    console.error('Error deleting from B2:', error);
+  logger.error('Error deleting from B2:', error);
     throw error;
   }
 };
@@ -213,7 +214,7 @@ export const getB2FileInfo = async (fileId) => {
 
     return response.data;
   } catch (error) {
-    console.error('Error getting file info from B2:', error);
+  logger.error('Error getting file info from B2:', error);
     throw error;
   }
 };

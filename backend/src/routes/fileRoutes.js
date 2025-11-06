@@ -14,6 +14,7 @@ import {
   bulkUpdateFiles,
   bulkDownloadFiles,
   bulkMoveFiles,
+  moveFileToBucket,
   bulkUploadFiles
 } from '../controllers/fileController.js';
 import { authenticate, authenticateApiKey, requirePermission, requireOwnership, authenticateFileToken } from '../middleware/auth.js';
@@ -75,6 +76,8 @@ router.get('/file/:fileId/download', authMiddleware, requirePermission('files:re
 router.post('/file/:fileId/signed-url', authMiddleware, requirePermission('files:read'), requireOwnership('file'), createSignedUrl);
 router.delete('/file/:fileId', authMiddleware, requirePermission('files:delete'), requireOwnership('file'), deleteFile);
 router.patch('/file/:fileId', authMiddleware, requirePermission('files:write'), requireOwnership('file'), validateFileUpload, updateFile);
+// Move single file to another bucket
+router.post('/file/:fileId/move', authMiddleware, requirePermission('files:write'), requireOwnership('file'), [ body('targetBucketId').isInt({ min: 1 }).withMessage('targetBucketId must be a positive integer'), validate ], moveFileToBucket);
 
 // Bulk operations routes
 router.post('/bulk/delete', authMiddleware, requirePermission('files:delete'), bulkDeleteValidation, bulkDeleteFiles);

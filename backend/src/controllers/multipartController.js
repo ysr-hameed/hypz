@@ -304,7 +304,7 @@ export const abortMultipartUpload = asyncHandler(async (req, res) => {
         fileId: upload.b2_file_id
       });
     } catch (error) {
-      console.error('Error canceling B2 large file:', error);
+  logger.error('Error canceling B2 large file:', error);
     }
 
     // Update upload status

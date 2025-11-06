@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { sendEmail } from '../utils/email.js';
 import { asyncHandler } from '../middleware/validator.js';
 import config from '../config/config.js';
+import { successResponse, errorResponse } from '../utils/helpers.js';
 
 // Invite team member
 export const inviteTeamMember = asyncHandler(async (req, res) => {
@@ -29,7 +30,7 @@ export const inviteTeamMember = asyncHandler(async (req, res) => {
     const inviteUrl = `${config.FRONTEND_URL}/team/accept-invite/${inviteToken}`;
     await sendEmail(email, 'Team Invitation', `<p>Click to accept: <a href="${inviteUrl}">Accept</a></p>`);
 
-    res.status(201).json({ success: true, message: 'Invitation sent', data: result.rows[0] });
+  return successResponse(res, result.rows[0], 'Invitation sent', 201);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -48,7 +49,7 @@ export const getTeamMembers = asyncHandler(async (req, res) => {
      ORDER BY tm.created_at DESC`,
     [userId]
   );
-  res.json({ success: true, data: result.rows });
+  return successResponse(res, result.rows);
 });
 
 export const acceptTeamInvite = asyncHandler(async (req, res) => {
@@ -62,14 +63,14 @@ export const acceptTeamInvite = asyncHandler(async (req, res) => {
       [token]
     );
     if (invite.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Invalid invitation' });
+      return errorResponse(res, 'Invalid invitation', 404);
     }
     await client.query(
       'UPDATE team_members SET user_id = $1, status = \'active\', accepted_at = NOW() WHERE id = $2',
       [userId, invite.rows[0].id]
     );
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Invitation accepted' });
+  return successResponse(res, null, 'Invitation accepted');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -88,9 +89,9 @@ export const updateTeamMember = asyncHandler(async (req, res) => {
     [role, JSON.stringify(permissions), memberId, userId]
   );
   if (result.rows.length === 0) {
-    return res.status(403).json({ success: false, message: 'Permission denied' });
+    return errorResponse(res, 'Permission denied', 403);
   }
-  res.json({ success: true, data: result.rows[0] });
+  return successResponse(res, result.rows[0]);
 });
 
 export const removeTeamMember = asyncHandler(async (req, res) => {
@@ -100,7 +101,7 @@ export const removeTeamMember = asyncHandler(async (req, res) => {
     'DELETE FROM team_members WHERE id = $1 AND (inviter_id = $2 OR user_id = $2)',
     [memberId, userId]
   );
-  res.json({ success: true, message: 'Member removed' });
+  return successResponse(res, null, 'Member removed');
 });
 
 export const getPendingInvites = asyncHandler(async (req, res) => {
@@ -113,7 +114,7 @@ export const getPendingInvites = asyncHandler(async (req, res) => {
      ORDER BY tm.created_at DESC`,
     [userId]
   );
-  res.json({ success: true, data: result.rows });
+  return successResponse(res, result.rows);
 });
 
 export const resendInvite = asyncHandler(async (req, res) => {
@@ -127,7 +128,7 @@ export const resendInvite = asyncHandler(async (req, res) => {
       [memberId, userId]
     );
     if (member.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Not found' });
+      return errorResponse(res, 'Not found', 404);
     }
     const newToken = crypto.randomBytes(32).toString('hex');
     const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -138,7 +139,7 @@ export const resendInvite = asyncHandler(async (req, res) => {
     await client.query('COMMIT');
     const inviteUrl = `${config.FRONTEND_URL}/team/accept-invite/${newToken}`;
     await sendEmail(member.rows[0].email, 'Team Invitation Reminder', `<p>Accept: <a href="${inviteUrl}">Click</a></p>`);
-    res.json({ success: true, message: 'Invitation resent' });
+  return successResponse(res, null, 'Invitation resent');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

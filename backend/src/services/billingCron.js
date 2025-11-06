@@ -1,7 +1,54 @@
 import { query, transaction } from '../config/database.js';
 import { lemonSqueezyService } from './lemonSqueezyService.js';
 import { sendInvoiceEmail, sendPaymentFailedEmail, sendManualInvoiceEmail, sendServiceSuspensionEmail } from '../utils/email.js';
+import { cleanupExpiredRefreshTokens } from './cleanupJobs.js';
 import cron from 'node-cron';
+import logger from '../utils/logger.js';
+
+// Helper: send email with retries, structured logging, and activity log entries
+const sendEmailWithRetry = async (emailFn, args = [], context = {}, maxRetries = 3) => {
+  const { userId = null, billingId = null, type = 'email' } = context || {};
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.info({ attempt, userId, billingId, type }, 'Attempting to send email');
+      await emailFn(...args);
+
+      // Record successful email send in activity_logs for traceability
+      try {
+        await query(
+          'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
+          [userId, 'email_sent', JSON.stringify({ type, billingId, attempt })]
+        );
+      } catch (logErr) {
+        logger.warn({ err: logErr, userId, billingId, type }, 'Failed to write activity log for sent email');
+      }
+
+      logger.info({ userId, billingId, type }, 'Email sent successfully');
+      return true;
+    } catch (err) {
+      logger.error({ err, attempt, userId, billingId, type }, 'Failed to send email, will retry');
+
+      // If last attempt, record failure to activity logs
+      if (attempt === maxRetries) {
+        try {
+          await query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
+            [userId, 'email_failed', JSON.stringify({ type, billingId, error: err.message || String(err) })]
+          );
+        } catch (logErr) {
+          logger.warn({ err: logErr, userId, billingId, type }, 'Failed to write activity log for failed email');
+        }
+
+        logger.error({ err, userId, billingId, type }, 'Email failed after retries');
+        return false;
+      }
+
+      // Exponential backoff before retrying
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+    }
+  }
+};
 
 /**
  * Monthly Billing Cycle Job - BEST PRACTICES
@@ -49,7 +96,7 @@ const calculateUsageCost = (storageBytes, bandwidthBytes, apiCalls, plan) => {
 };
 
 const processBillingCycle = async () => {
-  console.log('🔄 Starting monthly billing cycle...');
+  logger.info('🔄 Starting monthly billing cycle...');
   
   try {
     // Get previous month's date range
@@ -59,8 +106,9 @@ const processBillingCycle = async () => {
     
     const periodStart = lastMonth.toISOString().split('T')[0];
     const periodEnd = lastMonthEnd.toISOString().split('T')[0];
+  const billingPeriod = `${periodStart} to ${periodEnd}`;
     
-    console.log(`📅 Processing billing for period: ${periodStart} to ${periodEnd}`);
+  logger.info(`📅 Processing billing for period: ${periodStart} to ${periodEnd}`);
     
     // Get all PAYG users
     const usersResult = await query(
@@ -70,10 +118,10 @@ const processBillingCycle = async () => {
        WHERE p.type = 'payg' AND u.is_active = true`
     );
     
-    console.log(`👥 Found ${usersResult.rows.length} PAYG users`);
+  logger.info(`👥 Found ${usersResult.rows.length} PAYG users`);
     
     for (const user of usersResult.rows) {
-      console.log(`\n💳 Processing user: ${user.email}`);
+  logger.info(`\n💳 Processing user: ${user.email}`);
       
       // Get user's usage for last month
       const usageResult = await query(
@@ -96,12 +144,12 @@ const processBillingCycle = async () => {
         user
       );
       
-      console.log(`📊 Usage: ${costs.storageGB} GB storage, ${costs.bandwidthGB} GB bandwidth`);
-      console.log(`💰 Cost: $${costs.totalCost}`);
+  logger.info(`📊 Usage: ${costs.storageGB} GB storage, ${costs.bandwidthGB} GB bandwidth`);
+  logger.info(`💰 Cost: $${costs.totalCost}`);
       
       // Skip if cost is $0
       if (parseFloat(costs.totalCost) === 0) {
-        console.log('✅ No charges for this period');
+  logger.info('✅ No charges for this period');
         continue;
       }
       
@@ -113,7 +161,7 @@ const processBillingCycle = async () => {
       );
       
       if (existingBilling.rows.length > 0) {
-        console.log('⚠️  Billing record already exists, skipping');
+  logger.warn('⚠️  Billing record already exists, skipping');
         continue;
       }
       
@@ -145,7 +193,7 @@ const processBillingCycle = async () => {
       
       // If auto_renew is enabled and user has payment method, charge automatically
       if (user.auto_renew && user.payment_method_id) {
-        console.log('🔄 Auto-charging user...');
+  logger.info('🔄 Auto-charging user...');
         
         try {
           // Here you would integrate with LemonSqueezy to charge the card
@@ -183,20 +231,24 @@ const processBillingCycle = async () => {
               [paymentResult.rows[0].id, billing.id]
             );
             
-            console.log('✅ Payment successful');
+            logger.info('✅ Payment successful');
           });
           
-          // Send invoice email
-          await sendInvoiceEmail(
+          // Send invoice email (with retries & activity log on failure)
+          await sendEmailWithRetry(sendInvoiceEmail, [
             user.email,
             user.first_name,
             billing.total_cost,
             billingPeriod,
             billing.id
-          ).catch(err => console.error('Failed to send invoice email:', err));
+          ], {
+            userId: user.id,
+            billingId: billing.id,
+            type: 'invoice_email'
+          });
           
         } catch (error) {
-          console.error('❌ Payment failed:', error.message);
+          logger.error('❌ Payment failed:', error.message);
           
           // Update billing status to failed
           await query(
@@ -218,21 +270,25 @@ const processBillingCycle = async () => {
             [gracePeriodEnd.toISOString().split('T')[0], user.id]
           );
           
-          // Send payment failed email with grace period notice
-          await sendPaymentFailedEmail(
+          // Send payment failed email with grace period notice (with retries)
+          await sendEmailWithRetry(sendPaymentFailedEmail, [
             user.email,
             user.first_name,
             billing.total_cost,
             error.message,
             gracePeriodEnd.toLocaleDateString()
-          ).catch(err => console.error('Failed to send payment failed email:', err));
+          ], {
+            userId: user.id,
+            billingId: billing.id,
+            type: 'payment_failed_email'
+          });
           
-          console.log(`⏰ Grace period set until ${gracePeriodEnd.toISOString().split('T')[0]}`);
+          logger.info(`⏰ Grace period set until ${gracePeriodEnd.toISOString().split('T')[0]}`);
         }
         
       } else {
         // Manual payment required
-        console.log('📧 Creating manual invoice...');
+  logger.info('📧 Creating manual invoice...');
         
         await query(
           `UPDATE usage_billing SET 
@@ -242,33 +298,37 @@ const processBillingCycle = async () => {
           [billing.id]
         );
         
-        // Send manual invoice email
+        // Send manual invoice email (with retries)
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 14); // 14 days to pay
-        
-        await sendManualInvoiceEmail(
+
+        await sendEmailWithRetry(sendManualInvoiceEmail, [
           user.email,
           user.first_name,
           billing.total_cost,
           billingPeriod,
           dueDate.toLocaleDateString()
-        ).catch(err => console.error('Failed to send manual invoice email:', err));
+        ], {
+          userId: user.id,
+          billingId: billing.id,
+          type: 'manual_invoice_email'
+        });
         
-        console.log('✅ Manual invoice created');
+  logger.info('✅ Manual invoice created');
       }
     }
     
-    console.log('\n✅ Monthly billing cycle completed!');
+  logger.info('\n✅ Monthly billing cycle completed!');
     
   } catch (error) {
-    console.error('❌ Error in billing cycle:', error);
+    logger.error('❌ Error in billing cycle:', error);
     throw error;
   }
 };
 
 // Check for overdue payments and suspend services
 const checkOverduePayments = async () => {
-  console.log('🔍 Checking for overdue payments...');
+  logger.info('🔍 Checking for overdue payments...');
   
   try {
     // Get users with failed payments past grace period
@@ -281,10 +341,10 @@ const checkOverduePayments = async () => {
        AND u.services_active = true`
     );
     
-    console.log(`⚠️  Found ${overdueResult.rows.length} overdue accounts`);
+  logger.warn(`⚠️  Found ${overdueResult.rows.length} overdue accounts`);
     
     for (const user of overdueResult.rows) {
-      console.log(`🚫 Suspending services for: ${user.email}`);
+  logger.info(`🚫 Suspending services for: ${user.email}`);
       
       await transaction(async (client) => {
         // Suspend services
@@ -300,29 +360,33 @@ const checkOverduePayments = async () => {
         );
       });
       
-      // Send service suspension email
-      await sendServiceSuspensionEmail(
+      // Send service suspension email (with retries)
+      await sendEmailWithRetry(sendServiceSuspensionEmail, [
         user.email,
         user.first_name || 'User',
         'Payment overdue',
         user.total_cost
-      ).catch(err => console.error('Failed to send suspension email:', err));
+      ], {
+        userId: user.id,
+        billingId: user.billing_id,
+        type: 'service_suspension_email'
+      });
       
-      console.log('✅ Services suspended');
+  logger.info('✅ Services suspended');
     }
     
   } catch (error) {
-    console.error('❌ Error checking overdue payments:', error);
+    logger.error('❌ Error checking overdue payments:', error);
   }
 };
 
 // Schedule billing cycle for 1st of every month at 12:00 AM UTC
 export const startBillingScheduler = () => {
-  console.log('🚀 Starting billing scheduler...');
+  logger.info('🚀 Starting billing scheduler...');
   
   // Run on 1st of every month at 00:00 (midnight) UTC
   cron.schedule('0 0 1 * *', async () => {
-    console.log('\n⏰ Billing cycle triggered');
+  logger.info('\n⏰ Billing cycle triggered');
     await processBillingCycle();
   });
   
@@ -330,10 +394,19 @@ export const startBillingScheduler = () => {
   cron.schedule('0 1 * * *', async () => {
     await checkOverduePayments();
   });
+
+  // Cleanup expired refresh tokens daily at 02:00 AM UTC
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      await cleanupExpiredRefreshTokens();
+    } catch (err) {
+      logger.error('Failed to run refresh token cleanup:', err);
+    }
+  });
   
-  console.log('✅ Billing scheduler started');
-  console.log('📅 Billing cycle: 1st of every month at 00:00 UTC');
-  console.log('🔍 Overdue check: Daily at 01:00 UTC');
+  logger.info('✅ Billing scheduler started');
+  logger.info('📅 Billing cycle: 1st of every month at 00:00 UTC');
+  logger.info('🔍 Overdue check: Daily at 01:00 UTC');
 };
 
 // Manual trigger for testing

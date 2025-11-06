@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/validator.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import crypto from 'crypto';
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 // 1. CREATE EVENT SUBSCRIPTION
 export const createEventSubscription = asyncHandler(async (req, res) => {
@@ -239,11 +240,11 @@ export const triggerEvent = async (eventType, payload) => {
 
       // Attempt delivery (non-blocking)
       deliverWebhook(deliveryResult.rows[0].id, sub, eventType, payload).catch(err => {
-        console.error('Webhook delivery error:', err);
+        logger.error('Webhook delivery error:', err);
       });
     }
   } catch (error) {
-    console.error('Error triggering event:', error);
+    logger.error('Error triggering event:', error);
   }
 };
 

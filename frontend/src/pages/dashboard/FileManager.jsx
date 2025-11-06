@@ -81,7 +81,7 @@ const FileManager = () => {
       setBreadcrumbs([{ name: 'All Buckets', path: null }]);
     } catch (error) {
       toast.error('Failed to load buckets');
-      console.error('Error fetching buckets:', error);
+      logger.error('Error fetching buckets:', error);
     } finally {
       setLoading(false);
     }
@@ -128,7 +128,7 @@ const FileManager = () => {
       ]);
     } catch (error) {
       toast.error('Failed to load bucket contents');
-      console.error('Error fetching bucket contents:', error);
+      logger.error('Error fetching bucket contents:', error);
     } finally {
       setLoading(false);
     }
@@ -235,7 +235,7 @@ const FileManager = () => {
       fetchBucketContents();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to upload files');
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
     } finally {
       setUploading(false);
     }
@@ -257,7 +257,7 @@ const FileManager = () => {
       toast.success('Download started');
     } catch (error) {
       toast.error('Failed to download file');
-      console.error('Download error:', error);
+      logger.error('Download error:', error);
     }
   };
 
@@ -279,7 +279,7 @@ const FileManager = () => {
       }
     } catch (error) {
       toast.error(`Failed to delete ${type}`);
-      console.error('Delete error:', error);
+      logger.error('Delete error:', error);
     } finally {
       setConfirmModal({ isOpen: false, type: '', id: null, name: '' });
     }

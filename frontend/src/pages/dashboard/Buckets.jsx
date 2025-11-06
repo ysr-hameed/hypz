@@ -29,17 +29,17 @@ const Buckets = () => {
     try {
       setLoading(true);
       const response = await bucketAPI.getAll({ search: searchQuery });
-      console.log('📦 Fetch buckets response:', response);
+      logger.log('📦 Fetch buckets response:', response);
       
       // Backend returns: { success, message, data: { buckets: [], pagination: {} } }
       // Axios interceptor unwraps response.data
       // So we get: { success, message, data: { buckets: [], pagination: {} } }
       const bucketsData = response?.data?.buckets || [];
-      console.log('📦 Buckets data:', bucketsData);
+      logger.log('📦 Buckets data:', bucketsData);
       
       setBuckets(bucketsData);
     } catch (error) {
-      console.error('Failed to fetch buckets:', error);
+      logger.error('Failed to fetch buckets:', error);
       toast.error('Failed to load buckets');
     } finally {
       setLoading(false);
@@ -69,16 +69,16 @@ const Buckets = () => {
 
     try {
       setCreating(true);
-      console.log('Creating bucket with data:', bucketForm);
+      logger.log('Creating bucket with data:', bucketForm);
       const response = await bucketAPI.create(bucketForm);
-      console.log('Bucket created successfully:', response);
+      logger.log('Bucket created successfully:', response);
       toast.success('Bucket created successfully!');
       setShowCreateModal(false);
       setBucketForm({ name: '', visibility: 'private', description: '' });
       fetchBuckets();
     } catch (error) {
-      console.error('Failed to create bucket:', error);
-      console.error('Error response:', error.response);
+      logger.error('Failed to create bucket:', error);
+      logger.error('Error response:', error.response);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create bucket';
       toast.error(errorMessage);
     } finally {
@@ -96,7 +96,7 @@ const Buckets = () => {
       toast.success('Bucket deleted successfully');
       fetchBuckets();
     } catch (error) {
-      console.error('Failed to delete bucket:', error);
+      logger.error('Failed to delete bucket:', error);
       toast.error(error.response?.data?.message || 'Failed to delete bucket');
     }
   };

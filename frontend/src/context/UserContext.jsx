@@ -46,7 +46,7 @@ export const UserProvider = ({ children }) => {
         return null;
       }
     } catch (err) {
-      console.error('Error fetching user:', err);
+      logger.error('Error fetching user:', err);
       setError(err.message || 'Failed to load user data');
       
       // If unauthorized, clear user data

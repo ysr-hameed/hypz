@@ -2,6 +2,7 @@ import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
 import { createLemonSqueezyCheckout, verifyLemonSqueezyWebhook } from '../services/lemonSqueezyService.js';
+import logger from '../utils/logger.js';
 
 // Create Lemon Squeezy checkout
 export const createLemonSqueezyPayment = asyncHandler(async (req, res) => {
@@ -59,7 +60,7 @@ export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
   const isValid = verifyLemonSqueezyWebhook(payload, signature);
 
   if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Invalid signature' });
+    return errorResponse(res, 'Invalid signature', 400);
   }
 
   // Safely extract event data with null checks
@@ -67,8 +68,8 @@ export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
   const data = req.body?.data;
   
   if (!event || !data) {
-    console.error('Invalid webhook payload: missing event or data');
-    return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+    logger.error('Invalid webhook payload: missing event or data');
+    return errorResponse(res, 'Invalid webhook payload', 400);
   }
 
   if (event === 'order_created' || event === 'subscription_created') {
@@ -100,7 +101,7 @@ export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
     });
   }
 
-  res.status(200).json({ success: true });
+  return successResponse(res, null, 'Webhook processed', 200);
 });
 
 // Get payment history

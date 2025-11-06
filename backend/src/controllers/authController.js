@@ -15,6 +15,7 @@ import {
   sendWelcomeEmail
 } from '../utils/email.js';
 import { asyncHandler } from '../middleware/validator.js';
+import logger from '../utils/logger.js';
 
 // Register new user
 export const register = asyncHandler(async (req, res) => {
@@ -207,7 +208,7 @@ export const login = asyncHandler(async (req, res) => {
         }
       }
     } catch (err) {
-      console.error('Trusted device check failed:', err);
+      logger.error('Trusted device check failed:', err);
       // proceed to normal 2FA flow if anything fails
     }
   }
@@ -294,7 +295,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   try {
     await sendPasswordResetEmail(user.email, resetToken, user.first_name);
   } catch (error) {
-    console.error('Failed to send reset email:', error);
+    logger.error('Failed to send reset email:', error);
   }
 
   successResponse(res, null, 'If an account exists with this email, you will receive password reset instructions.');

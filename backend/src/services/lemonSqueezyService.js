@@ -1,20 +1,21 @@
 import { lemonSqueezySetup } from '@lemonsqueezy/lemonsqueezy.js';
 import config from '../config/config.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 // Initialize Lemon Squeezy
 const initializeLemonSqueezy = () => {
   if (!config.LEMONSQUEEZY_API_KEY) {
-    console.warn('⚠️  Lemon Squeezy API key not configured');
+    logger.warn('Lemon Squeezy API key not configured');
     return false;
   }
 
   lemonSqueezySetup({
     apiKey: config.LEMONSQUEEZY_API_KEY,
-    onError: (error) => console.error('Lemon Squeezy Error:', error)
+    onError: (error) => logger.error({ err: error }, 'Lemon Squeezy Error')
   });
 
-  console.log('✅ Lemon Squeezy initialized successfully');
+  logger.info('Lemon Squeezy initialized successfully');
   return true;
 };
 
@@ -33,7 +34,7 @@ export const createLemonSqueezyCheckout = async (variantId, customData = {}) => 
 
     return checkout.data;
   } catch (error) {
-    console.error('Error creating Lemon Squeezy checkout:', error);
+    logger.error({ err: error }, 'Error creating Lemon Squeezy checkout');
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const getLemonSqueezySubscription = async (subscriptionId) => {
     const subscription = await getSubscription(subscriptionId);
     return subscription.data;
   } catch (error) {
-    console.error('Error getting Lemon Squeezy subscription:', error);
+    logger.error({ err: error }, 'Error getting Lemon Squeezy subscription');
     throw error;
   }
 };
@@ -63,7 +64,7 @@ export const cancelLemonSqueezySubscription = async (subscriptionId) => {
     const result = await cancelSubscription(subscriptionId);
     return result.data;
   } catch (error) {
-    console.error('Error canceling Lemon Squeezy subscription:', error);
+    logger.error({ err: error }, 'Error canceling Lemon Squeezy subscription');
     throw error;
   }
 };
@@ -78,7 +79,7 @@ export const updateLemonSqueezySubscription = async (subscriptionId, data) => {
     const result = await updateSubscription(subscriptionId, data);
     return result.data;
   } catch (error) {
-    console.error('Error updating Lemon Squeezy subscription:', error);
+    logger.error({ err: error }, 'Error updating Lemon Squeezy subscription');
     throw error;
   }
 };
@@ -88,9 +89,13 @@ export const verifyLemonSqueezyWebhook = (payload, signature) => {
   try {
     const hmac = crypto.createHmac('sha256', config.LEMONSQUEEZY_WEBHOOK_SECRET);
     const digest = hmac.update(payload).digest('hex');
-    return digest === signature;
+    // Use timingSafeEqual to prevent timing attacks
+    const sigBuffer = Buffer.from(signature || '', 'utf8');
+    const digestBuffer = Buffer.from(digest, 'utf8');
+    if (sigBuffer.length !== digestBuffer.length) return false;
+    return crypto.timingSafeEqual(digestBuffer, sigBuffer);
   } catch (error) {
-    console.error('Error verifying Lemon Squeezy webhook:', error);
+    logger.error({ err: error }, 'Error verifying Lemon Squeezy webhook');
     return false;
   }
 };
@@ -108,7 +113,7 @@ export const getLemonSqueezyProducts = async () => {
 
     return products.data;
   } catch (error) {
-    console.error('Error getting Lemon Squeezy products:', error);
+    logger.error({ err: error }, 'Error getting Lemon Squeezy products');
     throw error;
   }
 };

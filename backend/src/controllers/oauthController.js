@@ -8,6 +8,7 @@ import {
 import { asyncHandler } from '../middleware/validator.js';
 import axios from 'axios';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
 
 // Google OAuth Login
 export const googleOAuth = asyncHandler(async (req, res) => {
@@ -101,7 +102,7 @@ export const googleOAuth = asyncHandler(async (req, res) => {
     }, 'Login successful');
 
   } catch (error) {
-    console.error('Google OAuth error:', error);
+    logger.error('Google OAuth error:', error);
     return errorResponse(res, 'Google authentication failed', 500);
   }
 });
@@ -214,7 +215,7 @@ export const githubOAuth = asyncHandler(async (req, res) => {
     }, 'Login successful');
 
   } catch (error) {
-    console.error('GitHub OAuth error:', error);
+    logger.error('GitHub OAuth error:', error);
     return errorResponse(res, 'GitHub authentication failed', 500);
   }
 });

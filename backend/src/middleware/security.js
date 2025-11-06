@@ -5,6 +5,8 @@ import compression from 'compression';
 import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
+import { errorResponse } from '../utils/helpers.js';
 
 // Smart rate limiter - only applies to API key usage, not JWT authenticated requests
 export const apiLimiter = rateLimit({
@@ -58,7 +60,7 @@ export const uploadLimiter = rateLimit({
 // CORS configuration
 export const corsOptions = {
   origin: function (origin, callback) {
-    console.log('🌐 CORS check - Origin:', origin, 'Environment:', config.NODE_ENV);
+  logger.debug({ origin, env: config.NODE_ENV }, 'CORS check - Origin');
     
     // In development, be very permissive
     if (config.NODE_ENV === 'development') {
@@ -87,10 +89,9 @@ export const corsOptions = {
       return callback(null, true);
     }
     
-    // Log and reject
-    console.warn('⚠️  CORS blocked origin:', origin);
-    console.warn('   Allowed origins:', allowedOrigins);
-    callback(new Error('Not allowed by CORS'));
+  // Log and reject
+  logger.warn({ origin, allowedOrigins }, 'CORS blocked origin');
+  callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,
@@ -126,7 +127,7 @@ export const compressionConfig = compression({
 
 // Error handling middleware
 export const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error('Error:', err);
 
   // Mongoose/MongoDB errors
   if (err.name === 'ValidationError') {
@@ -182,7 +183,7 @@ export const requestLogger = (req, res, next) => {
   
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`${req.method} ${req.originalUrl} - ${res.statusCode} - ${duration}ms`);
+    logger.info({ method: req.method, url: req.originalUrl, status: res.statusCode, duration }, 'Request completed');
   });
   
   next();

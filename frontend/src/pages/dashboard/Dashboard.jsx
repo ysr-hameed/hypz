@@ -119,7 +119,7 @@ const Dashboard = () => {
           }
         ]);
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
+        logger.error('Error fetching dashboard data:', err);
       } finally {
         setLoading(false);
       }

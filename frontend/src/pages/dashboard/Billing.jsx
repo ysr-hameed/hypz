@@ -49,7 +49,7 @@ const Billing = () => {
         setUsageCost(usageRes.data.data || usageRes.data);
       } catch (err) {
         // Not a PAYG user or no usage yet
-        console.log('No usage cost data');
+        logger.log('No usage cost data');
       }
 
       // Fetch payment history
@@ -58,7 +58,7 @@ const Billing = () => {
         const historyData = historyRes.data.data || historyRes.data;
         setPaymentHistory(historyData.payments || historyData || []);
       } catch (err) {
-        console.error('Failed to fetch payment history:', err);
+        logger.error('Failed to fetch payment history:', err);
         setPaymentHistory([]);
       }
 
@@ -68,12 +68,12 @@ const Billing = () => {
         const invoicesData = invoicesRes.data.data || invoicesRes.data;
         setPendingInvoices(invoicesData.invoices || invoicesData || []);
       } catch (err) {
-        console.log('No pending invoices');
+        logger.log('No pending invoices');
         setPendingInvoices([]);
       }
 
     } catch (error) {
-      console.error('Failed to load billing data:', error);
+      logger.error('Failed to load billing data:', error);
       toast.error('Failed to load billing information');
     } finally {
       setLoading(false);

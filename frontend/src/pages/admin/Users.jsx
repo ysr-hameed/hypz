@@ -44,7 +44,7 @@ const AdminUsersPage = () => {
       setTotalPages(response.data?.pagination?.totalPages || 1);
       setTotalUsers(response.data?.pagination?.totalUsers || 0);
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      logger.error('Failed to fetch users:', error);
     } finally {
       setLoading(false);
     }
@@ -55,7 +55,7 @@ const AdminUsersPage = () => {
       await adminAPI.updateUserStatus(userId, !currentStatus);
       fetchUsers();
     } catch (error) {
-      console.error('Failed to update user status:', error);
+      logger.error('Failed to update user status:', error);
     }
   };
 

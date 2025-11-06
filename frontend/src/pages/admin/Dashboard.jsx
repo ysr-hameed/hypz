@@ -36,7 +36,7 @@ const AdminDashboardPage = () => {
       setRecentUsers(usersRes.data?.users || []);
       setRecentActivity(activityRes.data?.logs || []);
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      logger.error('Failed to fetch dashboard data:', error);
     } finally {
       setLoading(false);
     }

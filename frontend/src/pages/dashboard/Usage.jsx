@@ -41,13 +41,13 @@ const Usage = () => {
       
       // Fetch current usage
       const usageResponse = await usageAPI.getCurrent();
-      console.log('Usage Response:', usageResponse);
+      logger.log('Usage Response:', usageResponse);
       // Backend returns: { success, message, data: {...} }
       setCurrentUsage(usageResponse?.data || usageResponse);
       
       // Fetch plan data
       const planResponse = await plansAPI.getUserPlan();
-      console.log('Plan Response:', planResponse);
+      logger.log('Plan Response:', planResponse);
       // Backend returns: { success, message, data: {...} }
       setPlanData(planResponse?.data || planResponse);
       
@@ -57,12 +57,12 @@ const Usage = () => {
       
       // Fetch historical data
       const historyResponse = await usageAPI.getHistory(parseInt(timeframe));
-      console.log('History Response:', historyResponse);
+      logger.log('History Response:', historyResponse);
       // Backend returns: { success, message, data: { history: [...] } }
       setHistoricalData(historyResponse?.data?.history || historyResponse?.history || []);
       
     } catch (error) {
-      console.error('Error fetching usage data:', error);
+      logger.error('Error fetching usage data:', error);
       toast.error('Failed to load usage data');
       // Set fallback data to prevent undefined errors
       setCurrentUsage({

@@ -37,17 +37,17 @@
 
 ---
 
-### 2. **Silent Error Handling - Errors Swallowed by console.log**
+### 2. **Silent Error Handling - Errors Swallowed by logger.log**
 **Files:** `fileController.js` (7 instances), `auth.js` (1 instance)
 
 ❌ **ISSUE:**
 ```javascript
 // fileController.js - Multiple locations
-.catch(err => console.error('Failed to update download count:', err));
-.catch(err => console.error('Failed to update usage:', err));
+.catch(err => logger.error('Failed to update download count:', err));
+.catch(err => logger.error('Failed to update usage:', err));
 
 // auth.js line 174
-.catch(err => console.error('Failed to update API key last_used:', err.message));
+.catch(err => logger.error('Failed to update API key last_used:', err.message));
 ```
 
 **Impact:** 
@@ -225,7 +225,7 @@ const fallbackPlanResult = await query(
 try {
   // Trusted device validation
 } catch (err) {
-  console.error('Trusted device check failed:', err);
+  logger.error('Trusted device check failed:', err);
   // proceed to normal 2FA flow if anything fails
 }
 ```
@@ -324,7 +324,7 @@ const ip = req.ip; // others
 
 ### Immediate Actions Required:
 1. ✅ **Implement all TODO email notifications** (billing, webhooks)
-2. ✅ **Fix silent error handling** (replace console.error with logging)
+2. ✅ **Fix silent error handling** (replace logger.error with logging)
 3. ✅ **Standardize error responses** (use errorResponse everywhere)
 4. ✅ **Add query parameter validation** (limits, offsets, status)
 5. ✅ **Fix webhook signature timing safety**

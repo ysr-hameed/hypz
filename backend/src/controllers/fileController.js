@@ -7,6 +7,7 @@ import { generateUniqueFilename, formatBytes, successResponse, errorResponse, pa
 import { asyncHandler } from '../middleware/validator.js';
 import { uploadToB2, deleteFromB2, isB2Available } from '../services/b2Service.js';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage(); // Use memory storage for B2
@@ -196,7 +197,7 @@ export const uploadFile = asyncHandler(async (req, res) => {
     //   throw dbError;
     // }
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error:', error);
     return errorResponse(res, 'Failed to upload file: ' + error.message, 500);
   }
 });
@@ -317,7 +318,7 @@ export const downloadFile = asyncHandler(async (req, res) => {
   }
 
   const file = result.rows[0];
-  console.log('Download request for file:', {
+  logger.info('Download request for file:', {
     id: file.id,
     path: file.path,
     url: file.url,
@@ -327,7 +328,7 @@ export const downloadFile = asyncHandler(async (req, res) => {
 
   // Increment download counter (non-blocking)
   query('UPDATE files SET downloads = downloads + 1 WHERE id = $1', [fileId])
-    .catch(err => console.error('Failed to update download count:', err));
+    .catch(err => logger.error('Failed to update download count:', err));
 
   // Update bandwidth usage (non-blocking; conservative if size unknown later)
   query(
@@ -341,7 +342,7 @@ export const downloadFile = asyncHandler(async (req, res) => {
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [userId, new Date().toISOString().slice(0, 10), file.size || 0]
-  ).catch(err => console.error('Failed to update usage:', err));
+  ).catch(err => logger.error('Failed to update usage:', err));
 
   // If stored in Backblaze B2, stream or redirect appropriately
   if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
@@ -360,7 +361,7 @@ export const downloadFile = asyncHandler(async (req, res) => {
       }
       return res.send(data);
     } catch (err) {
-      console.error('B2 download failed, falling back:', err);
+      logger.error('B2 download failed, falling back:', err);
       // If B2 streaming fails but URL exists, try redirect as last resort
       if (file.url) {
         return res.redirect(file.url);
@@ -374,7 +375,7 @@ export const downloadFile = asyncHandler(async (req, res) => {
     await fs.access(file.path);
     return res.download(file.path, file.original_name);
   } catch (error) {
-    console.error('Local download failed:', error?.message || error);
+    logger.error('Local download failed:', error?.message || error);
     return errorResponse(res, 'File not found on server', 404);
   }
 });
@@ -478,7 +479,7 @@ export const downloadFileSigned = asyncHandler(async (req, res) => {
 
   // Non-blocking metrics
   query('UPDATE files SET downloads = downloads + 1 WHERE id = $1', [fileId])
-    .catch(err => console.error('Failed to update download count:', err));
+    .catch(err => logger.error('Failed to update download count:', err));
   query(
     `INSERT INTO usage_records (user_id, date, bandwidth_bytes, download_bytes, download_calls, api_calls)
      VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
@@ -490,7 +491,7 @@ export const downloadFileSigned = asyncHandler(async (req, res) => {
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [file.user_id, file.size || 0]
-  ).catch(err => console.error('Failed to update usage:', err));
+  ).catch(err => logger.error('Failed to update usage:', err));
 
   // B2 or local
   if (file.b2_file_id || (file.url && file.url.includes('/file/'))) {
@@ -505,7 +506,7 @@ export const downloadFileSigned = asyncHandler(async (req, res) => {
       }
       return res.send(data);
     } catch (err) {
-      console.error('B2 download-signed failed:', err);
+      logger.error('B2 download-signed failed:', err);
       if (file.url) return res.redirect(file.url);
       return errorResponse(res, 'File not available', 404);
     }
@@ -564,7 +565,7 @@ export const deleteFile = asyncHandler(async (req, res) => {
       await fs.unlink(file.path);
     }
   } catch (error) {
-    console.error('Failed to delete physical file:', error);
+    logger.error('Failed to delete physical file:', error);
     // Continue anyway as database record is already deleted
   }
 
@@ -653,7 +654,7 @@ export const publicDownloadFile = asyncHandler(async (req, res) => {
   query(
     'UPDATE files SET downloads = downloads + 1 WHERE id = $1',
     [fileId]
-  ).catch(err => console.error('Failed to update download count:', err));
+  ).catch(err => logger.error('Failed to update download count:', err));
 
   // Update bandwidth usage (non-blocking)
   query(
@@ -667,7 +668,7 @@ export const publicDownloadFile = asyncHandler(async (req, res) => {
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [file.user_id, file.size]
-  ).catch(err => console.error('Failed to update usage:', err));
+  ).catch(err => logger.error('Failed to update usage:', err));
 
   // If using Backblaze B2, redirect to B2 URL
   if (file.url) {
@@ -738,7 +739,7 @@ export const bulkDeleteFiles = asyncHandler(async (req, res) => {
         await fs.unlink(file.path);
       }
     } catch (error) {
-      console.error('Failed to delete physical file:', file.id, error);
+      logger.error('Failed to delete physical file:', file.id, error);
     }
   });
 
@@ -870,7 +871,7 @@ export const bulkDownloadFiles = asyncHandler(async (req, res) => {
        api_calls = usage_records.api_calls + 1,
        updated_at = CURRENT_TIMESTAMP`,
     [userId, totalSize, files.length]
-  ).catch(err => console.error('Failed to update usage:', err));
+  ).catch(err => logger.error('Failed to update usage:', err));
 
   // Log activity
   await query(
@@ -924,6 +925,107 @@ export const bulkMoveFiles = asyncHandler(async (req, res) => {
   );
 
   successResponse(res, { movedCount: result.rows.length }, 'Files moved successfully');
+});
+
+// Move single file to another bucket (change visibility by moving between buckets)
+export const moveFileToBucket = asyncHandler(async (req, res) => {
+  const { fileId } = req.params;
+  const { targetBucketId } = req.body;
+  const userId = req.user.id;
+
+  if (!targetBucketId) {
+    return errorResponse(res, 'targetBucketId is required', 400);
+  }
+
+  // Fetch file and ensure ownership
+  const fileResult = await query('SELECT * FROM files WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL', [fileId, userId]);
+  if (fileResult.rows.length === 0) {
+    return errorResponse(res, 'File not found', 404);
+  }
+
+  const file = fileResult.rows[0];
+
+  // Verify target bucket ownership
+  const targetBucket = await query('SELECT id, visibility FROM buckets WHERE id = $1 AND user_id = $2', [targetBucketId, userId]);
+  if (targetBucket.rows.length === 0) {
+    return errorResponse(res, 'Target bucket not found', 404);
+  }
+
+  const targetVisibility = targetBucket.rows[0].visibility;
+  const targetIsPublic = targetVisibility === 'public';
+
+  // If already in target bucket, nothing to do
+  if (file.bucket_id === targetBucketId) {
+    return successResponse(res, file, 'File already in target bucket');
+  }
+
+  // Perform copy/move if file is stored in B2
+  try {
+    const { streamById, downloadFromB2, uploadToB2, deleteFromB2, isB2Available } = await import('../services/b2Service.js');
+
+    // Use a transaction to update DB atomically
+    const updatedFile = await transaction(async (client) => {
+      let newPath = file.path;
+      let newUrl = file.url;
+      let newCdnUrl = file.cdn_url;
+      let newB2FileId = file.b2_file_id;
+
+      if (isB2Available() && file.b2_file_id) {
+        // Stream file from B2 and re-upload to target bucket
+        const stream = await streamById(file.b2_file_id);
+
+        // Collect stream into buffer
+        const chunks = [];
+        for await (const chunk of stream) {
+          chunks.push(Buffer.from(chunk));
+        }
+        const fileBuffer = Buffer.concat(chunks);
+
+        // Upload to target bucket (this will select bucket inside uploadToB2)
+        const uniqueFilename = file.filename || file.path || `${file.id}-${Date.now()}`;
+        const targetPath = `${file.user_id || userId}/${targetBucketId}/${uniqueFilename}`;
+
+        const uploadResult = await uploadToB2(fileBuffer, targetPath, file.mime_type || 'application/octet-stream', targetIsPublic);
+
+        newPath = uploadResult.fileName || targetPath;
+        newUrl = uploadResult.url;
+        newCdnUrl = uploadResult.url;
+        newB2FileId = uploadResult.fileId;
+
+        // Try to delete old file from B2 (best-effort)
+        try {
+          if (file.b2_file_id) {
+            await deleteFromB2(file.b2_file_id, file.path);
+          }
+        } catch (delErr) {
+          logger.error('Failed to delete old B2 file after move:', delErr);
+        }
+      } else {
+        // Local storage: no physical move required since uploads are per-user directory
+        // Only update DB mapping
+      }
+
+      // Update DB record
+      const updateResult = await client.query(
+        `UPDATE files SET bucket_id = $1, path = $2, url = $3, cdn_url = $4, b2_file_id = $5, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6 AND user_id = $7 RETURNING *`,
+        [targetBucketId, newPath, newUrl, newCdnUrl, newB2FileId, fileId, userId]
+      );
+
+      // Log activity
+      await client.query(
+        'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
+        [userId, 'file_moved', 'file', fileId, { fromBucket: file.bucket_id, toBucket: targetBucketId }]
+      );
+
+      return updateResult.rows[0];
+    });
+
+    return successResponse(res, updatedFile, 'File moved successfully');
+  } catch (error) {
+    logger.error('Failed to move file:', error);
+    return errorResponse(res, 'Failed to move file: ' + error.message, 500);
+  }
 });
 
 // Bulk upload files

@@ -1,5 +1,6 @@
 import pg from 'pg';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
 
 const { Pool } = pg;
 
@@ -25,11 +26,11 @@ const pool = new Pool({
 
 // Test database connection
 pool.on('connect', () => {
-  console.log('✅ Database connected successfully');
+  logger.info('Database connected successfully');
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected database error:', err);
+  logger.error({ err }, 'Unexpected database error');
   process.exit(-1);
 });
 
@@ -53,7 +54,7 @@ export const query = async (text, params, options = {}) => {
     
     // Only log slow queries in production
     if (duration > 1000 || process.env.NODE_ENV !== 'production') {
-      console.log('Executed query', { text: text.substring(0, 100), duration, rows: res.rowCount });
+      logger.info({ text: text.substring(0, 100), duration, rows: res.rowCount }, 'Executed query');
     }
     
     // Cache result if enabled
@@ -70,7 +71,7 @@ export const query = async (text, params, options = {}) => {
     
     return res;
   } catch (error) {
-    console.error('Database query error:', error.message);
+    logger.error({ err: error }, 'Database query error');
     throw error;
   }
 };

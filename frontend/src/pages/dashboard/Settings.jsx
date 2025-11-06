@@ -99,10 +99,10 @@ const Settings = () => {
         () => twoFactorAPI.get2FAStatus(),
         30000 // 30 second cache
       );
-      console.log('2FA Status fetched:', response.data);
+      logger.log('2FA Status fetched:', response.data);
       setTwoFactorStatus(response.data);
     } catch (error) {
-      console.error('Failed to get 2FA status:', error);
+      logger.error('Failed to get 2FA status:', error);
       setTwoFactorStatus({ enabled: false, backupCodesCount: 0 });
     }
   };
@@ -119,7 +119,7 @@ const Settings = () => {
       );
       setTrustedDevices(res.data.devices || []);
     } catch (error) {
-      console.error('Failed to fetch trusted devices:', error);
+      logger.error('Failed to fetch trusted devices:', error);
       setTrustedDevices([]);
     }
   };
@@ -227,7 +227,7 @@ const Settings = () => {
         productUpdates: response.data.product_updates
       });
     } catch (error) {
-      console.error('Failed to fetch notification preferences:', error);
+      logger.error('Failed to fetch notification preferences:', error);
     }
   };
 

@@ -28,7 +28,7 @@ export const PlanProvider = ({ children }) => {
       setError(null);
     } catch (err) {
       setError(err.message);
-      console.error('Failed to load user plan:', err);
+      logger.error('Failed to load user plan:', err);
     } finally {
       setLoading(false);
     }

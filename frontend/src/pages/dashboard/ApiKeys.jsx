@@ -31,7 +31,7 @@ const ApiKeys = () => {
       const response = await apiKeyAPI.getAll();
       setApiKeys(response.data || []);
     } catch (error) {
-      console.error('Failed to fetch API keys:', error);
+      logger.error('Failed to fetch API keys:', error);
       toast.error('Failed to load API keys');
     } finally {
       setLoading(false);

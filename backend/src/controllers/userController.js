@@ -1,5 +1,7 @@
+import logger from '../utils/logger.js';
 import { query } from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import { successResponse, errorResponse } from '../utils/helpers.js';
 
 // Get user profile
 export const getProfile = async (req, res) => {
@@ -17,16 +19,13 @@ export const getProfile = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return errorResponse(res, 'User not found', 404);
     }
 
-    res.json({
-      success: true,
-      data: result.rows[0]
-    });
+    return successResponse(res, result.rows[0]);
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Get profile error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -60,7 +59,7 @@ export const updateProfile = async (req, res) => {
     }
 
     if (updates.length === 0) {
-      return res.status(400).json({ message: 'No fields to update' });
+      return errorResponse(res, 'No fields to update', 400);
     }
 
     // Add updated_at
@@ -83,14 +82,10 @@ export const updateProfile = async (req, res) => {
       [userId, 'profile_updated', JSON.stringify({ firstName, lastName })]
     );
 
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: result.rows[0]
-    });
+    return successResponse(res, result.rows[0], 'Profile updated successfully');
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Update profile error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -101,11 +96,11 @@ export const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Current and new password are required' });
+      return errorResponse(res, 'Current and new password are required', 400);
     }
 
     if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+      return errorResponse(res, 'New password must be at least 8 characters long', 400);
     }
 
     // Get current password hash
@@ -115,13 +110,13 @@ export const changePassword = async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return errorResponse(res, 'User not found', 404);
     }
 
     // Verify current password
     const isValidPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password);
     if (!isValidPassword) {
-      return res.status(401).json({ message: 'Current password is incorrect' });
+      return errorResponse(res, 'Current password is incorrect', 401);
     }
 
     // Hash new password
@@ -142,13 +137,10 @@ export const changePassword = async (req, res) => {
       [userId, 'password_changed', JSON.stringify({ timestamp: new Date() }), req.ip]
     );
 
-    res.json({
-      success: true,
-      message: 'Password changed successfully'
-    });
+    return successResponse(res, null, 'Password changed successfully');
   } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Change password error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -175,13 +167,10 @@ export const getNotificationPreferences = async (req, res) => {
       );
     }
 
-    res.json({
-      success: true,
-      data: result.rows[0]
-    });
+    return successResponse(res, result.rows[0]);
   } catch (error) {
-    console.error('Get notification preferences error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Get notification preferences error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -240,7 +229,7 @@ export const updateNotificationPreferences = async (req, res) => {
     }
 
     if (updates.length === 0) {
-      return res.status(400).json({ message: 'No preferences to update' });
+      return errorResponse(res, 'No preferences to update', 400);
     }
 
     // Add updated_at
@@ -277,14 +266,10 @@ export const updateNotificationPreferences = async (req, res) => {
       [userId, 'notification_preferences_updated', JSON.stringify(req.body)]
     );
 
-    res.json({
-      success: true,
-      message: 'Notification preferences updated successfully',
-      data: result.rows[0]
-    });
+    return successResponse(res, result.rows[0], 'Notification preferences updated successfully');
   } catch (error) {
-    console.error('Update notification preferences error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Update notification preferences error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -295,11 +280,11 @@ export const deleteAccount = async (req, res) => {
     const { password, confirmation } = req.body;
 
     if (!password) {
-      return res.status(400).json({ message: 'Password is required' });
+      return errorResponse(res, 'Password is required', 400);
     }
 
     if (confirmation !== 'DELETE') {
-      return res.status(400).json({ message: 'Please type DELETE to confirm' });
+      return errorResponse(res, 'Please type DELETE to confirm', 400);
     }
 
     // Verify password
@@ -309,12 +294,12 @@ export const deleteAccount = async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return errorResponse(res, 'User not found', 404);
     }
 
     const isValidPassword = await bcrypt.compare(password, userResult.rows[0].password);
     if (!isValidPassword) {
-      return res.status(401).json({ message: 'Incorrect password' });
+      return errorResponse(res, 'Incorrect password', 401);
     }
 
     // Log activity before deletion
@@ -332,12 +317,9 @@ export const deleteAccount = async (req, res) => {
       [userId]
     );
 
-    res.json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
+    return successResponse(res, null, 'Account deleted successfully');
   } catch (error) {
-    console.error('Delete account error:', error);
-    res.status(500).json({ message: 'Server error' });
+    logger.error({ err: error }, 'Delete account error');
+    return errorResponse(res, 'Server error', 500);
   }
 };

@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { successResponse, errorResponse, formatBytes } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
+import logger from '../utils/logger.js';
 
 // Get current usage
 export const getCurrentUsage = asyncHandler(async (req, res) => {
@@ -248,6 +249,6 @@ export const trackApiCall = async (userId) => {
       [userId]
     );
   } catch (error) {
-    console.error('Failed to track API call:', error);
+    logger.error({ err: error }, 'Failed to track API call');
   }
 };

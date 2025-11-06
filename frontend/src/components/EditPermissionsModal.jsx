@@ -33,7 +33,7 @@ const EditPermissionsModal = ({
       await onSave(permissions);
       onClose();
     } catch (error) {
-      console.error('Failed to save permissions:', error);
+      logger.error('Failed to save permissions:', error);
     } finally {
       setSaving(false);
     }

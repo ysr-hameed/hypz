@@ -3,6 +3,7 @@ import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { sendWebhookNotificationEmail } from '../utils/email.js';
 import config from '../config/config.js';
+import logger from '../utils/logger.js';
 
 /**
  * LemonSqueezy Webhook Handler
@@ -18,7 +19,7 @@ import config from '../config/config.js';
 // Verify LemonSqueezy webhook signature
 const verifyWebhookSignature = (payload, signature) => {
   if (!config.LEMONSQUEEZY_WEBHOOK_SECRET) {
-    console.warn('⚠️  LemonSqueezy webhook secret not configured');
+    logger.warn('LemonSqueezy webhook secret not configured');
     return false;
   }
 
@@ -27,7 +28,7 @@ const verifyWebhookSignature = (payload, signature) => {
     const digest = hmac.update(payload).digest('hex');
     return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
   } catch (error) {
-    console.error('❌ Signature verification error:', error);
+    logger.error({ err: error }, 'Signature verification error');
     return false;
   }
 };
@@ -39,7 +40,7 @@ export const handleLemonSqueezyWebhook = async (req, res) => {
     const signature = req.headers['x-signature'];
     
     if (!signature) {
-      console.error('❌ No signature header found');
+      logger.warn('No signature header found on webhook');
       return errorResponse(res, 'No signature provided', 400);
     }
 
@@ -48,7 +49,7 @@ export const handleLemonSqueezyWebhook = async (req, res) => {
     const isValid = verifyWebhookSignature(rawBody, signature);
 
     if (!isValid) {
-      console.error('❌ Invalid webhook signature');
+      logger.warn('Invalid webhook signature');
       return errorResponse(res, 'Invalid signature', 401);
     }
 
@@ -57,19 +58,18 @@ export const handleLemonSqueezyWebhook = async (req, res) => {
     const eventName = meta.event_name;
     const eventId = meta.custom_data?.event_id || `${eventName}_${Date.now()}`;
 
-    console.log(`📥 LemonSqueezy Webhook: ${eventName}`);
-    console.log(`🆔 Event ID: ${eventId}`);
+  logger.info({ event: eventName, eventId }, 'Received LemonSqueezy webhook');
 
-    // Respond immediately to LemonSqueezy (best practice)
-    res.status(200).json({ received: true });
+  // Respond immediately to LemonSqueezy (best practice)
+  return successResponse(res, { received: true }, 'Webhook received', 200);
 
     // Process webhook asynchronously
     await processWebhookEvent(eventName, data, meta);
 
   } catch (error) {
-    console.error('❌ Webhook processing error:', error);
+    logger.error({ err: error }, 'Webhook processing error');
     // Still return 200 to avoid retries for unrecoverable errors
-    return res.status(200).json({ received: true, error: error.message });
+    return successResponse(res, { received: true, error: error.message }, 'Webhook processed with errors', 200);
   }
 };
 
@@ -113,24 +113,24 @@ const processWebhookEvent = async (eventName, data, meta) => {
         break;
 
       default:
-        console.log(`ℹ️  Unhandled event: ${eventName}`);
+        logger.info({ eventName }, 'Unhandled webhook event');
     }
   } catch (error) {
-    console.error(`❌ Error processing ${eventName}:`, error);
+    logger.error({ err: error, eventName }, `Error processing ${eventName}`);
     throw error;
   }
 };
 
 // Handle order created (one-time purchase or initial subscription setup)
 const handleOrderCreated = async (data, attributes, customData) => {
-  console.log('💰 Processing order_created');
+  logger.info('Processing order_created');
 
   const userId = customData.userId;
   const planId = customData.planId;
   const orderId = data.id;
 
   if (!userId) {
-    console.error('❌ No userId in custom_data');
+    logger.warn('No userId in webhook custom_data for order_created');
     return;
   }
 
@@ -162,12 +162,12 @@ const handleOrderCreated = async (data, attributes, customData) => {
     );
   });
 
-  console.log('✅ Order created successfully');
+  logger.info('Order created successfully');
 };
 
 // Handle subscription created
 const handleSubscriptionCreated = async (data, attributes, customData) => {
-  console.log('🎉 Processing subscription_created');
+  logger.info('Processing subscription_created');
 
   const userId = customData.userId || attributes.user_email; // fallback to email
   const planId = customData.planId;
@@ -175,7 +175,7 @@ const handleSubscriptionCreated = async (data, attributes, customData) => {
   const customerId = attributes.customer_id;
 
   if (!userId) {
-    console.error('❌ No userId found');
+    logger.warn('No userId found for subscription_created');
     return;
   }
 
@@ -227,12 +227,12 @@ const handleSubscriptionCreated = async (data, attributes, customData) => {
     );
   });
 
-  console.log('✅ Subscription created successfully');
+  logger.info('Subscription created successfully');
 };
 
 // Handle subscription updated
 const handleSubscriptionUpdated = async (data, attributes, customData) => {
-  console.log('🔄 Processing subscription_updated');
+  logger.info('Processing subscription_updated');
 
   const subscriptionId = data.id;
 
@@ -267,12 +267,12 @@ const handleSubscriptionUpdated = async (data, attributes, customData) => {
     );
   });
 
-  console.log('✅ Subscription updated successfully');
+  logger.info('Subscription updated successfully');
 };
 
 // Handle successful payment
 const handleSubscriptionPaymentSuccess = async (data, attributes, customData) => {
-  console.log('💳 Processing subscription_payment_success');
+  logger.info('Processing subscription_payment_success');
 
   const subscriptionId = attributes.subscription_id;
   const orderId = data.id;
@@ -285,7 +285,7 @@ const handleSubscriptionPaymentSuccess = async (data, attributes, customData) =>
     );
 
     if (subResult.rows.length === 0) {
-      console.error('❌ Subscription not found');
+      logger.warn('Subscription not found for payment success');
       return;
     }
 
@@ -327,12 +327,12 @@ const handleSubscriptionPaymentSuccess = async (data, attributes, customData) =>
     );
   });
 
-  console.log('✅ Payment recorded successfully');
+  logger.info('Payment recorded successfully');
 };
 
 // Handle failed payment
 const handleSubscriptionPaymentFailed = async (data, attributes, customData) => {
-  console.log('❌ Processing subscription_payment_failed');
+  logger.info('Processing subscription_payment_failed');
 
   const subscriptionId = attributes.subscription_id;
 
@@ -344,7 +344,7 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
     );
 
     if (subResult.rows.length === 0) {
-      console.error('❌ Subscription not found');
+      logger.warn('Subscription not found for payment failure handling');
       return;
     }
 
@@ -375,7 +375,7 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
     );
   });
 
-  console.log('⚠️  Payment failed, grace period set');
+  logger.info('Payment failed, grace period set');
   
   // Send email notification
   const userResult = await query(
@@ -390,13 +390,13 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
       'Payment Failed',
       { subscriptionId, gracePeriodEnd: gracePeriodEnd.toLocaleDateString(), status: 'grace_period' },
       new Date().toISOString()
-    ).catch(err => console.error('Failed to send webhook notification:', err));
+    ).catch(err => logger.warn({ err }, 'Failed to send webhook notification'));
   }
 };
 
 // Handle subscription cancelled
 const handleSubscriptionCancelled = async (data, attributes, customData) => {
-  console.log('🚫 Processing subscription_cancelled');
+  logger.info('Processing subscription_cancelled');
 
   const subscriptionId = data.id;
 
@@ -434,12 +434,12 @@ const handleSubscriptionCancelled = async (data, attributes, customData) => {
     }
   });
 
-  console.log('✅ Subscription cancelled');
+  logger.info('Subscription cancelled');
 };
 
 // Handle subscription resumed
 const handleSubscriptionResumed = async (data, attributes, customData) => {
-  console.log('▶️  Processing subscription_resumed');
+  logger.info('Processing subscription_resumed');
 
   const subscriptionId = data.id;
 
@@ -464,12 +464,12 @@ const handleSubscriptionResumed = async (data, attributes, customData) => {
     );
   });
 
-  console.log('✅ Subscription resumed');
+  logger.info('Subscription resumed');
 };
 
 // Handle subscription expired
 const handleSubscriptionExpired = async (data, attributes, customData) => {
-  console.log('⏰ Processing subscription_expired');
+  logger.info('Processing subscription_expired');
 
   const subscriptionId = data.id;
 
@@ -493,7 +493,7 @@ const handleSubscriptionExpired = async (data, attributes, customData) => {
     );
   });
 
-  console.log('✅ Subscription expired');
+  logger.info('Subscription expired');
 };
 
 export default handleLemonSqueezyWebhook;

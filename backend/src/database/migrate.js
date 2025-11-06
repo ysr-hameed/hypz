@@ -1,8 +1,9 @@
 import { query } from '../config/database.js';
+import logger from '../utils/logger.js';
 
 const createTables = async () => {
   try {
-    console.log('🔄 Creating database tables...');
+  logger.info('Creating database tables...');
 
     // Users table - CLEANED (removed email_verification_token)
     await query(`
@@ -133,7 +134,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created storage_classes table');
+  logger.info('Created storage_classes table');
 
     // Insert default storage classes
     await query(`
@@ -157,7 +158,7 @@ const createTables = async () => {
         transitioned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created storage_class_transitions table');
+  logger.info('Created storage_class_transitions table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_transitions_file ON storage_class_transitions(file_id);
@@ -188,7 +189,7 @@ const createTables = async () => {
         aborted_at TIMESTAMP
       );
     `);
-    console.log('✅ Created multipart_uploads table');
+  logger.info('Created multipart_uploads table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_multipart_user ON multipart_uploads(user_id);
@@ -212,7 +213,7 @@ const createTables = async () => {
         UNIQUE(multipart_upload_id, part_number)
       );
     `);
-    console.log('✅ Created upload_parts table');
+  logger.info('Created upload_parts table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_parts_upload ON upload_parts(multipart_upload_id);
@@ -232,7 +233,7 @@ const createTables = async () => {
         UNIQUE(bucket_id, name)
       );
     `);
-    console.log('✅ Created lifecycle_policies table');
+  logger.info('Created lifecycle_policies table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_lifecycle_bucket ON lifecycle_policies(bucket_id);
@@ -255,7 +256,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created event_subscriptions table');
+  logger.info('Created event_subscriptions table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_event_subs_user ON event_subscriptions(user_id);
@@ -279,7 +280,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created webhook_deliveries table');
+  logger.info('Created webhook_deliveries table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_webhook_subscription ON webhook_deliveries(subscription_id);
@@ -301,7 +302,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created cors_rules table');
+  logger.info('Created cors_rules table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_cors_bucket ON cors_rules(bucket_id);
@@ -317,7 +318,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created bucket_policies table');
+  logger.info('Created bucket_policies table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_bucket_policies_bucket ON bucket_policies(bucket_id);
@@ -338,7 +339,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created presigned_post_policies table');
+  logger.info('Created presigned_post_policies table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_presigned_user ON presigned_post_policies(user_id);
@@ -364,7 +365,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created batch_jobs table');
+  logger.info('Created batch_jobs table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_batch_jobs_user ON batch_jobs(user_id);
@@ -387,7 +388,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created batch_operations table');
+  logger.info('Created batch_operations table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_batch_ops_job ON batch_operations(job_id);
@@ -470,7 +471,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created subscriptions table');
+  logger.info('Created subscriptions table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
@@ -508,7 +509,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created payments table');
+  logger.info('Created payments table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
@@ -542,7 +543,7 @@ const createTables = async () => {
         UNIQUE(user_id, billing_period_start)
       );
     `);
-    console.log('✅ Created usage_billing table');
+  logger.info('Created usage_billing table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_usage_billing_user ON usage_billing(user_id);
@@ -569,7 +570,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ Created payment_methods table');
+  logger.info('Created payment_methods table');
 
     await query(`
       CREATE INDEX IF NOT EXISTS idx_payment_methods_user ON payment_methods(user_id);
@@ -845,7 +846,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Created plans table');
+  logger.info('Created plans table');
 
     // Add new columns if they don't exist (for existing databases)
     await query(`
@@ -902,7 +903,7 @@ const createTables = async () => {
         description = EXCLUDED.description,
         updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted/Updated Free plan');
+  logger.info('Inserted/Updated Free plan');
 
     // Insert Pro plan with advanced S3 features
     await query(`
@@ -960,7 +961,7 @@ const createTables = async () => {
         description = EXCLUDED.description,
         updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted/Updated Pro plan');
+  logger.info('Inserted/Updated Pro plan');
 
     // Insert PAYG plan with enterprise-grade S3 features
     await query(`
@@ -1023,7 +1024,7 @@ const createTables = async () => {
         description = EXCLUDED.description,
         updated_at = CURRENT_TIMESTAMP
     `);
-    console.log('✅ Inserted/Updated PAYG plan');
+  logger.info('Inserted/Updated PAYG plan');
 
     // Add backup_files table for 30-day retention
     await query(`
@@ -1046,7 +1047,7 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Created backup_files table');
+  logger.info('Created backup_files table');
 
     // Create index for quick lookups
     await query('CREATE INDEX IF NOT EXISTS idx_backup_files_user ON backup_files(user_id)');
@@ -1071,15 +1072,15 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Created custom_domains table');
+  logger.info('Created custom_domains table');
 
     // Create index for domains
     await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_user ON custom_domains(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_bucket ON custom_domains(bucket_id)');
 
-    console.log('✅ All tables created successfully!');
+  logger.info('All tables created successfully');
   } catch (error) {
-    console.error('❌ Error creating tables:', error);
+    logger.error('❌ Error creating tables:', error);
     throw error;
   }
 };
@@ -1087,10 +1088,10 @@ const createTables = async () => {
 // Run migration
 createTables()
   .then(() => {
-    console.log('✅ Database migration completed');
+  logger.info('Database migration completed');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Migration failed:', error);
+    logger.error('❌ Migration failed:', error);
     process.exit(1);
   });

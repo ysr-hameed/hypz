@@ -349,7 +349,7 @@ const Api = () => {
 
 const data = await response.json();
 const token = data.data.token;
-console.log('JWT Token:', token);`, 'login')}
+logger.log('JWT Token:', token);`, 'login')}
                 className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition"
               >
                 {copiedCode === 'login' ? <CheckCircle size={16} /> : <Copy size={16} />}
@@ -366,7 +366,7 @@ console.log('JWT Token:', token);`, 'login')}
 
 const data = await response.json();
 const token = data.data.token;
-console.log('JWT Token:', token);`}</code></pre>
+logger.log('JWT Token:', token);`}</code></pre>
               </div>
             </div>
           </div>
@@ -389,7 +389,7 @@ const response = await fetch('${apiConfig.baseUrl}/files/BUCKET_ID/upload', {
 });
 
 const data = await response.json();
-console.log('File uploaded:', data.data.url);
+logger.log('File uploaded:', data.data.url);
 // Note: File visibility automatically matches bucket visibility`, 'upload')}
                 className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition"
               >
@@ -409,7 +409,7 @@ const response = await fetch('${apiConfig.baseUrl}/files/BUCKET_ID/upload', {
 });
 
 const data = await response.json();
-console.log('File uploaded:', data.data.url);`}</code></pre>
+logger.log('File uploaded:', data.data.url);`}</code></pre>
               </div>
             </div>
           </div>
@@ -426,9 +426,9 @@ console.log('File uploaded:', data.data.url);`}</code></pre>
 });
 
 const data = await response.json();
-console.log('Usage:', data.data.usage);
-console.log('Costs:', data.data.costs);
-console.log('Total:', data.data.costs.total);`, 'usage')}
+logger.log('Usage:', data.data.usage);
+logger.log('Costs:', data.data.costs);
+logger.log('Total:', data.data.costs.total);`, 'usage')}
                 className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition"
               >
                 {copiedCode === 'usage' ? <CheckCircle size={16} /> : <Copy size={16} />}
@@ -441,9 +441,9 @@ console.log('Total:', data.data.costs.total);`, 'usage')}
 });
 
 const data = await response.json();
-console.log('Usage:', data.data.usage);
-console.log('Costs:', data.data.costs);
-console.log('Total:', data.data.costs.total);`}</code></pre>
+logger.log('Usage:', data.data.usage);
+logger.log('Costs:', data.data.costs);
+logger.log('Total:', data.data.costs.total);`}</code></pre>
               </div>
             </div>
           </div>

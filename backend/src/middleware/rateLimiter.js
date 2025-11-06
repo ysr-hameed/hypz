@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import logger from '../utils/logger.js';
 
 // In-memory store for rate limiting (use Redis in production)
 const requestCounts = new Map();
@@ -117,7 +118,7 @@ export const planBasedRateLimit = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Rate limiting error:', error);
+    logger.error({ err: error }, 'Rate limiting error');
     // Don't block request on rate limit error
     next();
   }

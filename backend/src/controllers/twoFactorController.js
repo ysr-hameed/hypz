@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import logger from '../utils/logger.js';
 import { asyncHandler } from '../middleware/validator.js';
 import {
   generateToken,
@@ -66,7 +67,7 @@ export const sendVerificationOTP = asyncHandler(async (req, res) => {
   try {
     await sendOTPEmail(user.email, otp, user.first_name);
   } catch (error) {
-    console.error('Failed to send OTP email:', error);
+    logger.error({ err: error }, 'Failed to send OTP email');
     return errorResponse(res, 'Failed to send OTP. Please try again.', 500);
   }
 
@@ -125,7 +126,7 @@ export const verifyEmailOTP = asyncHandler(async (req, res) => {
   try {
     await sendWelcomeEmail(user.email, user.first_name);
   } catch (error) {
-    console.error('Failed to send welcome email:', error);
+    logger.error({ err: error }, 'Failed to send welcome email');
     // Don't fail the verification if welcome email fails
   }
 
@@ -175,7 +176,7 @@ export const send2FAEmailFallback = asyncHandler(async (req, res) => {
   try {
     await send2FAEmail(user.email, code, user.first_name);
   } catch (error) {
-    console.error('Failed to send email fallback code:', error);
+    logger.error({ err: error }, 'Failed to send email fallback code');
     return errorResponse(res, 'Failed to send verification code. Please try again.', 500);
   }
 
@@ -226,7 +227,7 @@ export const send2FACode = asyncHandler(async (req, res) => {
   try {
     await send2FAEmail(user.email, code, user.first_name);
   } catch (error) {
-    console.error('Failed to send 2FA email:', error);
+    logger.error('Failed to send 2FA email:', error);
     return errorResponse(res, 'Failed to send 2FA code. Please try again.', 500);
   }
 
@@ -334,7 +335,7 @@ export const verify2FALogin = asyncHandler(async (req, res) => {
         [user.id, deviceName || null, deviceTokenHash, ipAddress, userAgent, expiresAt]
       );
     } catch (err) {
-      console.error('Failed to create trusted device:', err);
+      logger.error({ err }, 'Failed to create trusted device');
       // don't fail login if trusted device creation fails
       deviceTokenPlain = null;
     }

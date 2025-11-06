@@ -1,4 +1,6 @@
 import { validationResult } from 'express-validator';
+import logger from '../utils/logger.js';
+import { errorResponse } from '../utils/helpers.js';
 
 // Validation error handler
 export const validate = (req, res, next) => {
@@ -166,11 +168,8 @@ export const validateFileUpload = (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error('Validation error:', error);
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid request data'
-    });
+    logger.error({ err: error }, 'Validation error');
+    return errorResponse(res, 'Invalid request data', 400);
   }
 };
 

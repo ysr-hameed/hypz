@@ -15,7 +15,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
         // Response interceptor already unwraps data
         setConfig(response);
       } catch (err) {
-        console.error('Failed to fetch config:', err);
+        logger.error('Failed to fetch config:', err);
       }
     };
     fetchConfig();
@@ -54,7 +54,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
       window.location.href = checkoutUrl;
 
     } catch (err) {
-      console.error('LemonSqueezy payment error:', err);
+      logger.error('LemonSqueezy payment error:', err);
       setError(err.message || err.response?.data?.message || 'Payment failed. Please try again.');
       setLoading(false);
     }
