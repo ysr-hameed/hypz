@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 
 const PlanContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePlan = () => {
   const context = useContext(PlanContext);
   if (!context) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Folder, 
@@ -42,7 +42,6 @@ const FileManager = () => {
 
   // URL params for navigation
   const bucketId = searchParams.get('bucket');
-  const folderId = searchParams.get('folder');
 
   // State
   const [buckets, setBuckets] = useState([]);
@@ -66,15 +65,7 @@ const FileManager = () => {
   const [detailsModal, setDetailsModal] = useState({ isOpen: false, item: null });
 
   // Fetch data based on current view
-  useEffect(() => {
-    if (!bucketId) {
-      fetchBuckets();
-    } else {
-      fetchBucketContents();
-    }
-  }, [bucketId, folderId, searchQuery, sortBy, filterType]);
-
-  const fetchBuckets = async () => {
+  const fetchBuckets = useCallback(async () => {
     setLoading(true);
     try {
       const response = await bucketAPI.getAll({ search: searchQuery });
@@ -87,9 +78,36 @@ const FileManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery]);
 
-  const fetchBucketContents = async () => {
+  const getFileCategory = useCallback((mimeType) => {
+    if (!mimeType) return 'other';
+    if (mimeType.startsWith('image/')) return 'images';
+    if (mimeType.startsWith('video/')) return 'videos';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) return 'documents';
+    if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar')) return 'archives';
+    if (mimeType.includes('javascript') || mimeType.includes('json') || mimeType.includes('html')) return 'code';
+    return 'other';
+  }, []);
+
+  const sortFiles = useCallback((fileList, sortType) => {
+    const sorted = [...fileList];
+    switch (sortType) {
+      case 'name':
+        return sorted.sort((a, b) => a.original_name.localeCompare(b.original_name));
+      case 'date':
+        return sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      case 'size':
+        return sorted.sort((a, b) => b.size - a.size);
+      case 'type':
+        return sorted.sort((a, b) => a.mime_type.localeCompare(b.mime_type));
+      default:
+        return sorted;
+    }
+  }, []);
+
+  const fetchBucketContents = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch bucket details
@@ -134,34 +152,15 @@ const FileManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [bucketId, filterType, getFileCategory, searchQuery, sortBy, sortFiles]);
 
-  const sortFiles = (fileList, sortType) => {
-    const sorted = [...fileList];
-    switch (sortType) {
-      case 'name':
-        return sorted.sort((a, b) => a.original_name.localeCompare(b.original_name));
-      case 'date':
-        return sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      case 'size':
-        return sorted.sort((a, b) => b.size - a.size);
-      case 'type':
-        return sorted.sort((a, b) => a.mime_type.localeCompare(b.mime_type));
-      default:
-        return sorted;
+  useEffect(() => {
+    if (!bucketId) {
+      fetchBuckets();
+    } else {
+      fetchBucketContents();
     }
-  };
-
-  const getFileCategory = (mimeType) => {
-    if (!mimeType) return 'other';
-    if (mimeType.startsWith('image/')) return 'images';
-    if (mimeType.startsWith('video/')) return 'videos';
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) return 'documents';
-    if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar')) return 'archives';
-    if (mimeType.includes('javascript') || mimeType.includes('json') || mimeType.includes('html')) return 'code';
-    return 'other';
-  };
+  }, [bucketId, fetchBucketContents, fetchBuckets]);
 
   const handleBucketClick = (bucket) => {
     setSearchParams({ bucket: bucket.id });

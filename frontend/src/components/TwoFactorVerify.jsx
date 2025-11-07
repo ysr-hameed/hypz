@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, ArrowLeft, Loader2, CheckCircle2, Smartphone, Mail } from 'lucide-react';
 import axios from 'axios';
@@ -19,14 +19,6 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   
   const inputRefs = useRef([]);
   const navigate = useNavigate();
-  const hasSentCode = useRef(false); // Prevent duplicate 2FA code sending
-
-  // Don't auto-send code anymore since we're using authenticator app
-  // Only send if user requests email fallback
-  useEffect(() => {
-    // No automatic code sending for authenticator app
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleSendEmailFallback = async () => {
     setSendingCode(true);

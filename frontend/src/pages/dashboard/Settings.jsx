@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { User, Bell, Shield, Mail, Key, QrCode, Copy, Check, AlertTriangle, Loader2, Lock } from 'lucide-react';
-import { twoFactorAPI, authAPI, userAPI } from '../../services/api';
+import { twoFactorAPI, userAPI } from '../../services/api';
 import { useUser } from '../../context/UserContext';
 import { toast } from 'react-hot-toast';
 import { apiCache } from '../../utils/apiCache';

@@ -9,10 +9,12 @@ const ConfirmModal = ({
   confirmText = 'Confirm', 
   cancelText = 'Cancel',
   confirmButtonClass = 'bg-red-600 hover:bg-red-700',
-  icon: Icon = AlertTriangle,
+  icon,
   iconColor = 'text-red-600'
 }) => {
   if (!isOpen) return null;
+
+  const IconComponent = icon || AlertTriangle;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -21,7 +23,7 @@ const ConfirmModal = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${iconColor}`}>
-              <Icon size={24} />
+              <IconComponent size={24} />
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
               {title}

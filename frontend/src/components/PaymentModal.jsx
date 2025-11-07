@@ -1,28 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Check, CreditCard, Loader2 } from 'lucide-react';
-import { paymentAPI, plansAPI, configAPI } from '../services/api';
+import { paymentAPI, plansAPI } from '../services/api';
 import { logger } from '../utils/logger';
 
 const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [config, setConfig] = useState(null);
-
-  // Fetch backend config
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const response = await configAPI.getPublicConfig();
-        // Response interceptor already unwraps data
-        setConfig(response);
-      } catch (err) {
-        logger.error('Failed to fetch config:', err);
-      }
-    };
-    fetchConfig();
-  }, []);
-
-  const currency = 'USD';
   const price = plan.price_usd;
 
   // Handle Lemon Squeezy payment
@@ -72,6 +55,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
       onSuccess?.();
       onClose();
     } catch (err) {
+      logger.error('Failed to activate free plan:', err);
       setError('Failed to activate plan. Please try again.');
       setLoading(false);
     }

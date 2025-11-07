@@ -53,7 +53,7 @@ export const validatePassword = (password) => {
     errors.push('Password must contain at least one number');
   }
   
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+  if (!/[^\da-zA-Z]/.test(password)) {
     errors.push('Password must contain at least one special character');
   }
   
@@ -307,7 +307,7 @@ export const validateURL = (url) => {
   
   try {
     new URL(url);
-  } catch (e) {
+  } catch {
     errors.push('Invalid URL format');
   }
   

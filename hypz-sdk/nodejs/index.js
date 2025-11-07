@@ -366,6 +366,66 @@ class FileManager {
   }
 
   /**
+   * Initiate a direct-to-B2 presigned upload
+   * @param {Object} options
+   * @param {string} options.bucketId
+   * @param {string} options.fileName
+   * @param {number} [options.fileSize]
+   * @param {string} [options.mimeType]
+   * @param {Array<string>} [options.tags]
+   * @param {Object} [options.metadata]
+   */
+  async initiatePresignedUpload(options) {
+    const {
+      bucketId,
+      fileName,
+      fileSize,
+      mimeType,
+      tags,
+      metadata
+    } = options || {};
+
+    if (!bucketId) {
+      throw new Error('bucketId is required');
+    }
+    if (!fileName) {
+      throw new Error('fileName is required');
+    }
+
+    const payload = {
+      filename: fileName,
+      mimeType: mimeType || 'application/octet-stream',
+      size: typeof fileSize === 'number' ? fileSize : undefined,
+      tags,
+      metadata
+    };
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined || payload[key] === null) {
+        delete payload[key];
+      }
+    });
+
+    return this.sdk._request('POST', `/files/${bucketId}/files/presigned`, payload);
+  }
+
+  /**
+   * Complete a presigned upload after uploading to B2
+   * @param {string} fileId
+   * @param {Object} payload
+   */
+  async completePresignedUpload(fileId, payload) {
+    if (!fileId) {
+      throw new Error('fileId is required');
+    }
+    if (!payload || !payload.b2FileId) {
+      throw new Error('payload.b2FileId is required');
+    }
+
+    return this.sdk._request('POST', `/files/file/${fileId}/complete`, payload);
+  }
+
+  /**
    * Bulk delete files (up to 100 files)
    */
   async bulkDelete(fileIds) {

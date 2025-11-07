@@ -387,6 +387,8 @@ class HypzError extends Error {
   }
 }
 
+/* global module, define */
+
 // Export for different environments
 if (typeof module !== 'undefined' && module.exports) {
   // Node.js

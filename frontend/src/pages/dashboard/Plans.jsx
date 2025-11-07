@@ -33,7 +33,7 @@ const Plans = () => {
           const planData = currentPlanResponse?.plan || currentPlanResponse?.data?.plan || currentPlanResponse;
           setCurrentPlan(planData);
         } catch (err) {
-          logger.log('No current plan found');
+          logger.debug('No current plan found:', err);
         }
       } catch (err) {
         logger.error('Failed to load plans:', err);

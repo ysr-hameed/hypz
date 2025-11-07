@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Database, Plus, Search, MoreVertical, Lock, Globe, Calendar, HardDrive, Trash2, Edit3, X, AlertCircle, Loader, FolderOpen } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SkeletonBuckets } from '../../components/SkeletonLoaders';
 import { bucketAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
@@ -22,11 +22,7 @@ const Buckets = () => {
     description: ''
   });
 
-  useEffect(() => {
-    fetchBuckets();
-  }, []);
-
-  const fetchBuckets = async () => {
+  const fetchBuckets = useCallback(async () => {
     try {
       setLoading(true);
       const response = await bucketAPI.getAll({ search: searchQuery });
@@ -45,7 +41,11 @@ const Buckets = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchBuckets();
+  }, [fetchBuckets]);
 
   const handleCreateBucket = async (e) => {
     e.preventDefault();
@@ -130,7 +130,7 @@ const Buckets = () => {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [fetchBuckets, loading, searchQuery]);
 
   const filteredBuckets = buckets;
 

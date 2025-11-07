@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, Send, Users, Trash2, Filter, Calendar, TrendingUp } from 'lucide-react';
 import { notificationAPI } from '../../services/api';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,15 +27,7 @@ const AdminNotifications = () => {
     expiresAt: ''
   });
 
-  useEffect(() => {
-    if (activeTab === 'history') {
-      fetchNotifications();
-    } else if (activeTab === 'stats') {
-      fetchStats();
-    }
-  }, [activeTab, filters]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -49,9 +41,9 @@ const AdminNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
       const response = await notificationAPI.getStats();
@@ -61,7 +53,15 @@ const AdminNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchNotifications();
+    } else if (activeTab === 'stats') {
+      fetchStats();
+    }
+  }, [activeTab, fetchNotifications, fetchStats]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;

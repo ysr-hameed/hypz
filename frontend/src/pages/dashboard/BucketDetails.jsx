@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Download, Trash2, Copy, ExternalLink, MoreVertical, File, Image, FileText, Film, Music, Archive, Code, X, Loader, AlertCircle, FolderOpen } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { bucketAPI, fileAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -20,12 +20,7 @@ const BucketDetails = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, fileId: null, fileName: '' });
 
-  useEffect(() => {
-    fetchBucketDetails();
-    fetchFiles();
-  }, [bucketId]);
-
-  const fetchBucketDetails = async () => {
+  const fetchBucketDetails = useCallback(async () => {
     try {
       const response = await bucketAPI.getById(bucketId);
       // Backend returns: { success, message, data: bucketObject }
@@ -37,9 +32,9 @@ const BucketDetails = () => {
         navigate('/buckets');
       }
     }
-  };
+  }, [bucketId, navigate]);
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fileAPI.getAll(bucketId);
@@ -51,7 +46,12 @@ const BucketDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [bucketId]);
+
+  useEffect(() => {
+    fetchBucketDetails();
+    fetchFiles();
+  }, [fetchBucketDetails, fetchFiles]);
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -133,8 +133,8 @@ const BucketDetails = () => {
       await fileAPI.delete(confirmModal.fileId);
       toast.success('File deleted successfully');
       setConfirmModal({ isOpen: false, fileId: null, fileName: '' });
-      fetchFiles();
-      fetchBucketDetails();
+  fetchFiles();
+  fetchBucketDetails();
     } catch (error) {
       logger.error('Failed to delete file:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete file';

@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { Code, Book, Zap, Key, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import SEO from '../components/SEO';
-import { logger } from '../utils/logger';
 
 const Api = () => {
   const [copiedCode, setCopiedCode] = useState(null);

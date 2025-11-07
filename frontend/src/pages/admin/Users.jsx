@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminAPI } from '../../services/api';
 import { logger } from '../../utils/logger';
 import {
@@ -26,11 +26,7 @@ const AdminUsersPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [currentPage, searchTerm, filterRole, filterStatus]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await adminAPI.getUsers({
@@ -49,7 +45,11 @@ const AdminUsersPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, filterRole, filterStatus, searchTerm]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleToggleStatus = async (userId, currentStatus) => {
     try {

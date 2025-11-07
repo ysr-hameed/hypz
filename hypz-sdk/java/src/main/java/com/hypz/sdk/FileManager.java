@@ -1,222 +1,254 @@
 package com.hypz.sdk;
 
-import okhttp3.*;
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * File operations manager
+ * File operations manager powered by the java.net.http client.
  */
 public class FileManager {
-    
+
     private final HypzClient client;
-    
+
     FileManager(HypzClient client) {
         this.client = client;
     }
-    
-    /**
-     * Upload a file to a bucket
-     * 
-     * @param bucketId Bucket ID
-     * @param file File to upload
-     * @param metadata Optional metadata
-     * @param tags Optional tags
-     * @return Upload response
-     */
+
     public HypzClient.HypzResponse upload(String bucketId, File file, Map<String, String> metadata, String[] tags) throws IOException {
-        MultipartBody.Builder builder = new MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("file", file.getName(),
-                RequestBody.create(file, MediaType.parse("application/octet-stream")));
-        
-        if (metadata != null) {
-            builder.addFormDataPart("metadata", client.getGson().toJson(metadata));
+        byte[] fileBytes = Files.readAllBytes(file.toPath());
+        Map<String, String> fields = new LinkedHashMap<>();
+        if (metadata != null && !metadata.isEmpty()) {
+            fields.put("metadata", client.getGson().toJson(metadata));
         }
-        
         if (tags != null && tags.length > 0) {
-            builder.addFormDataPart("tags", String.join(",", tags));
+            fields.put("tags", String.join(",", tags));
         }
-        
-        RequestBody requestBody = builder.build();
-        
-        Request request = new Request.Builder()
-            .url(client.getBaseUrl() + "/files/" + bucketId + "/upload")
-            .post(requestBody)
-            .build();
-        
-        try (Response response = client.getHttpClient().newCall(request).execute()) {
-            String responseBody = response.body() != null ? response.body().string() : "{}";
-            com.google.gson.JsonObject json = client.getGson().fromJson(responseBody, com.google.gson.JsonObject.class);
-            
-            return new HypzClient.HypzResponse(
-                response.code(),
-                json.get("success").getAsBoolean(),
-                json.has("message") ? json.get("message").getAsString() : null,
-                json.has("data") ? json.get("data") : null
-            );
-        }
+
+        MultipartPayload payload = buildMultipartPayload(file.getName(), fileBytes, fields);
+        return client.sendRequest(
+            "POST",
+            "/files/" + bucketId + "/upload",
+            HttpRequest.BodyPublishers.ofByteArray(payload.body),
+            Collections.singletonMap("Content-Type", "multipart/form-data; boundary=" + payload.boundary)
+        );
     }
-    
-    /**
-     * Upload a file with no metadata or tags
-     */
+
     public HypzClient.HypzResponse upload(String bucketId, File file) throws IOException {
         return upload(bucketId, file, null, null);
     }
-    
-    /**
-     * Upload bytes as a file
-     * 
-     * @param bucketId Bucket ID
-     * @param fileName File name
-     * @param bytes File content as bytes
-     * @return Upload response
-     */
+
     public HypzClient.HypzResponse uploadBytes(String bucketId, String fileName, byte[] bytes) throws IOException {
-        RequestBody requestBody = new MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("file", fileName,
-                RequestBody.create(bytes, MediaType.parse("application/octet-stream")))
-            .build();
-        
-        Request request = new Request.Builder()
-            .url(client.getBaseUrl() + "/files/" + bucketId + "/upload")
-            .post(requestBody)
-            .build();
-        
-        try (Response response = client.getHttpClient().newCall(request).execute()) {
-            String responseBody = response.body() != null ? response.body().string() : "{}";
-            com.google.gson.JsonObject json = client.getGson().fromJson(responseBody, com.google.gson.JsonObject.class);
-            
-            return new HypzClient.HypzResponse(
-                response.code(),
-                json.get("success").getAsBoolean(),
-                json.has("message") ? json.get("message").getAsString() : null,
-                json.has("data") ? json.get("data") : null
-            );
-        }
+        MultipartPayload payload = buildMultipartPayload(fileName, bytes, Collections.emptyMap());
+        return client.sendRequest(
+            "POST",
+            "/files/" + bucketId + "/upload",
+            HttpRequest.BodyPublishers.ofByteArray(payload.body),
+            Collections.singletonMap("Content-Type", "multipart/form-data; boundary=" + payload.boundary)
+        );
     }
-    
-    /**
-     * List files in a bucket
-     * 
-     * @param bucketId Bucket ID
-     * @param page Page number
-     * @param limit Items per page
-     * @return List of files
-     */
+
     public HypzClient.HypzResponse list(String bucketId, int page, int limit) throws IOException {
         return client.get("/files/" + bucketId + "/files?page=" + page + "&limit=" + limit);
     }
-    
-    /**
-     * List files with default pagination
-     */
+
     public HypzClient.HypzResponse list(String bucketId) throws IOException {
         return list(bucketId, 1, 20);
     }
-    
-    /**
-     * Get file details
-     * 
-     * @param fileId File ID
-     * @return File details
-     */
+
     public HypzClient.HypzResponse get(String fileId) throws IOException {
         return client.get("/files/file/" + fileId);
     }
-    
-    /**
-     * Download file
-     * 
-     * @param fileId File ID
-     * @param outputFile File to save to
-     * @throws IOException if download fails
-     */
+
     public void download(String fileId, File outputFile) throws IOException {
-        Request request = new Request.Builder()
-            .url(client.getBaseUrl() + "/files/file/" + fileId + "/download")
-            .get()
-            .build();
-        
-        try (Response response = client.getHttpClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("Download failed: " + response.code());
-            }
-            
-            try (InputStream is = response.body().byteStream();
-                 FileOutputStream fos = new FileOutputStream(outputFile)) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = is.read(buffer)) != -1) {
-                    fos.write(buffer, 0, bytesRead);
-                }
-            }
+        HttpRequest.Builder builder = client.baseRequest("/files/file/" + fileId + "/download");
+        builder.header("Accept", "*/*");
+        byte[] data = client.sendForBytes(builder);
+        try (FileOutputStream fos = new FileOutputStream(outputFile)) {
+            fos.write(data);
         }
     }
-    
-    /**
-     * Download file as bytes
-     * 
-     * @param fileId File ID
-     * @return File content as bytes
-     */
+
     public byte[] downloadBytes(String fileId) throws IOException {
-        Request request = new Request.Builder()
-            .url(client.getBaseUrl() + "/files/file/" + fileId + "/download")
-            .get()
-            .build();
-        
-        try (Response response = client.getHttpClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("Download failed: " + response.code());
-            }
-            return response.body().bytes();
-        }
+        HttpRequest.Builder builder = client.baseRequest("/files/file/" + fileId + "/download");
+        builder.header("Accept", "*/*");
+        return client.sendForBytes(builder);
     }
-    
-    /**
-     * Update file metadata
-     * 
-     * @param fileId File ID
-     * @param updates Map of fields to update
-     * @return Update response
-     */
+
     public HypzClient.HypzResponse update(String fileId, Map<String, Object> updates) throws IOException {
         return client.put("/files/file/" + fileId, updates);
     }
-    
-    /**
-     * Delete file
-     * 
-     * @param fileId File ID
-     * @return Deletion response
-     */
+
     public HypzClient.HypzResponse delete(String fileId) throws IOException {
         return client.delete("/files/file/" + fileId);
     }
-    
-    /**
-     * Get public download URL for a file
-     * 
-     * @param fileId File ID
-     * @return Public download URL
-     */
+
     public String getPublicUrl(String fileId) {
         return client.getBaseUrl() + "/files/public/" + fileId + "/download";
     }
-    
-    /**
-     * Get download URLs for multiple files
-     * 
-     * @param fileIds Array of file IDs
-     * @return Bulk download response with URLs for each file
-     */
+
     public HypzClient.HypzResponse bulkDownload(String[] fileIds) throws IOException {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("fileIds", fileIds);
+        payload.put("fileIds", Arrays.asList(fileIds));
         return client.post("/files/bulk/download", payload);
+    }
+
+    public HypzClient.HypzResponse initiatePresignedUpload(String bucketId, PresignedUploadOptions options) throws IOException {
+        if (bucketId == null || bucketId.isEmpty()) {
+            throw new IllegalArgumentException("bucketId is required");
+        }
+        if (options == null || options.fileName == null || options.fileName.isEmpty()) {
+            throw new IllegalArgumentException("fileName is required");
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("filename", options.fileName);
+        payload.put("mimeType", options.mimeType != null ? options.mimeType : "application/octet-stream");
+
+        if (options.fileSize != null) {
+            payload.put("size", options.fileSize);
+        }
+        if (options.tags != null && !options.tags.isEmpty()) {
+            payload.put("tags", options.tags);
+        }
+        if (options.metadata != null && !options.metadata.isEmpty()) {
+            payload.put("metadata", options.metadata);
+        }
+
+        return client.post("/files/" + bucketId + "/files/presigned", payload);
+    }
+
+    public HypzClient.HypzResponse completePresignedUpload(String fileId, PresignedUploadCompletion completion) throws IOException {
+        if (fileId == null || fileId.isEmpty()) {
+            throw new IllegalArgumentException("fileId is required");
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        if (completion != null) {
+            if (completion.finalSize != null) {
+                payload.put("finalSize", completion.finalSize);
+            }
+            if (completion.sha1 != null && !completion.sha1.isEmpty()) {
+                payload.put("sha1", completion.sha1);
+            }
+            if (completion.partCount != null) {
+                payload.put("partCount", completion.partCount);
+            }
+        }
+
+        if (payload.isEmpty()) {
+            return client.post("/files/file/" + fileId + "/complete", Collections.emptyMap());
+        }
+
+        return client.post("/files/file/" + fileId + "/complete", payload);
+    }
+
+    public static class PresignedUploadOptions {
+        private final String fileName;
+        private Long fileSize;
+        private String mimeType;
+        private List<String> tags;
+        private Map<String, Object> metadata;
+
+        public PresignedUploadOptions(String fileName) {
+            this.fileName = fileName;
+        }
+
+        public PresignedUploadOptions fileSize(Long fileSize) {
+            this.fileSize = fileSize;
+            return this;
+        }
+
+        public PresignedUploadOptions mimeType(String mimeType) {
+            this.mimeType = mimeType;
+            return this;
+        }
+
+        public PresignedUploadOptions tags(List<String> tags) {
+            this.tags = tags;
+            return this;
+        }
+
+        public PresignedUploadOptions metadata(Map<String, Object> metadata) {
+            this.metadata = metadata;
+            return this;
+        }
+    }
+
+    public static class PresignedUploadCompletion {
+        private Long finalSize;
+        private String sha1;
+        private Integer partCount;
+
+        public PresignedUploadCompletion finalSize(Long finalSize) {
+            this.finalSize = finalSize;
+            return this;
+        }
+
+        public PresignedUploadCompletion sha1(String sha1) {
+            this.sha1 = sha1;
+            return this;
+        }
+
+        public PresignedUploadCompletion partCount(Integer partCount) {
+            this.partCount = partCount;
+            return this;
+        }
+    }
+
+    private MultipartPayload buildMultipartPayload(String filename, byte[] fileBytes, Map<String, String> fields) throws IOException {
+        String boundary = "----HypzBoundary" + UUID.randomUUID();
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        OutputStreamWriter writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
+
+        writer.append("--").append(boundary).append("\r\n");
+        writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
+            .append(filename)
+            .append("\"\r\n");
+        writer.append("Content-Type: application/octet-stream\r\n\r\n");
+        writer.flush();
+
+        output.write(fileBytes);
+        writer.append("\r\n");
+
+        if (fields != null) {
+            for (Map.Entry<String, String> entry : fields.entrySet()) {
+                if (entry.getValue() == null) {
+                    continue;
+                }
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"")
+                    .append(entry.getKey())
+                    .append("\"\r\n\r\n");
+                writer.append(entry.getValue()).append("\r\n");
+            }
+        }
+
+        writer.append("--").append(boundary).append("--\r\n");
+        writer.flush();
+
+        return new MultipartPayload(output.toByteArray(), boundary);
+    }
+
+    private static class MultipartPayload {
+        final byte[] body;
+        final String boundary;
+
+        MultipartPayload(byte[] body, String boundary) {
+            this.body = body;
+            this.boundary = boundary;
+        }
     }
 }

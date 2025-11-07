@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { authAPI } from '../../services/api';
 import { useUser } from '../../context/UserContext';
 import TwoFactorVerify from '../../components/TwoFactorVerify';
+import { logger } from '../../utils/logger';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ const Login = () => {
       // Redirect to OAuth provider
       window.location.href = url;
     } catch (err) {
+      logger.error(`Failed to initiate ${provider} login:`, err);
       setError(`Failed to initiate ${provider} login`);
     }
   };
@@ -86,6 +88,7 @@ const Login = () => {
       navigate('/dashboard', { replace: true });
       
     } catch (err) {
+      logger.error('Login error:', err);
       setError(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);

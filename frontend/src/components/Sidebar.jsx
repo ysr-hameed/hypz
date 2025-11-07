@@ -17,7 +17,7 @@ import { apiCache } from '../utils/apiCache';
 import { logger } from '../utils/logger';
 
 const Sidebar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed] = useState(false);
   const [storageUsed, setStorageUsed] = useState(0);
   const [storageLimit, setStorageLimit] = useState(1073741824); // 1GB default
   const [planName, setPlanName] = useState('FREE PLAN');

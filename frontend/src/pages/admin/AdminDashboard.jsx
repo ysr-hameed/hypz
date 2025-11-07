@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext';
 import { adminAPI } from '../../services/api';
 import { logger } from '../../utils/logger';
 import {
@@ -30,7 +29,6 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { theme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedUser, setSelectedUser] = useState(null);

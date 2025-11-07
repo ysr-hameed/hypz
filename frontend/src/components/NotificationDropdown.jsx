@@ -50,6 +50,7 @@ const NotificationDropdown = () => {
       ));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
+      logger.error('Failed to mark notification as read:', error);
       toast.error('Failed to mark notification as read');
     }
   };
@@ -62,6 +63,7 @@ const NotificationDropdown = () => {
       setUnreadCount(0);
       toast.success('All notifications marked as read');
     } catch (error) {
+      logger.error('Failed to mark all notifications as read:', error);
       toast.error('Failed to mark all as read');
     } finally {
       setLoading(false);
@@ -77,6 +79,7 @@ const NotificationDropdown = () => {
       }
       toast.success('Notification deleted');
     } catch (error) {
+      logger.error('Failed to delete notification:', error);
       toast.error('Failed to delete notification');
     }
   };

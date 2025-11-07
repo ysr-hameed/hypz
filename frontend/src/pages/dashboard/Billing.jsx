@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   CreditCard, 
   RefreshCw, 
@@ -25,18 +25,14 @@ const Billing = () => {
   const [autoRenew, setAutoRenew] = useState(true);
   const [updating, setUpdating] = useState(false);
 
-  const api = axios.create({
+  const api = useMemo(() => axios.create({
     baseURL: apiConfig.API_URL,
     headers: {
       Authorization: `Bearer ${localStorage.getItem('token')}`
     }
-  });
+  }), []);
 
-  useEffect(() => {
-    fetchBillingData();
-  }, []);
-
-  const fetchBillingData = async () => {
+  const fetchBillingData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch subscription status
@@ -50,7 +46,7 @@ const Billing = () => {
         setUsageCost(usageRes.data.data || usageRes.data);
       } catch (err) {
         // Not a PAYG user or no usage yet
-        logger.log('No usage cost data');
+        logger.debug('No usage cost data available:', err);
       }
 
       // Fetch payment history
@@ -69,7 +65,7 @@ const Billing = () => {
         const invoicesData = invoicesRes.data.data || invoicesRes.data;
         setPendingInvoices(invoicesData.invoices || invoicesData || []);
       } catch (err) {
-        logger.log('No pending invoices');
+        logger.debug('No pending invoices:', err);
         setPendingInvoices([]);
       }
 
@@ -79,7 +75,11 @@ const Billing = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    fetchBillingData();
+  }, [fetchBillingData]);
 
   const handleAutoRenewToggle = async () => {
     setUpdating(true);
@@ -88,6 +88,7 @@ const Billing = () => {
       setAutoRenew(!autoRenew);
       toast.success(`Auto-renewal ${!autoRenew ? 'enabled' : 'disabled'}`);
     } catch (error) {
+      logger.error('Failed to update auto-renewal setting:', error);
       toast.error('Failed to update auto-renewal setting');
     } finally {
       setUpdating(false);
@@ -100,6 +101,7 @@ const Billing = () => {
       toast.success('Payment successful!');
       fetchBillingData(); // Refresh data
     } catch (error) {
+      logger.error('Failed to pay invoice:', error);
       toast.error(error.response?.data?.message || 'Payment failed');
     }
   };

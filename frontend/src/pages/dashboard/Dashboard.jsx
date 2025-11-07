@@ -10,13 +10,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState([]);
   const [currentPlan, setCurrentPlan] = useState(null);
-  const [buckets, setBuckets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingStages, setLoadingStages] = useState({
-    usage: true,
-    plan: true,
-    buckets: true
-  });
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -29,17 +23,14 @@ const Dashboard = () => {
         setLoading(true);
 
         // Fetch usage data with cache
-        setLoadingStages(prev => ({ ...prev, usage: true }));
         const usageResponse = await apiCache.wrapRequest(
           'usage:current',
           () => usageAPI.getCurrent(),
           30000 // 30 second cache
         );
         const usage = usageResponse.data;
-        setLoadingStages(prev => ({ ...prev, usage: false }));
 
         // Fetch current plan with cache
-        setLoadingStages(prev => ({ ...prev, plan: true }));
         let planData = null;
         try {
           const planResponse = await apiCache.wrapRequest(
@@ -63,18 +54,14 @@ const Dashboard = () => {
           setCurrentPlan(defaultPlan);
           planData = defaultPlan.plan;
         }
-        setLoadingStages(prev => ({ ...prev, plan: false }));
 
         // Fetch buckets count with cache
-        setLoadingStages(prev => ({ ...prev, buckets: true }));
         const bucketsResponse = await apiCache.wrapRequest(
           'buckets:all',
           () => bucketAPI.getAll(),
           30000 // 30 second cache
         );
         // Backend returns: { success, message, data: { buckets: [], pagination: {} } }
-        setBuckets(bucketsResponse?.data?.buckets || []);
-        setLoadingStages(prev => ({ ...prev, buckets: false }));
 
         // Calculate stats - usage.month contains current usage
         const storageUsed = usage.month?.storage_bytes || 0;

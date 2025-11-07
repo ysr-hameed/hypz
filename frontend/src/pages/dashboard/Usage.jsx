@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   HardDrive, 
   Globe, 
@@ -32,11 +32,7 @@ const Usage = () => {
   const [historicalData, setHistoricalData] = useState([]);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   
-  useEffect(() => {
-    fetchUsageData();
-  }, [timeframe]);
-
-  const fetchUsageData = async () => {
+  const fetchUsageData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -79,7 +75,11 @@ const Usage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeframe]);
+
+  useEffect(() => {
+    fetchUsageData();
+  }, [fetchUsageData]);
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 B';

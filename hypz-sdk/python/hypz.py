@@ -386,6 +386,93 @@ class FileManager:
         
         response = self.client._request('POST', '/files/bulk/delete', json={'fileIds': file_ids})
         return response.get('data', response)
+
+    def initiate_presigned_upload(
+        self,
+        bucket_id: str,
+        file_name: str,
+        file_size: Optional[int] = None,
+        mime_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Initiate a direct-to-B2 presigned upload.
+
+        Args:
+            bucket_id: Target bucket ID
+            file_name: Name of the file to upload
+            file_size: Optional file size in bytes
+            mime_type: Optional MIME type (defaults to application/octet-stream)
+            tags: Optional list of tags
+            metadata: Optional metadata dictionary
+
+        Returns:
+            Presigned upload payload containing uploadUrl, uploadAuthToken, fileId, etc.
+        """
+        if not bucket_id:
+            raise ValueError('bucket_id is required')
+        if not file_name:
+            raise ValueError('file_name is required')
+
+        payload: Dict[str, Any] = {
+            'filename': file_name,
+            'mimeType': mime_type or 'application/octet-stream',
+            'size': file_size,
+            'tags': tags,
+            'metadata': metadata
+        }
+
+        # Remove empty values to avoid sending nulls
+        cleaned_payload = {k: v for k, v in payload.items() if v is not None}
+
+        response = self.client._request(
+            'POST',
+            f'/files/{bucket_id}/files/presigned',
+            json=cleaned_payload
+        )
+        return response.get('data', response)
+
+    def complete_presigned_upload(
+        self,
+        file_id: Union[int, str],
+        final_size: Optional[int] = None,
+        sha1: Optional[str] = None,
+        part_count: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Complete a presigned upload after the file has been uploaded to B2.
+
+        Args:
+            file_id: The temporary file ID received from initiate_presigned_upload
+            final_size: Optional final file size in bytes (recommended)
+            sha1: Optional SHA1 checksum if available
+            part_count: Optional number of uploaded parts for multipart uploads
+
+        Returns:
+            Finalized file metadata from the Hypz API.
+        """
+        if not file_id:
+            raise ValueError('file_id is required')
+
+        payload: Dict[str, Any] = {
+            'finalSize': final_size,
+            'sha1': sha1,
+            'partCount': part_count
+        }
+
+        cleaned_payload = {k: v for k, v in payload.items() if v is not None}
+
+        request_kwargs: Dict[str, Any] = {}
+        if cleaned_payload:
+            request_kwargs['json'] = cleaned_payload
+
+        response = self.client._request(
+            'POST',
+            f'/files/file/{file_id}/complete',
+            **request_kwargs
+        )
+        return response.get('data', response)
     
     def bulk_update(self, file_ids: List[Union[int, str]], tags: Optional[List[str]] = None, 
                     metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
