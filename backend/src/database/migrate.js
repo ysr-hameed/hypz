@@ -103,6 +103,8 @@ const createTables = async () => {
         metadata JSONB,
         tags TEXT[],
         downloads INTEGER DEFAULT 0,
+        upload_status VARCHAR(20) DEFAULT 'completed',
+        sha1 VARCHAR(40),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         deleted_at TIMESTAMP
@@ -117,6 +119,7 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_files_version ON files(bucket_id, filename, version_id);
       CREATE INDEX IF NOT EXISTS idx_files_latest ON files(bucket_id, is_latest) WHERE is_latest = true;
       CREATE INDEX IF NOT EXISTS idx_files_storage_class ON files(storage_class);
+      CREATE INDEX IF NOT EXISTS idx_files_upload_status ON files(upload_status) WHERE upload_status != 'completed';
     `);
 
     // Storage Classes table

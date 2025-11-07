@@ -1,16 +1,37 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs/promises';
+import { promises as fs } from 'fs';
+import fsSync from 'fs';
 import jwt from 'jsonwebtoken';
 import { query, transaction } from '../config/database.js';
 import { generateUniqueFilename, formatBytes, successResponse, errorResponse, paginate, getPaginationMeta } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
-import { uploadToB2, deleteFromB2, isB2Available } from '../services/b2Service.js';
+import { uploadToB2, deleteFromB2, isB2Available, getPresignedUploadUrl, getB2FileInfo } from '../services/b2Service.js';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
+const uploadRoot = path.resolve(config.UPLOAD_DIR || './uploads');
+
+if (!fsSync.existsSync(uploadRoot)) {
+  fsSync.mkdirSync(uploadRoot, { recursive: true });
+}
+
 // Configure multer for file uploads
-const storage = multer.memoryStorage(); // Use memory storage for B2
+// Use disk storage to avoid buffering large uploads in memory
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+  cb(null, uploadRoot);
+  },
+  filename: (req, file, cb) => {
+    // Use the same filename strategy used elsewhere
+    try {
+      const unique = generateUniqueFilename(file.originalname);
+      cb(null, unique);
+    } catch (e) {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    }
+  }
+});
 
 export const upload = multer({
   storage,
@@ -88,26 +109,33 @@ export const uploadFile = asyncHandler(async (req, res) => {
   let fileUrl, cdnUrl, filePath, b2FileId;
 
   try {
-    // Generate unique filename
-    const uniqueFilename = generateUniqueFilename(req.file.originalname);
+    // The multer diskStorage already generated a unique filename and saved the file
+    const uniqueFilename = req.file.filename || generateUniqueFilename(req.file.originalname);
+    const tempPath = req.file.path; // temp file path on disk
 
     if (isB2Available()) {
       // Upload to Backblaze B2 (public or private bucket based on bucket visibility)
       const b2Path = `${userId}/${bucketId}/${uniqueFilename}`;
-      const uploadResult = await uploadToB2(req.file.buffer, b2Path, req.file.mimetype, isPublicBucket);
-      
+
+      // Read file from disk into a buffer for upload (avoid keeping it in memory long-term)
+      const fileBuffer = await fs.readFile(tempPath);
+      const uploadResult = await uploadToB2(fileBuffer, b2Path, req.file.mimetype, isPublicBucket);
+
+      // Clean up temp file
+      try { await fs.unlink(tempPath); } catch (e) { /* non-fatal */ }
+
       fileUrl = uploadResult.url;
       cdnUrl = uploadResult.url;
       filePath = b2Path;
       b2FileId = uploadResult.fileId;
     } else {
-      // Fallback to local storage
-      const uploadDir = path.join(config.UPLOAD_DIR, userId);
+      // Fallback to local storage: move file into user folder
+  const uploadDir = path.join(uploadRoot, String(userId));
       await fs.mkdir(uploadDir, { recursive: true });
-      
+
       filePath = path.join(uploadDir, uniqueFilename);
-      await fs.writeFile(filePath, req.file.buffer);
-      
+      await fs.rename(tempPath, filePath);
+
       fileUrl = `/uploads/${userId}/${uniqueFilename}`;
       cdnUrl = `${config.FRONTEND_URL}/cdn${fileUrl}`;
     }
@@ -1274,3 +1302,232 @@ export const bulkUploadFiles = asyncHandler(async (req, res) => {
 
   successResponse(res, response, message, 201);
 });
+
+// ============ PRESIGNED UPLOAD (Direct Client to B2) ============
+
+// Step 1: Initiate presigned upload - returns upload URL for direct client upload
+export const initiatePresignedUpload = asyncHandler(async (req, res) => {
+  const { bucketId } = req.params;
+  const userId = req.user.id;
+  const { filename, mimeType, size } = req.body;
+
+  if (!filename || !mimeType) {
+    return errorResponse(res, 'filename and mimeType are required', 400);
+  }
+
+  // Get user's plan to check file size limit
+  const userPlanResult = await query(
+    `SELECT p.* FROM users u
+     JOIN plans p ON u.plan_id = p.id
+     WHERE u.id = $1`,
+    [userId]
+  );
+
+  if (userPlanResult.rows.length === 0) {
+    return errorResponse(res, 'User plan not found', 404);
+  }
+
+  const plan = userPlanResult.rows[0];
+
+  // Check file size limit (0 or null means unlimited)
+  if (plan.max_file_size_mb > 0 && size) {
+    const fileSizeMB = size / (1024 * 1024);
+    if (fileSizeMB > plan.max_file_size_mb) {
+      return errorResponse(
+        res,
+        `File size (${fileSizeMB.toFixed(2)}MB) exceeds your plan limit of ${plan.max_file_size_mb}MB. Please upgrade your plan to upload larger files.`,
+        413
+      );
+    }
+  }
+
+  // Verify bucket ownership
+  const bucket = await query(
+    'SELECT id, name, visibility FROM buckets WHERE id = $1 AND user_id = $2',
+    [bucketId, userId]
+  );
+
+  if (bucket.rows.length === 0) {
+    return errorResponse(res, 'Bucket not found', 404);
+  }
+
+  const bucketVisibility = bucket.rows[0].visibility;
+  const isPublicBucket = bucketVisibility === 'public';
+
+  try {
+    if (!isB2Available()) {
+      return errorResponse(res, 'Direct uploads are not available. B2 storage not configured.', 503);
+    }
+
+    // Generate unique filename
+    const uniqueFilename = generateUniqueFilename(filename);
+    const b2Path = `${userId}/${bucketId}/${uniqueFilename}`;
+
+    // Get presigned upload URL from B2
+    const presignedData = await getPresignedUploadUrl(b2Path, isPublicBucket);
+
+    // Create a pending file record in database
+    const fileRecord = await query(
+      `INSERT INTO files (
+        bucket_id, user_id, filename, original_name, path, size,
+        mime_type, extension, is_public, upload_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, filename, path`,
+      [
+        bucketId,
+        userId,
+        uniqueFilename,
+        filename,
+        b2Path,
+        size || 0,
+        mimeType,
+        path.extname(filename),
+        isPublicBucket,
+        'pending' // Mark as pending until client completes upload
+      ]
+    );
+
+    const fileId = fileRecord.rows[0].id;
+
+    // Return presigned upload URL and file ID to client
+    successResponse(res, {
+      fileId,
+      uploadUrl: presignedData.uploadUrl,
+      uploadAuthToken: presignedData.uploadAuthToken,
+      fileName: b2Path,
+      bucketName: presignedData.bucketName,
+      downloadUrl: presignedData.downloadUrl,
+      mimeType
+    }, 'Presigned upload URL generated successfully', 201);
+
+  } catch (error) {
+    logger.error('Presigned upload initiation error:', error);
+    return errorResponse(res, 'Failed to generate presigned upload URL: ' + error.message, 500);
+  }
+});
+
+// Step 2: Complete presigned upload - client notifies backend after direct upload to B2
+export const completePresignedUpload = asyncHandler(async (req, res) => {
+  const { fileId } = req.params;
+  const userId = req.user.id;
+  const { b2FileId, sha1, url, tags = [], metadata = {} } = req.body;
+
+  if (!b2FileId) {
+    return errorResponse(res, 'b2FileId is required', 400);
+  }
+
+  try {
+    // Get the pending file record
+    const fileResult = await query(
+      `SELECT f.*, b.name as bucket_name, b.visibility as bucket_visibility 
+       FROM files f 
+       JOIN buckets b ON f.bucket_id = b.id 
+       WHERE f.id = $1 AND f.user_id = $2 AND f.upload_status = 'pending'`,
+      [fileId, userId]
+    );
+
+    if (fileResult.rows.length === 0) {
+      return errorResponse(res, 'Pending file record not found', 404);
+    }
+
+    const file = fileResult.rows[0];
+    const bucketName = file.bucket_visibility === 'public' 
+      ? config.B2_PUBLIC_BUCKET_NAME 
+      : config.B2_PRIVATE_BUCKET_NAME;
+
+    // Generate URLs
+    const fileUrl = url || `${config.B2_DOWNLOAD_URL || 'https://f000.backblazeb2.com'}/file/${bucketName}/${file.path}`;
+    const cdnUrl = fileUrl;
+
+    let resolvedSha1 = sha1;
+    if (!resolvedSha1) {
+      try {
+        const info = await getB2FileInfo(b2FileId);
+        resolvedSha1 = info?.contentSha1 || null;
+      } catch (infoError) {
+        logger.warn('Unable to retrieve B2 checksum for file completion', {
+          fileId,
+          b2FileId,
+          error: infoError?.message || infoError
+        });
+      }
+    }
+
+    // Update file record with B2 info in a transaction
+    const result = await transaction(async (client) => {
+      // Check if versioning is enabled
+      const bucketCheckResult = await client.query(
+        'SELECT versioning_enabled FROM buckets WHERE id = $1',
+        [file.bucket_id]
+      );
+      
+      const versioningEnabled = bucketCheckResult.rows[0]?.versioning_enabled || false;
+      let versionId = 'null';
+      
+      if (versioningEnabled) {
+        // Mark existing file with same name as not latest
+        await client.query(
+          `UPDATE files
+           SET is_latest = false
+           WHERE bucket_id = $1 AND filename = $2 AND is_latest = true AND deleted_at IS NULL AND id != $3`,
+          [file.bucket_id, file.filename, fileId]
+        );
+        
+        // Generate new version ID
+        const crypto = await import('crypto');
+        versionId = crypto.randomUUID();
+      }
+
+      // Update file record to completed
+      const updateResult = await client.query(
+        `UPDATE files 
+         SET b2_file_id = $1, 
+             url = $2, 
+             cdn_url = $3, 
+             upload_status = 'completed',
+             sha1 = $4,
+             tags = $5,
+             metadata = $6,
+             version_id = $7,
+             is_latest = true,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $8
+         RETURNING *`,
+        [b2FileId, fileUrl, cdnUrl, resolvedSha1, JSON.stringify(tags), JSON.stringify(metadata), versionId, fileId]
+      );
+
+      // Update usage
+      await client.query(
+        `INSERT INTO usage_records (user_id, date, storage_bytes, upload_bytes, upload_calls, api_calls)
+         VALUES ($1, CURRENT_DATE, $2, $2, 1, 1)
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET 
+           storage_bytes = usage_records.storage_bytes + $2,
+           upload_bytes = usage_records.upload_bytes + $2,
+           upload_calls = usage_records.upload_calls + 1,
+           api_calls = usage_records.api_calls + 1,
+           bandwidth_bytes = usage_records.bandwidth_bytes + $2,
+           updated_at = CURRENT_TIMESTAMP`,
+        [userId, file.size]
+      );
+
+      // Log activity
+      await client.query(
+        'INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details) VALUES ($1, $2, $3, $4, $5)',
+        [userId, 'file_uploaded_presigned', 'file', fileId, { filename: file.original_name, size: file.size, versionId }]
+      );
+
+      return updateResult.rows[0];
+    });
+
+    successResponse(res, {
+      ...result,
+      formattedSize: formatBytes(result.size)
+    }, 'File upload completed successfully', 200);
+
+  } catch (error) {
+    logger.error('Presigned upload completion error:', error);
+    return errorResponse(res, 'Failed to complete upload: ' + error.message, 500);
+  }
+});
+

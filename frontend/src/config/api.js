@@ -1,8 +1,22 @@
 // API Configuration for Frontend
 
+const deriveApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const origin = window.location.origin.replace(/\/$/, '');
+    return `${origin}/api/v1`;
+  }
+
+  return 'http://localhost:5000/api/v1';
+};
+
 const config = {
   // Backend API URL
-  API_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  API_URL: deriveApiUrl(),
   
   // API Endpoints
   endpoints: {

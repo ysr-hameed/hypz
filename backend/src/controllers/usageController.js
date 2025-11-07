@@ -2,6 +2,7 @@ import { query } from '../config/database.js';
 import { successResponse, errorResponse, formatBytes } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
 import logger from '../utils/logger.js';
+import performanceStats from '../utils/performanceStats.js';
 
 // Get current usage
 export const getCurrentUsage = asyncHandler(async (req, res) => {
@@ -109,7 +110,7 @@ export const getCurrentUsage = asyncHandler(async (req, res) => {
       downloaded_today: parseInt(fileStats.rows[0]?.downloaded_today || 0)
     },
     performance: {
-      avg_response_time: Math.floor(Math.random() * 150) + 50 // Placeholder, implement real tracking later
+      avg_response_time: performanceStats.getAverageResponseTime() // in ms, null if not available
     }
   };
 

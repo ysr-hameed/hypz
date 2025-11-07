@@ -4,6 +4,7 @@
  */
 
 import logger from '../utils/logger.js';
+import performanceStats from '../utils/performanceStats.js';
 
 export const performanceMonitor = (req, res, next) => {
   const start = process.hrtime();
@@ -12,6 +13,14 @@ export const performanceMonitor = (req, res, next) => {
   res.on('finish', () => {
     const diff = process.hrtime(start);
     const time = (diff[0] * 1e9 + diff[1]) / 1e6; // ms
+
+    // Record response time for analytics (in-memory)
+    try {
+      performanceStats.recordResponseTime(Math.round(time));
+    } catch (e) {
+      // non-fatal
+      logger.debug('Failed to record response time', e?.message || e);
+    }
 
     // NOTE: Do not set headers here; headers are already sent at 'finish'
     if (time > 500) {

@@ -31,6 +31,7 @@ api.interceptors.request.use(
 // Response interceptor - Handle errors
 api.interceptors.response.use(
   (response) => {
+    // Preserve standard API response shape { success, message, data }
     return response.data;
   },
   (error) => {
@@ -97,6 +98,13 @@ export const fileAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress
     });
+  },
+  // Presigned upload flow (direct to B2)
+  initiatePresignedUpload: (bucketId, fileInfo) => {
+    return api.post(`/buckets/${bucketId}/files/presigned`, fileInfo);
+  },
+  completePresignedUpload: (fileId, uploadInfo) => {
+    return api.post(`/files/file/${fileId}/complete`, uploadInfo);
   },
   getAll: (bucketId, params) => api.get(apiConfig.endpoints.getFiles(bucketId), { params }),
   getById: (fileId) => api.get(apiConfig.endpoints.getFile(fileId)),
@@ -190,7 +198,26 @@ export const adminAPI = {
   getSystemStats: () => api.get('/admin/stats'),
   
   // Logs
-  getActivityLogs: (params) => api.get('/admin/logs', { params })
+  getActivityLogs: (params) => api.get('/admin/logs', { params }),
+
+  // Plans
+  getAllPlans: () => api.get('/admin/plans'),
+  createPlan: (data) => api.post('/admin/plans', data),
+  updatePlan: (planId, data) => api.put(`/admin/plans/${planId}`, data),
+  deletePlan: (planId) => api.delete(`/admin/plans/${planId}`),
+
+  // Webhooks
+  getAllWebhooks: (params) => api.get('/admin/webhooks', { params }),
+  getWebhookDeliveries: (subscriptionId, params) => api.get(`/admin/webhooks/${subscriptionId}/deliveries`, { params }),
+  disableWebhook: (subscriptionId) => api.patch(`/admin/webhooks/${subscriptionId}/disable`),
+
+  // API Keys
+  getAllApiKeys: (params) => api.get('/admin/api-keys', { params }),
+  revokeApiKey: (keyId) => api.patch(`/admin/api-keys/${keyId}/revoke`),
+
+  // Files
+  getAllFiles: (params) => api.get('/admin/files', { params }),
+  deleteFileAdmin: (fileId) => api.delete(`/admin/files/${fileId}`)
 };
 
 export default api;

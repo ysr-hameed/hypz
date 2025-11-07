@@ -33,6 +33,7 @@ import { bucketAPI, fileAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
 import { logger } from '../../utils/logger';
+import { uploadFilePresigned, shouldUsePresignedUpload } from '../../utils/presignedUpload';
 
 const FileManager = () => {
   const navigate = useNavigate();
@@ -192,37 +193,31 @@ const FileManager = () => {
     setUploadProgress(0);
 
     try {
+      const usePresigned = shouldUsePresignedUpload();
+
       // Upload files sequentially with better progress tracking
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
-        const formData = new FormData();
-        formData.append('file', file);
 
         // Calculate progress for multiple files
         const fileProgressStart = (i / selectedFiles.length) * 100;
         const fileProgressRange = 100 / selectedFiles.length;
 
-        // Simulate smooth progress for better UX
-        let simulatedProgress = 0;
-        const progressInterval = setInterval(() => {
-          simulatedProgress += 5;
-          if (simulatedProgress < 90) {
-            const totalProgress = fileProgressStart + (simulatedProgress / 100) * fileProgressRange;
-            setUploadProgress(Math.round(totalProgress));
-          }
-        }, 100);
-
-        try {
-          await fileAPI.upload(bucketId, formData, (progressEvent) => {
-            clearInterval(progressInterval);
-            if (progressEvent && progressEvent.total) {
-              const fileProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        if (usePresigned) {
+          // Use presigned upload (direct to B2)
+          try {
+            await uploadFilePresigned(file, bucketId, (fileProgress) => {
               const totalProgress = fileProgressStart + (fileProgress / 100) * fileProgressRange;
               setUploadProgress(Math.round(totalProgress));
-            }
-          });
-        } finally {
-          clearInterval(progressInterval);
+            });
+          } catch (error) {
+            // Fall back to traditional upload if presigned fails
+            logger.warn('Presigned upload failed, falling back to traditional upload:', error);
+            await uploadFileTraditional(file, bucketId, fileProgressStart, fileProgressRange);
+          }
+        } else {
+          // Use traditional upload (via server)
+          await uploadFileTraditional(file, bucketId, fileProgressStart, fileProgressRange);
         }
 
         // Set progress to complete for this file
@@ -235,10 +230,39 @@ const FileManager = () => {
       setUploadProgress(0);
       fetchBucketContents();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to upload files');
+      toast.error(error.response?.data?.message || error.message || 'Failed to upload files');
       logger.error('Upload error:', error);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Traditional upload helper (via server proxy)
+  const uploadFileTraditional = async (file, bucketId, progressStart, progressRange) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Simulate smooth progress for better UX
+    let simulatedProgress = 0;
+    const progressInterval = setInterval(() => {
+      simulatedProgress += 5;
+      if (simulatedProgress < 90) {
+        const totalProgress = progressStart + (simulatedProgress / 100) * progressRange;
+        setUploadProgress(Math.round(totalProgress));
+      }
+    }, 100);
+
+    try {
+      await fileAPI.upload(bucketId, formData, (progressEvent) => {
+        clearInterval(progressInterval);
+        if (progressEvent && progressEvent.total) {
+          const fileProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          const totalProgress = progressStart + (fileProgress / 100) * progressRange;
+          setUploadProgress(Math.round(totalProgress));
+        }
+      });
+    } finally {
+      clearInterval(progressInterval);
     }
   };
 

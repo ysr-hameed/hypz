@@ -29,23 +29,28 @@ export const UserProvider = ({ children }) => {
         apiCache.clear('user-data');
       }
 
-      const userData = await apiCache.wrapRequest(
+      const userResponse = await apiCache.wrapRequest(
         'user-data',
         () => authAPI.getCurrentUser(),
         300000 // 5 minutes cache
       );
 
-      if (userData?.success && userData?.data) {
-        setUser(userData.data);
-        return userData.data;
-      } else if (userData?.data) {
-        // Fallback if success flag is missing
-        setUser(userData.data);
-        return userData.data;
-      } else {
-        setUser(null);
-        return null;
+      let profile = null;
+      if (userResponse && typeof userResponse === 'object') {
+        if (Object.prototype.hasOwnProperty.call(userResponse, 'data')) {
+          profile = userResponse.data;
+        } else {
+          profile = userResponse;
+        }
       }
+
+      if (profile && typeof profile === 'object') {
+        setUser(profile);
+        return profile;
+      }
+
+      setUser(null);
+      return null;
     } catch (err) {
       logger.error('Error fetching user:', err);
       setError(err.message || 'Failed to load user data');

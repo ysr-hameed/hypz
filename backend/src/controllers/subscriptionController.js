@@ -48,25 +48,32 @@ export const createSubscription = asyncHandler(async (req, res) => {
   }
 
   // Create LemonSqueezy checkout with custom data
-  const checkoutData = await createLemonSqueezyCheckout(variantId, {
-    userId,
-    planId,
-    planType: plan.type,
-    autoRenew,
-    email: req.user.email
-  });
+  try {
+    const checkoutData = await createLemonSqueezyCheckout(variantId, {
+      userId,
+      planId,
+      planType: plan.type,
+      autoRenew,
+      email: req.user.email
+    });
 
-  // Store pending subscription record
-  await query(
-    `INSERT INTO subscriptions (user_id, plan_id, status, metadata)
-     VALUES ($1, $2, $3, $4)`,
-    [userId, planId, 'pending', { checkoutUrl: checkoutData.attributes.url }]
-  );
+    // Store pending subscription record
+    await query(
+      `INSERT INTO subscriptions (user_id, plan_id, status, metadata)
+       VALUES ($1, $2, $3, $4)`,
+      [userId, planId, 'pending', { checkoutUrl: checkoutData.attributes.url }]
+    );
 
-  successResponse(res, {
-    checkoutUrl: checkoutData.attributes.url,
-    message: 'Redirect to checkout to complete subscription'
-  });
+    successResponse(res, {
+      checkoutUrl: checkoutData.attributes.url,
+      message: 'Redirect to checkout to complete subscription'
+    });
+  } catch (error) {
+    return errorResponse(res, 
+      `Failed to create checkout: ${error.message}. Please verify LemonSqueezy variant ID is valid.`, 
+      400
+    );
+  }
 });
 
 // Add payment method for PAYG (setup intent)
@@ -74,9 +81,9 @@ export const addPaymentMethod = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { paymentMethodId, type, brand, last4, expMonth, expYear } = req.body;
 
-  // Store payment method
+  // Store payment method - NOTE: Table uses lemon_payment_method_id not payment_method_id
   const result = await query(
-    `INSERT INTO payment_methods (user_id, payment_method_id, type, brand, last4, exp_month, exp_year, is_default)
+    `INSERT INTO payment_methods (user_id, lemon_payment_method_id, type, brand, last4, exp_month, exp_year, is_default)
      VALUES ($1, $2, $3, $4, $5, $6, $7, true)
      RETURNING *`,
     [userId, paymentMethodId, type, brand, last4, expMonth, expYear]

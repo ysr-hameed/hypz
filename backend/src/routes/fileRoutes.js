@@ -15,7 +15,9 @@ import {
   bulkDownloadFiles,
   bulkMoveFiles,
   moveFileToBucket,
-  bulkUploadFiles
+  bulkUploadFiles,
+  initiatePresignedUpload,
+  completePresignedUpload
 } from '../controllers/fileController.js';
 import { authenticate, authenticateApiKey, requirePermission, requireOwnership, authenticateFileToken } from '../middleware/auth.js';
 import { uploadLimiter } from '../middleware/security.js';
@@ -70,6 +72,23 @@ router.get('/file/:fileId/download-signed', authenticateFileToken, downloadFileS
 // Protected routes - All routes enforce ownership and permissions
 router.post('/:bucketId/upload', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), uploadLimiter, upload.single('file'), validateFileUpload, uploadFile);
 router.post('/:bucketId/bulk-upload', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), uploadLimiter, upload.array('files', 20), validateFileUpload, bulkUploadFiles);
+
+// Presigned upload routes (direct client to B2)
+router.post('/:bucketId/files/presigned', authMiddleware, requirePermission('files:write'), requireOwnership('bucket'), [
+  body('filename').notEmpty().withMessage('filename is required'),
+  body('mimeType').notEmpty().withMessage('mimeType is required'),
+  body('size').optional().isInt({ min: 0 }).withMessage('size must be a positive integer'),
+  validate
+], initiatePresignedUpload);
+router.post('/file/:fileId/complete', authMiddleware, requirePermission('files:write'), requireOwnership('file'), [
+  body('b2FileId').notEmpty().withMessage('b2FileId is required'),
+  body('sha1').optional().isString(),
+  body('url').optional().isURL(),
+  body('tags').optional().isArray(),
+  body('metadata').optional().isObject(),
+  validate
+], completePresignedUpload);
+
 router.get('/:bucketId/files', authMiddleware, requirePermission('files:read'), requireOwnership('bucket'), validatePagination, getFiles);
 router.get('/file/:fileId', authMiddleware, requirePermission('files:read'), requireOwnership('file'), getFile);
 router.get('/file/:fileId/download', authMiddleware, requirePermission('files:read'), requireOwnership('file'), downloadFile);

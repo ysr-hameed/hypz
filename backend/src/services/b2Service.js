@@ -219,6 +219,49 @@ export const getB2FileInfo = async (fileId) => {
   }
 };
 
+// Get presigned upload URL for direct client uploads
+export const getPresignedUploadUrl = async (fileName, isPublic = false) => {
+  try {
+    if (!b2) {
+      await initializeB2();
+    }
+
+    if (!b2) {
+      throw new Error('Backblaze B2 not initialized');
+    }
+
+    // Select bucket based on visibility
+    const bucketId = isPublic ? config.B2_PUBLIC_BUCKET_ID : config.B2_PRIVATE_BUCKET_ID;
+    const bucketName = isPublic ? config.B2_PUBLIC_BUCKET_NAME : config.B2_PRIVATE_BUCKET_NAME;
+
+    if (!bucketId || !bucketName) {
+      throw new Error(`Backblaze B2 ${isPublic ? 'public' : 'private'} bucket not configured`);
+    }
+
+    // Get upload URL from B2
+    const uploadUrlResponse = await b2.getUploadUrl({
+      bucketId: bucketId
+    });
+
+    const uploadUrl = uploadUrlResponse.data.uploadUrl;
+    const uploadAuthToken = uploadUrlResponse.data.authorizationToken;
+
+    logger.info('Generated presigned upload URL', { fileName, bucketName });
+
+    return {
+      uploadUrl,
+      uploadAuthToken,
+      bucketId,
+      bucketName,
+      fileName,
+      downloadUrl
+    };
+  } catch (error) {
+    logger.error('Error getting presigned upload URL:', error);
+    throw error;
+  }
+};
+
 // Check if B2 is available
 export const isB2Available = () => {
   return !!(config.B2_APPLICATION_KEY_ID && config.B2_APPLICATION_KEY);
@@ -233,5 +276,6 @@ export default {
   deleteFromB2,
   streamById,
   getB2FileInfo,
+  getPresignedUploadUrl,
   isB2Available
 };

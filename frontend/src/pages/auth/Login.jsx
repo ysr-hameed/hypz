@@ -41,18 +41,25 @@ const Login = () => {
     try {
       // Real API call to login
       const response = await authAPI.login({ email, password });
-      
-      const data = response.data;
+      const payload = response?.data ?? response;
+
+      if (!payload) {
+        throw new Error(response?.message || 'Login failed. Please try again.');
+      }
 
       // Check if 2FA is required
-      if (data.requiresTwoFactor) {
+      if (payload.requiresTwoFactor) {
         setShow2FA(true);
-        setUserEmail(data.email || email);
+        setUserEmail(payload.email || email);
         setLoading(false);
         return;
       }
 
-      const { token, refreshToken, user } = data;
+      const { token, refreshToken, user } = payload;
+
+      if (!token || !user) {
+        throw new Error(response?.message || 'Login failed. Please try again.');
+      }
 
       // Check if email is verified
       if (user && !user.emailVerified) {
