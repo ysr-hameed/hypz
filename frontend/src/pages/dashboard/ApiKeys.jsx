@@ -5,6 +5,7 @@ import { apiKeyAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
 import EditPermissionsModal from '../../components/EditPermissionsModal';
+import { logger } from '../../utils/logger';
 
 const ApiKeys = () => {
   const [apiKeys, setApiKeys] = useState([]);

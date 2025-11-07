@@ -7,6 +7,7 @@ import { useUser } from '../context/UserContext';
 import PaymentModal from '../components/PaymentModal';
 import { toast } from 'react-hot-toast';
 import SEO from '../components/SEO';
+import { logger } from '../utils/logger';
 
 const Pricing = () => {
   const [plans, setPlans] = useState([]);

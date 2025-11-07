@@ -1,5 +1,5 @@
 import { query, transaction } from '../config/database.js';
-import { lemonSqueezyService } from './lemonSqueezyService.js';
+import lemonSqueezyService from './lemonSqueezyService.js';
 import { sendInvoiceEmail, sendPaymentFailedEmail, sendManualInvoiceEmail, sendServiceSuspensionEmail } from '../utils/email.js';
 import { cleanupExpiredRefreshTokens } from './cleanupJobs.js';
 import cron from 'node-cron';

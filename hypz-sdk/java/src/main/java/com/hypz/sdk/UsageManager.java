@@ -38,4 +38,22 @@ public class UsageManager {
     public HypzClient.HypzResponse getHistory() throws IOException {
         return getHistory(30);
     }
+    
+    /**
+     * Get detailed usage analytics
+     * 
+     * @param startDate Start date (YYYY-MM-DD)
+     * @param endDate End date (YYYY-MM-DD)
+     * @return Detailed analytics including top files, file types, API usage
+     */
+    public HypzClient.HypzResponse getAnalytics(String startDate, String endDate) throws IOException {
+        return client.get("/usage/analytics?startDate=" + startDate + "&endDate=" + endDate);
+    }
+    
+    /**
+     * Get analytics for current month
+     */
+    public HypzClient.HypzResponse getAnalytics() throws IOException {
+        return client.get("/usage/analytics");
+    }
 }

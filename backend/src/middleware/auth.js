@@ -25,10 +25,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required. Please provide a valid token.'
-      });
+      return errorResponse(res, 'Authentication required. Please provide a valid token.', 401);
     }
 
     try {
@@ -51,10 +48,7 @@ export const authenticate = async (req, res, next) => {
         );
 
         if (result.rows.length === 0) {
-          return res.status(401).json({
-            success: false,
-            message: 'User not found or token invalid'
-          });
+          return errorResponse(res, 'User not found or token invalid', 401);
         }
 
         user = result.rows[0];
@@ -62,10 +56,7 @@ export const authenticate = async (req, res, next) => {
       }
 
       if (!user.is_active) {
-        return res.status(403).json({
-          success: false,
-          message: 'Your account has been deactivated'
-        });
+        return errorResponse(res, 'Your account has been deactivated', 403);
       }
 
       // Attach user to request
@@ -74,19 +65,13 @@ export const authenticate = async (req, res, next) => {
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({
-          success: false,
-          message: 'Token expired. Please login again.'
-        });
+        return errorResponse(res, 'Token expired. Please login again.', 401);
       }
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
+      return errorResponse(res, 'Invalid token', 401);
     }
     } catch (error) {
       logger.error({ err: error }, 'Authentication error');
-      return errorResponse(res, 'Authentication failed', 500);
+      return errorResponse(res, config.NODE_ENV === 'development' ? error.message : 'Authentication failed', 500);
     }
 };
 
@@ -100,10 +85,7 @@ export const authenticateApiKey = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'] || req.query.api_key;
 
     if (!apiKey) {
-      return res.status(401).json({
-        success: false,
-        message: 'API key required'
-      });
+      return errorResponse(res, 'API key required', 401);
     }
     
     // Extract key prefix for faster lookup (must match database format)
@@ -161,10 +143,7 @@ export const authenticateApiKey = async (req, res, next) => {
     }
 
     if (!matchedKey) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired API key'
-      });
+      return errorResponse(res, 'Invalid or expired API key', 401);
     }
 
     // Update last used (non-blocking, no await)
@@ -186,7 +165,7 @@ export const authenticateApiKey = async (req, res, next) => {
     next();
     } catch (error) {
     logger.error({ err: error }, 'API Key authentication error');
-    return errorResponse(res, process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed', 500);
+    return errorResponse(res, config.NODE_ENV === 'development' ? error.message : 'Authentication failed', 500);
   }
 };
 
@@ -241,16 +220,11 @@ export const requirePermission = (requiredPermission) => {
       }
 
       logger.warn({ action, requiredPermission, permissions }, 'Permission denied (object-based)');
-      return res.status(403).json({
-        success: false,
-        message: `API key missing required permission: ${requiredPermission}`,
-        required: requiredPermission,
-        available: permissions
-      });
+      return errorResponse(res, `API key missing required permission: ${requiredPermission}`, 403);
     }
 
     logger.warn('Invalid permissions format for API key');
-    return errorResponse(res, 'Invalid API key permissions format', 403, permissions);
+    return errorResponse(res, 'Invalid API key permissions format', 403);
   };
 };
 
@@ -280,10 +254,7 @@ export const requireOwnership = (resourceType) => {
           break;
         
         default:
-          return res.status(400).json({
-            success: false,
-            message: 'Invalid resource type'
-          });
+          return errorResponse(res, 'Invalid resource type', 400);
       }
 
       if (!resourceId) {
@@ -313,10 +284,7 @@ export const requireOwnership = (resourceType) => {
 // Block API key access to admin/platform routes
 export const blockApiKeyAccess = (req, res, next) => {
   if (req.authMethod === 'api_key') {
-    return res.status(403).json({
-      success: false,
-      message: 'This endpoint cannot be accessed with API keys. Please use dashboard authentication.'
-    });
+    return errorResponse(res, 'This endpoint cannot be accessed with API keys. Please use dashboard authentication.', 403);
   }
   next();
 };
@@ -325,17 +293,17 @@ export const blockApiKeyAccess = (req, res, next) => {
 export const authenticateFileToken = (req, res, next) => {
   const token = req.query.token;
   if (!token) {
-    return res.status(401).json({ success: false, message: 'Missing token' });
+    return errorResponse(res, 'Missing token', 401);
   }
   try {
     const decoded = jwt.verify(token, config.JWT_SECRET);
     if (decoded.t !== 'file' || !decoded.fid) {
-      return res.status(401).json({ success: false, message: 'Invalid token' });
+      return errorResponse(res, 'Invalid token', 401);
     }
     req.fileToken = decoded; // { t: 'file', fid, uid, iat, exp }
     next();
   } catch (e) {
-    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return errorResponse(res, 'Invalid or expired token', 401);
   }
 };
 
@@ -343,17 +311,11 @@ export const authenticateFileToken = (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
+      return errorResponse(res, 'Authentication required', 401);
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to perform this action'
-      });
+      return errorResponse(res, 'You do not have permission to perform this action', 403);
     }
 
     next();
@@ -363,17 +325,11 @@ export const authorize = (...roles) => {
 // Admin-only middleware
 export const requireAdmin = (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Authentication required'
-    });
+    return errorResponse(res, 'Authentication required', 401);
   }
 
   if (req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Admin access required'
-    });
+    return errorResponse(res, 'Admin access required', 403);
   }
 
   next();

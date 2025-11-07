@@ -5,6 +5,7 @@ import { useUser } from '../../context/UserContext';
 import { toast } from 'react-hot-toast';
 import { apiCache } from '../../utils/apiCache';
 import { SkeletonSettings } from '../../components/SkeletonLoaders';
+import { logger } from '../../utils/logger';
 
 // Helper function to parse user agent string
 const parseUserAgent = (userAgent) => {

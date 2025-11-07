@@ -207,4 +207,16 @@ public class FileManager {
     public String getPublicUrl(String fileId) {
         return client.getBaseUrl() + "/files/public/" + fileId + "/download";
     }
+    
+    /**
+     * Get download URLs for multiple files
+     * 
+     * @param fileIds Array of file IDs
+     * @return Bulk download response with URLs for each file
+     */
+    public HypzClient.HypzResponse bulkDownload(String[] fileIds) throws IOException {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("fileIds", fileIds);
+        return client.post("/files/bulk/download", payload);
+    }
 }

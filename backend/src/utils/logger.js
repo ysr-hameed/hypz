@@ -1,9 +1,10 @@
 import pino from 'pino';
+import config from '../config/config.js';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = config.NODE_ENV !== 'production';
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
+  level: config.LOG_LEVEL || (isDev ? 'debug' : 'info'),
   transport: isDev
     ? {
         target: 'pino-pretty',

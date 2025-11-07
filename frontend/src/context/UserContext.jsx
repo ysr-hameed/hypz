@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI } from '../services/api';
 import { apiCache } from '../utils/apiCache';
+import { logger } from '../utils/logger';
 
 const UserContext = createContext(null);
 

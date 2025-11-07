@@ -14,6 +14,7 @@ import {
 import { useState, useEffect } from 'react';
 import { usageAPI, plansAPI } from '../services/api';
 import { apiCache } from '../utils/apiCache';
+import { logger } from '../utils/logger';
 
 const Sidebar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
   const [collapsed, setCollapsed] = useState(false);

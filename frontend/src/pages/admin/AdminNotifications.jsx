@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, Send, Users, Trash2, Filter, Calendar, TrendingUp } from 'lucide-react';
 import { notificationAPI } from '../../services/api';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '../../utils/logger';
 
 const AdminNotifications = () => {
   const [activeTab, setActiveTab] = useState('send');

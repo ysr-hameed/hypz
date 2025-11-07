@@ -131,50 +131,36 @@ export const errorHandler = (err, req, res, next) => {
 
   // Mongoose/MongoDB errors
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      errors: Object.values(err.errors).map(e => e.message)
-    });
+    return errorResponse(res, 'Validation error', 400, Object.values(err.errors).map(e => e.message));
   }
 
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
+    return errorResponse(res, 'Invalid token', 401);
   }
 
   if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
+    return errorResponse(res, 'Token expired', 401);
   }
 
   // Duplicate key error
   if (err.code === '23505') { // PostgreSQL unique violation
-    return res.status(400).json({
-      success: false,
-      message: 'Duplicate entry. Resource already exists.'
-    });
+    return errorResponse(res, 'Duplicate entry. Resource already exists.', 400);
   }
 
   // Default error
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    ...(config.NODE_ENV === 'development' && { stack: err.stack })
-  });
+  const defaultMsg = err.message || 'Internal server error';
+  const statusCode = err.statusCode || 500;
+  if (config.NODE_ENV === 'development') {
+    // Include stack in development
+    return errorResponse(res, defaultMsg, statusCode, [{ detail: err.stack }]);
+  }
+  return errorResponse(res, defaultMsg, statusCode);
 };
 
 // Not found handler
 export const notFound = (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.originalUrl} not found`
-  });
+  return errorResponse(res, `Route ${req.originalUrl} not found`, 404);
 };
 
 // Request logger middleware

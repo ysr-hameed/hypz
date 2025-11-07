@@ -53,43 +53,86 @@ export const createLemonSqueezyPayment = asyncHandler(async (req, res) => {
 
 // Lemon Squeezy webhook (handled by webhookController.js now)
 export const lemonSqueezyWebhook = asyncHandler(async (req, res) => {
-  const signature = req.headers['x-signature'];
-  const payload = JSON.stringify(req.body);
+  const rawSignature = req.headers['x-signature'] || req.headers['x-lemonsqueezy-signature'] || req.headers['x-ls-signature'];
+  const payload = JSON.stringify(req.body || {});
 
-  // Verify webhook signature
-  const isValid = verifyLemonSqueezyWebhook(payload, signature);
+  // Validate presence
+  if (!rawSignature) {
+    logger.warn({ headers: Object.keys(req.headers) }, 'Missing signature header on LemonSqueezy webhook');
+    return errorResponse(res, 'Missing signature', 400);
+  }
 
+  // Verify webhook signature using timing-safe comparison in service
+  const isValid = verifyLemonSqueezyWebhook(payload, String(rawSignature));
   if (!isValid) {
+    logger.warn('Invalid LemonSqueezy webhook signature');
     return errorResponse(res, 'Invalid signature', 400);
   }
 
   // Safely extract event data with null checks
-  const event = req.body?.meta?.event_name;
-  const data = req.body?.data;
-  
+  const event = req.body?.meta?.event_name || req.body?.type || req.body?.event;
+  const data = req.body?.data || req.body?.attributes;
+
   if (!event || !data) {
-    logger.error('Invalid webhook payload: missing event or data');
+    logger.error({ body: req.body }, 'Invalid webhook payload: missing event or data');
     return errorResponse(res, 'Invalid webhook payload', 400);
   }
 
+  // Only process idempotent events and skip if already processed
   if (event === 'order_created' || event === 'subscription_created') {
-    const customData = data.attributes.custom_data;
-    
-    await transaction(async (client) => {
-      // Update payment
-      await client.query(
-        `UPDATE payments 
-         SET status = $1, amount = $2, metadata = metadata || $3::jsonb, updated_at = CURRENT_TIMESTAMP
-         WHERE transaction_id = $4`,
-        [
-          'completed',
-          data.attributes.total / 100,
-          JSON.stringify({ webhookEvent: event, subscriptionId: data.id }),
-          data.attributes.order_id
-        ]
-      );
+    const orderId = data.attributes?.order_id || data.order_id || data.id;
+    const totalCents = data.attributes?.total ?? data.total ?? null;
+    const amount = totalCents !== null ? Number(totalCents) / 100 : null;
+    const customData = data.attributes?.custom_data || data.custom_data || {};
 
-      // Update user plan if userId is in custom data
+    if (!orderId) {
+      logger.error({ data }, 'Webhook missing order id');
+      return errorResponse(res, 'Webhook missing order id', 400);
+    }
+
+    // Idempotency: check if payment record already marked completed
+    const existing = await query('SELECT id, status FROM payments WHERE transaction_id = $1', [orderId]);
+    if (existing.rows.length > 0 && existing.rows[0].status === 'completed') {
+      logger.info({ orderId }, 'Webhook already processed for order');
+      return successResponse(res, null, 'Already processed', 200);
+    }
+
+    await transaction(async (client) => {
+      // Update payment record if present, otherwise insert a record
+      if (existing.rows.length > 0) {
+        await client.query(
+          `UPDATE payments 
+           SET status = $1, amount = $2, metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb, updated_at = CURRENT_TIMESTAMP
+           WHERE transaction_id = $4`,
+          [
+            'completed',
+            amount,
+            JSON.stringify({ webhookEvent: event, subscriptionId: data.id, customData }),
+            orderId
+          ]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO payments (
+            user_id, plan_id, amount, currency, status, payment_method,
+            payment_gateway, transaction_id, metadata, invoice_url, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CURRENT_TIMESTAMP)` ,
+          [
+            customData.userId || null,
+            customData.planId || null,
+            amount,
+            'USD',
+            'completed',
+            'lemonsqueezy',
+            'lemonsqueezy',
+            orderId,
+            JSON.stringify({ webhookEvent: event, subscriptionId: data.id, customData }),
+            null
+          ]
+        );
+      }
+
+      // Update user plan if userId and planId provided in custom data
       if (customData && customData.userId && customData.planId) {
         await client.query(
           `UPDATE users 

@@ -93,9 +93,7 @@ export const planBasedRateLimit = async (req, res, next) => {
         'Retry-After': retryAfter
       });
 
-      return res.status(429).json({
-        success: false,
-        message: `Rate limit exceeded. Your plan allows ${rateLimit} requests per second. Please upgrade your plan for higher limits.`,
+      return errorResponse(res, `Rate limit exceeded. Your plan allows ${rateLimit} requests per second. Please upgrade your plan for higher limits.`, 429, {
         error: 'RATE_LIMIT_EXCEEDED',
         limit: rateLimit,
         retryAfter,
@@ -158,11 +156,7 @@ export const globalRateLimit = (maxRequests = 10) => {
         'Retry-After': retryAfter
       });
 
-      return res.status(429).json({
-        success: false,
-        message: `Too many requests. Please try again in ${retryAfter} second(s).`,
-        error: 'RATE_LIMIT_EXCEEDED'
-      });
+      return errorResponse(res, `Too many requests. Please try again in ${retryAfter} second(s).`, 429, { error: 'RATE_LIMIT_EXCEEDED' });
     }
 
     res.set({

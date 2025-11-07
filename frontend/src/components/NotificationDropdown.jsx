@@ -3,6 +3,7 @@ import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
 import { notificationAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '../utils/logger';
 
 const NotificationDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);

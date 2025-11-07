@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { usageAPI, plansAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { logger } from '../../utils/logger';
 
 const Usage = () => {
   const [loading, setLoading] = useState(true);

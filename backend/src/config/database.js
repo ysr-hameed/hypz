@@ -53,7 +53,7 @@ export const query = async (text, params, options = {}) => {
     const duration = Date.now() - start;
     
     // Only log slow queries in production
-    if (duration > 1000 || process.env.NODE_ENV !== 'production') {
+    if (duration > 1000 || config.NODE_ENV !== 'production') {
       logger.info({ text: text.substring(0, 100), duration, rows: res.rowCount }, 'Executed query');
     }
     

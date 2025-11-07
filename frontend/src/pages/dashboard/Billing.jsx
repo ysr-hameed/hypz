@@ -14,6 +14,7 @@ import {
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import apiConfig from '../../config/api';
+import { logger } from '../../utils/logger';
 
 const Billing = () => {
   const [loading, setLoading] = useState(true);

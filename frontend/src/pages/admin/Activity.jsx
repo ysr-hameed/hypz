@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../../services/api';
 import { Activity, RefreshCw, Search } from 'lucide-react';
+import { logger } from '../../utils/logger';
 
 const AdminActivityPage = () => {
   const [logs, setLogs] = useState([]);

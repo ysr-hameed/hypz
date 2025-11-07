@@ -32,6 +32,7 @@ import {
 import { bucketAPI, fileAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
+import { logger } from '../../utils/logger';
 
 const FileManager = () => {
   const navigate = useNavigate();

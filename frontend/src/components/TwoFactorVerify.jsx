@@ -4,6 +4,7 @@ import { Shield, ArrowLeft, Loader2, CheckCircle2, Smartphone, Mail } from 'luci
 import axios from 'axios';
 import config from '../config/env';
 import { validate2FAToken } from '../utils/validation';
+import { logger } from '../utils/logger';
 
 const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -95,7 +96,7 @@ const TwoFactorVerify = ({ email, onBack, onSuccess }) => {
         try {
           localStorage.setItem('trustedDeviceToken', deviceToken);
         } catch (err) {
-          console.warn('Failed to store trusted device token locally:', err);
+          logger.warn('Failed to store trusted device token locally:', err);
         }
       }
 

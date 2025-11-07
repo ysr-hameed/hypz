@@ -4,6 +4,7 @@ import { bucketAPI, usageAPI, plansAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import { apiCache } from '../../utils/apiCache';
 import { SkeletonDashboard } from '../../components/SkeletonLoaders';
+import { logger } from '../../utils/logger';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ const Dashboard = () => {
           setCurrentPlan(planResponse.data);
           planData = planResponse.data?.plan;
         } catch (planError) {
-          console.warn('Plan fetch failed, using defaults:', planError);
+          logger.warn('Plan fetch failed, using defaults:', planError);
           // Set default plan if fetch fails
           const defaultPlan = {
             plan: {

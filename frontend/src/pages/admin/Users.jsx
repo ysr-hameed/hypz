@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../../services/api';
+import { logger } from '../../utils/logger';
 import {
   Search,
   Filter,

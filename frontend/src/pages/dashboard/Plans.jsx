@@ -3,6 +3,7 @@ import { Check, Loader2, Star, Sparkles, Zap } from 'lucide-react';
 import { plansAPI } from '../../services/api';
 import PaymentModal from '../../components/PaymentModal';
 import { SkeletonPlans } from '../../components/SkeletonLoaders';
+import { logger } from '../../utils/logger';
 
 const Plans = () => {
   const [plans, setPlans] = useState([]);

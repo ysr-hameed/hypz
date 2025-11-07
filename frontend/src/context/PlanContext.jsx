@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { fetchUserPlan, getPlanById, getUsagePercentage, canAccessFeature } from '../config/plans';
+import { logger } from '../utils/logger';
 
 const PlanContext = createContext();
 

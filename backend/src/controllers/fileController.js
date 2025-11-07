@@ -899,32 +899,130 @@ export const bulkMoveFiles = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Cannot move more than 100 files at once', 400);
   }
 
-  // Verify target bucket ownership
-  const targetBucket = await query(
-    'SELECT id FROM buckets WHERE id = $1 AND user_id = $2',
+  // Verify target bucket ownership and get visibility
+  const targetBucketResult = await query(
+    'SELECT id, visibility FROM buckets WHERE id = $1 AND user_id = $2',
     [targetBucketId, userId]
   );
 
-  if (targetBucket.rows.length === 0) {
+  if (targetBucketResult.rows.length === 0) {
     return errorResponse(res, 'Target bucket not found', 404);
   }
 
-  // Move files
-  const placeholders = fileIds.map((_, i) => `$${i + 3}`).join(', ');
-  const result = await query(
-    `UPDATE files SET bucket_id = $1, updated_at = CURRENT_TIMESTAMP 
-     WHERE user_id = $2 AND id IN (${placeholders}) AND deleted_at IS NULL
-     RETURNING id`,
-    [targetBucketId, userId, ...fileIds]
+  const targetBucket = targetBucketResult.rows[0];
+  const targetIsPublic = targetBucket.visibility === 'public';
+
+  // Fetch all files to be moved
+  const placeholders = fileIds.map((_, i) => `$${i + 2}`).join(', ');
+  const filesResult = await query(
+    `SELECT id, bucket_id, path, url, cdn_url, b2_file_id, filename, mime_type, user_id 
+     FROM files 
+     WHERE user_id = $1 AND id IN (${placeholders}) AND deleted_at IS NULL`,
+    [userId, ...fileIds]
   );
 
-  // Log activity
-  await query(
-    'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
-    [userId, 'bulk_files_moved', 'file', { count: result.rows.length, targetBucketId }]
-  );
+  const filesToMove = filesResult.rows;
 
-  successResponse(res, { movedCount: result.rows.length }, 'Files moved successfully');
+  if (filesToMove.length === 0) {
+    return errorResponse(res, 'No files found to move', 404);
+  }
+
+  // Use transaction for atomic DB + storage operations
+  try {
+    const { streamById, uploadToB2, deleteFromB2, isB2Available } = await import('../services/b2Service.js');
+
+    const movedFiles = await transaction(async (client) => {
+      const results = [];
+
+      for (const file of filesToMove) {
+        // Skip if already in target bucket
+        if (file.bucket_id === targetBucketId) {
+          results.push({ id: file.id, status: 'skipped', reason: 'already_in_target' });
+          continue;
+        }
+
+        let newPath = file.path;
+        let newUrl = file.url;
+        let newCdnUrl = file.cdn_url;
+        let newB2FileId = file.b2_file_id;
+
+        // If B2 is available and file is stored in B2, perform physical copy
+        if (isB2Available() && file.b2_file_id) {
+          try {
+            // Stream file from B2
+            const stream = await streamById(file.b2_file_id);
+
+            // Collect stream into buffer
+            const chunks = [];
+            for await (const chunk of stream) {
+              chunks.push(Buffer.from(chunk));
+            }
+            const fileBuffer = Buffer.concat(chunks);
+
+            // Upload to target bucket
+            const uniqueFilename = file.filename || file.path || `${file.id}-${Date.now()}`;
+            const targetPath = `${file.user_id || userId}/${targetBucketId}/${uniqueFilename}`;
+
+            const uploadResult = await uploadToB2(fileBuffer, targetPath, file.mime_type || 'application/octet-stream', targetIsPublic);
+
+            newPath = uploadResult.fileName || targetPath;
+            newUrl = uploadResult.url;
+            newCdnUrl = uploadResult.url;
+            newB2FileId = uploadResult.fileId;
+
+            // Try to delete old file from B2 (best-effort, don't fail the move)
+            try {
+              if (file.b2_file_id) {
+                await deleteFromB2(file.b2_file_id, file.path);
+              }
+            } catch (delErr) {
+              logger.warn({ err: delErr, fileId: file.id }, 'Failed to delete old B2 file after bulk move');
+            }
+          } catch (copyErr) {
+            logger.error({ err: copyErr, fileId: file.id }, 'Failed to copy file in B2 during bulk move');
+            results.push({ id: file.id, status: 'failed', reason: copyErr.message });
+            continue;
+          }
+        }
+
+        // Update DB record
+        const updateResult = await client.query(
+          `UPDATE files SET bucket_id = $1, path = $2, url = $3, cdn_url = $4, b2_file_id = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $6 AND user_id = $7 RETURNING id`,
+          [targetBucketId, newPath, newUrl, newCdnUrl, newB2FileId, file.id, userId]
+        );
+
+        if (updateResult.rows.length > 0) {
+          results.push({ id: file.id, status: 'moved' });
+        } else {
+          results.push({ id: file.id, status: 'failed', reason: 'db_update_failed' });
+        }
+      }
+
+      // Log activity
+      const movedCount = results.filter(r => r.status === 'moved').length;
+      await client.query(
+        'INSERT INTO activity_logs (user_id, action, resource_type, details) VALUES ($1, $2, $3, $4)',
+        [userId, 'bulk_files_moved', 'file', { count: movedCount, targetBucketId, results }]
+      );
+
+      return results;
+    });
+
+    const movedCount = movedFiles.filter(r => r.status === 'moved').length;
+    const skippedCount = movedFiles.filter(r => r.status === 'skipped').length;
+    const failedCount = movedFiles.filter(r => r.status === 'failed').length;
+
+    successResponse(res, { 
+      movedCount, 
+      skippedCount, 
+      failedCount, 
+      details: movedFiles 
+    }, 'Bulk move completed');
+  } catch (error) {
+    logger.error({ err: error }, 'Bulk move failed');
+    return errorResponse(res, 'Bulk move failed: ' + error.message, 500);
+  }
 });
 
 // Move single file to another bucket (change visibility by moving between buckets)

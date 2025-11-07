@@ -48,6 +48,9 @@ class HypzClient:
         # Initialize resource managers
         self.buckets = BucketManager(self)
         self.files = FileManager(self)
+        self.usage = UsageManager(self)
+        self.plans = PlanManager(self)
+        self.api_keys = APIKeyManager(self)
     
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """

@@ -8,7 +8,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrate.js",
-    "seed": "node src/database/seed.js"
+    "seed": "node src/database/seed.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "keywords": [
     "storage",
@@ -39,6 +41,8 @@
     "nodemailer": "^7.0.10",
     "pg": "^8.11.3",
     "pg-pool": "^3.6.1",
+    "pino": "^10.1.0",
+    "pino-pretty": "^13.1.2",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "speakeasy": "^2.0.0",
@@ -46,6 +50,7 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.0.2"
   },
   "engines": {

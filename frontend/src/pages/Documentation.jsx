@@ -923,6 +923,7 @@ System.out.println("Moved " + result.getMovedCount() + " files");`,
       bulkUpload: `// Upload multiple files at once (up to 20 files)
 // File visibility matches bucket visibility
 import java.io.File;
+import { logger } from '../utils/logger';
 
 BulkUploadResponse result = hypz.files().bulkUpload(
     new BulkUploadRequest()

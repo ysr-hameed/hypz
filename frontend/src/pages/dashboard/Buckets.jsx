@@ -5,6 +5,7 @@ import { SkeletonBuckets } from '../../components/SkeletonLoaders';
 import { bucketAPI } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
+import { logger } from '../../utils/logger';
 
 const Buckets = () => {
   const [buckets, setBuckets] = useState([]);

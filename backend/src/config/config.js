@@ -36,6 +36,8 @@ export default {
   BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS) || 12,
   API_RATE_LIMIT: parseInt(process.env.API_RATE_LIMIT) || 100,
   API_RATE_WINDOW: parseInt(process.env.API_RATE_WINDOW) || 15,
+  // Logging
+  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 
   // OAuth
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

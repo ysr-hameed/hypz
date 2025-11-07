@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { adminAPI } from '../../services/api';
+import { logger } from '../../utils/logger';
 import {
   Users,
   Database,

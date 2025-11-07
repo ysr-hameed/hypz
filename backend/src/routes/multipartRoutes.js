@@ -9,7 +9,7 @@ import {
   listMultipartUploads
 } from '../controllers/multipartController.js';
 import { authenticate, requirePermission } from '../middleware/auth.js';
-import { validate } from '../middleware/validator.js';
+import { validate, validateListQuery } from '../middleware/validator.js';
 import { body, param, query } from 'express-validator';
 
 const router = express.Router();
@@ -91,6 +91,7 @@ router.get(
   query('limit').optional().isInt({ min: 1, max: 1000 }),
   query('offset').optional().isInt({ min: 0 }),
   validate,
+  validateListQuery,
   listMultipartUploads
 );
 

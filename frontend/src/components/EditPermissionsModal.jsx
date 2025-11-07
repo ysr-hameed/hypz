@@ -1,5 +1,6 @@
 import { X, Shield, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 const EditPermissionsModal = ({ 
   isOpen, 

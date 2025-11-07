@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Check, CreditCard, Loader2 } from 'lucide-react';
 import { paymentAPI, plansAPI, configAPI } from '../services/api';
+import { logger } from '../utils/logger';
 
 const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
