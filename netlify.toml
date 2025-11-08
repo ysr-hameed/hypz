@@ -1,0 +1,19 @@
+[build]
+  base = "frontend"
+  publish = "frontend/dist"
+  command = "npm run build"
+
+[context.production.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[headers]
+  [[headers.values]]
+  for = "/*"
+  [headers.values.headers]
+  Cache-Control = "public, max-age=0, must-revalidate"
