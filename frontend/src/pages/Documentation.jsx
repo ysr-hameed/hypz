@@ -818,15 +818,28 @@ except RateLimitError as error:
     },
 
     java: {
-      installation: `<!-- Add to your pom.xml -->
+      installation: `<!-- Add JitPack repository to your pom.xml -->
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-    <groupId>io.hypz</groupId>
-    <artifactId>hypz-sdk</artifactId>
-    <version>1.0.0</version>
+    <groupId>com.github.ysr-hameed</groupId>
+    <artifactId>hypz-java-sdk</artifactId>
+    <version>1.0.1</version>
 </dependency>
 
 <!-- Or for Gradle (build.gradle) -->
-implementation 'io.hypz:hypz-sdk:1.0.0'`,
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.ysr-hameed:hypz-java-sdk:1.0.1'
+}`,
       
       authentication: `import io.hypz.Hypz;
 import io.hypz.models.User;
