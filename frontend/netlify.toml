@@ -12,8 +12,9 @@
   status = 200
   force = true
 
-[headers]
-  [[headers.values]]
+[ [headers] ]
+  # Netlify expects the headers block as an array of tables
+[[headers]]
   for = "/*"
-  [headers.values.headers]
-  Cache-Control = "public, max-age=0, must-revalidate"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
