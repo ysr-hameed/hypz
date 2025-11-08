@@ -828,7 +828,7 @@ except RateLimitError as error:
 
 <dependency>
     <groupId>com.github.ysr-hameed</groupId>
-    <artifactId>hypz-java-sdk</artifactId>
+    <artifactId>hypz-cloud</artifactId>
     <version>1.0.1</version>
 </dependency>
 
@@ -838,7 +838,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.ysr-hameed:hypz-java-sdk:1.0.1'
+    implementation 'com.github.ysr-hameed:hypz-cloud:1.0.1'
 }`,
       
       authentication: `import io.hypz.Hypz;
