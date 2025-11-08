@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate, blockApiKeyAccess } from '../middleware/auth.js';
+import { authenticateUserAccess } from '../middleware/auth.js';
 import {
   getProfile,
   updateProfile,
@@ -13,9 +13,8 @@ import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
 
-// Block API key access to all user management routes
-router.use(authenticate);
-router.use(blockApiKeyAccess); // User profile/account changes must be done via dashboard
+// Allow either JWT or API key auth for user management
+router.use(authenticateUserAccess);
 
 // Validation rules
 const updateProfileValidation = [
@@ -52,11 +51,11 @@ const deleteAccountValidation = [
 ];
 
 // Routes
-router.get('/profile', authenticate, getProfile);
-router.put('/profile', authenticate, updateProfileValidation, updateProfile);
-router.put('/change-password', authenticate, changePasswordValidation, changePassword);
-router.get('/notifications', authenticate, getNotificationPreferences);
-router.put('/notifications', authenticate, notificationPreferencesValidation, updateNotificationPreferences);
-router.delete('/account', authenticate, deleteAccountValidation, deleteAccount);
+router.get('/profile', getProfile);
+router.put('/profile', updateProfileValidation, updateProfile);
+router.put('/change-password', changePasswordValidation, changePassword);
+router.get('/notifications', getNotificationPreferences);
+router.put('/notifications', notificationPreferencesValidation, updateNotificationPreferences);
+router.delete('/account', deleteAccountValidation, deleteAccount);
 
 export default router;

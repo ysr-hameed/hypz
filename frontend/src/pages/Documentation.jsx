@@ -291,12 +291,10 @@ logger.log('Is public:', file.data.is_public); // Matches bucket visibility`,
       presignedUpload: `// Presigned Upload - Direct Client-to-B2 Upload (Recommended for large files)
 // Step 1: Initiate presigned upload
 const { uploadUrl, uploadAuthToken, fileId, fileName } = await hypz.files.initiatePresignedUpload({
-  bucketId: bucketId,
+  bucketId,
   fileName: 'large-video.mp4',
   fileSize: 104857600, // 100 MB in bytes
-  mimeType: 'video/mp4',
-  tags: ['video', 'media'],
-  metadata: { category: 'videos' }
+  mimeType: 'video/mp4'
 });
 
 // Step 2: Calculate SHA1 hash (required by B2)
@@ -310,7 +308,7 @@ const calculateSHA1 = async (file) => {
 const sha1 = await calculateSHA1(fileObject);
 
 // Step 3: Upload directly to B2 (bypasses your server)
-await fetch(uploadUrl, {
+const uploadResponse = await fetch(uploadUrl, {
   method: 'POST',
   headers: {
     'Authorization': uploadAuthToken,
@@ -322,10 +320,18 @@ await fetch(uploadUrl, {
   body: fileObject // Direct file upload
 });
 
+if (!uploadResponse.ok) {
+  throw new Error('B2 upload failed with status ' + uploadResponse.status);
+}
+
+const b2Result = await uploadResponse.json();
+
 // Step 4: Complete the upload on your server
 const file = await hypz.files.completePresignedUpload(fileId, {
-  sha1: sha1,
-  finalSize: 104857600
+  b2FileId: b2Result.fileId,
+  sha1,
+  tags: ['video', 'media'],
+  metadata: { category: 'videos' }
 });
 
 logger.log('File uploaded:', file.data.url);
@@ -376,14 +382,14 @@ await hypz.files.delete(fileId);
 logger.log('File deleted successfully');`,
 
       bulkDelete: `// Delete multiple files at once
-const result = await hypz.files.bulkDelete([123, 456, 789]);
+const result = await hypz.files.bulkDelete([fileId1, fileId2, fileId3]);
 
 logger.log(\`Deleted \${result.data.deletedCount} files\`);
 logger.log(\`Freed \${result.data.totalSize} bytes\`);`,
 
       bulkUpdate: `// Update multiple files at once
 const result = await hypz.files.bulkUpdate({
-  fileIds: [123, 456, 789],
+  fileIds: [fileId1, fileId2, fileId3],
   tags: ['archived', '2024'],
   metadata: { processed: true }
 });
@@ -391,7 +397,7 @@ const result = await hypz.files.bulkUpdate({
 logger.log(\`Updated \${result.data.updatedCount} files\`);`,
 
       bulkDownload: `// Get download URLs for multiple files
-const result = await hypz.files.bulkDownload([123, 456, 789]);
+const result = await hypz.files.bulkDownload([fileId1, fileId2, fileId3]);
 
 result.data.files.forEach(file => {
   logger.log(\`\${file.filename}: \${file.downloadUrl}\`);
@@ -399,8 +405,8 @@ result.data.files.forEach(file => {
 
       bulkMove: `// Move multiple files to another bucket
 const result = await hypz.files.bulkMove({
-  fileIds: [123, 456, 789],
-  targetBucketId: 42
+  fileIds: [fileId1, fileId2, fileId3],
+  targetBucketId: targetBucketId
 });
 
 logger.log(\`Moved \${result.data.movedCount} files\`);`,
@@ -616,7 +622,8 @@ sha1_hex = sha1.hexdigest()
 
 # Step 3: Upload directly to B2 (bypasses your server)
 with open('large-video.mp4', 'rb') as f:
-    response = requests.post(upload_url, 
+    b2_response = requests.post(
+        upload_url,
         headers={
             'Authorization': upload_auth_token,
             'X-Bz-File-Name': file_name,
@@ -627,11 +634,18 @@ with open('large-video.mp4', 'rb') as f:
         data=f
     )
 
+b2_response.raise_for_status()
+b2_payload = b2_response.json()
+
 # Step 4: Complete the upload on your server
-file = hypz.files.complete_presigned_upload(file_id, {
-    'sha1': sha1_hex,
-    'finalSize': 104857600
-})
+file = hypz.files.complete_presigned_upload(
+    file_id,
+    b2_file_id=b2_payload['fileId'],
+    final_size=104857600,
+    sha1=sha1_hex,
+    tags=['video', 'media'],
+    metadata={'category': 'videos'}
+)
 
 print(f'File uploaded: {file["url"]}')
 print('Upload method: Direct to B2 (50-70% faster!)')`,
@@ -679,7 +693,7 @@ print('File deleted successfully')`,
 
       bulkDelete: `# Delete multiple files at once
 result = hypz.files.bulk_delete(
-    file_ids=[123, 456, 789]
+    file_ids=[file_id1, file_id2, file_id3]
 )
 
 print(f'Deleted {result["deletedCount"]} files')
@@ -687,7 +701,7 @@ print(f'Freed {result["totalSize"]} bytes')`,
 
       bulkUpdate: `# Update multiple files at once
 result = hypz.files.bulk_update(
-    file_ids=[123, 456, 789],
+    file_ids=[file_id1, file_id2, file_id3],
     tags=['archived', '2024'],
     metadata={'processed': True}
 )
@@ -696,7 +710,7 @@ print(f'Updated {result["updatedCount"]} files')`,
 
       bulkDownload: `# Get download URLs for multiple files
 result = hypz.files.bulk_download(
-    file_ids=[123, 456, 789]
+    file_ids=[file_id1, file_id2, file_id3]
 )
 
 for file in result['files']:
@@ -704,8 +718,8 @@ for file in result['files']:
 
       bulkMove: `# Move multiple files to another bucket
 result = hypz.files.bulk_move(
-    file_ids=[123, 456, 789],
-    target_bucket_id=42
+    file_ids=[file_id1, file_id2, file_id3],
+    target_bucket_id=target_bucket_id
 )
 
 print(f'Moved {result["movedCount"]} files')`,
@@ -898,6 +912,8 @@ System.out.println("Is public: " + file.isPublic());`,
       presignedUpload: `// Presigned Upload - Direct Client-to-B2 Upload (Recommended for large files)
 import java.security.MessageDigest;
 import java.nio.file.Files;
+import java.util.Map;
+import org.json.JSONObject;
 import okhttp3.*;
 
 // Step 1: Initiate presigned upload
@@ -939,11 +955,22 @@ Request uploadRequest = new Request.Builder()
 
 Response uploadResponse = client.newCall(uploadRequest).execute();
 
+if (!uploadResponse.isSuccessful()) {
+  throw new IOException("B2 upload failed: " + uploadResponse.code());
+}
+
+String b2ResponseBody = uploadResponse.body().string();
+JSONObject b2Json = new JSONObject(b2ResponseBody);
+String b2FileId = b2Json.getString("fileId");
+
 // Step 4: Complete the upload on your server
 FileUpload completedFile = hypz.files().completePresignedUpload(fileId,
-    new CompleteUploadRequest()
-        .sha1(sha1Hex)
-        .finalSize(104857600L)
+  new CompleteUploadRequest()
+    .b2FileId(b2FileId)
+    .sha1(sha1Hex)
+    .finalSize(104857600L)
+    .tags(Arrays.asList("video", "media"))
+    .metadata(Map.of("category", "videos"))
 );
 
 System.out.println("File uploaded: " + completedFile.getUrl());
@@ -996,7 +1023,7 @@ System.out.println("File deleted successfully");`,
       bulkDelete: `// Delete multiple files at once
 BulkDeleteResponse result = hypz.files().bulkDelete(
     new BulkDeleteRequest()
-        .fileIds(Arrays.asList(123, 456, 789))
+        .fileIds(Arrays.asList(fileId1, fileId2, fileId3))
 );
 
 System.out.println("Deleted " + result.getDeletedCount() + " files");
@@ -1005,7 +1032,7 @@ System.out.println("Freed " + result.getTotalSize() + " bytes");`,
       bulkUpdate: `// Update multiple files at once
 BulkUpdateResponse result = hypz.files().bulkUpdate(
     new BulkUpdateRequest()
-        .fileIds(Arrays.asList(123, 456, 789))
+        .fileIds(Arrays.asList(fileId1, fileId2, fileId3))
         .tags(Arrays.asList("archived", "2024"))
         .metadata(Map.of("processed", true))
 );
@@ -1015,7 +1042,7 @@ System.out.println("Updated " + result.getUpdatedCount() + " files");`,
       bulkDownload: `// Get download URLs for multiple files
 BulkDownloadResponse result = hypz.files().bulkDownload(
     new BulkDownloadRequest()
-        .fileIds(Arrays.asList(123, 456, 789))
+        .fileIds(Arrays.asList(fileId1, fileId2, fileId3))
 );
 
 for (FileDownloadInfo file : result.getFiles()) {
@@ -1026,8 +1053,8 @@ for (FileDownloadInfo file : result.getFiles()) {
       bulkMove: `// Move multiple files to another bucket
 BulkMoveResponse result = hypz.files().bulkMove(
     new BulkMoveRequest()
-        .fileIds(Arrays.asList(123, 456, 789))
-        .targetBucketId(42)
+        .fileIds(Arrays.asList(fileId1, fileId2, fileId3))
+        .targetBucketId(targetBucketId)
 );
 
 System.out.println("Moved " + result.getMovedCount() + " files");`,
@@ -1151,13 +1178,45 @@ curl --version
 
 # For Windows, download from: https://curl.se/windows/`,
       
-      authentication: `# All requests require an API key in the header
-# Method 1: Using header (recommended)
+   authentication: `# All requests require authentication.
+# Method 1: API key header (works for storage endpoints)
 curl -H "x-api-key: your-api-key-here" \\
-     ${API_BASE_URL}/user
+  ${API_BASE_URL}/buckets
 
-# Method 2: Using query parameter
-curl "${API_BASE_URL}/user?api_key=your-api-key-here"`,
+# Method 2: API key as query string
+curl "${API_BASE_URL}/buckets?api_key=your-api-key-here"
+
+# Method 3: JWT bearer token (required for /auth/* routes; optional for /user/*)
+curl -H "Authorization: Bearer your-jwt-token" \\
+  ${API_BASE_URL}/auth/me
+
+# NOTE: /auth/* endpoints refuse API keys. Use a JWT from /auth/login.
+#       /user/* endpoints accept either a scoped API key or a JWT, so you can use the
+#       same credentials as your bucket/file operations.
+# Example: Fetch profile with an API key
+curl -H "x-api-key: your-api-key-here" \
+  ${API_BASE_URL}/user/profile
+
+# API key requests populate the user context from the owning account, matching
+# the new backend behavior rolled out on 2025-11-08.
+# Successful response:
+# {
+#   "success": true,
+#   "message": "Authenticated",
+#   "data": {
+#     "id": 321,
+#     "email": "founder@hypz.io",
+#     "first_name": "Ysr",
+#     "last_name": "Hameed",
+#     "role": "user"
+#   }
+# }
+
+# Unauthorized response (missing or invalid JWT):
+# {
+#   "success": false,
+#   "message": "Authentication required. Please provide a valid token."
+# }`,
 
       createBucket: `# Create a new bucket
 curl -X POST ${API_BASE_URL}/buckets \\
@@ -1168,15 +1227,67 @@ curl -X POST ${API_BASE_URL}/buckets \\
     "visibility": "private",
     "description": "Store my app assets",
     "region": "us-east-1"
-  }'`,
+  }'
+
+# Response 201:
+# {
+#   "success": true,
+#   "message": "Bucket created successfully",
+#   "data": {
+#     "id": 123,
+#     "name": "my-awesome-bucket",
+#     "slug": "my-awesome-bucket-x1y2",
+#     "visibility": "private",
+#     "region": "us-east-1",
+#     "description": "Store my app assets",
+#     "created_at": "2025-11-08T10:15:23.456Z"
+#   }
+# }`,
 
       listBuckets: `# List all buckets with pagination
 curl -X GET "${API_BASE_URL}/buckets?page=1&limit=10&search=my-bucket" \\
-  -H "x-api-key: your-api-key-here"`,
+  -H "x-api-key: your-api-key-here"
+
+# Response 200:
+# {
+#   "success": true,
+#   "message": "Buckets fetched successfully",
+#   "data": {
+#     "buckets": [
+#       {
+#         "id": 123,
+#         "name": "my-awesome-bucket",
+#         "visibility": "private",
+#         "file_count": 0,
+#         "total_size": 0
+#       }
+#     ],
+#     "pagination": {
+#       "page": 1,
+#       "limit": 10,
+#       "total": 1,
+#       "totalPages": 1
+#     }
+#   }
+# }`,
 
       getBucket: `# Get bucket details
 curl -X GET ${API_BASE_URL}/buckets/{bucketId} \\
-  -H "x-api-key: your-api-key-here"`,
+  -H "x-api-key: your-api-key-here"
+
+# Response 200:
+# {
+#   "success": true,
+#   "message": "Success",
+#   "data": {
+#     "id": 123,
+#     "name": "my-awesome-bucket",
+#     "visibility": "private",
+#     "file_count": 4,
+#     "total_size": 5242880,
+#     "compression_ratio": null
+#   }
+# }`,
 
       updateBucket: `# Update bucket settings
 curl -X PUT ${API_BASE_URL}/buckets/{bucketId} \\
@@ -1187,7 +1298,21 @@ curl -X PUT ${API_BASE_URL}/buckets/{bucketId} \\
     "description": "Updated description",
     "corsEnabled": true,
     "corsOrigins": ["https://myapp.com"]
-  }'`,
+  }'
+
+# Response 200:
+# {
+#   "success": true,
+#   "message": "Bucket updated successfully",
+#   "data": {
+#     "id": 123,
+#     "visibility": "public",
+#     "description": "Updated description",
+#     "cors_enabled": true,
+#     "cors_origins": ["https://myapp.com"],
+#     "updated_at": "2025-11-08T10:20:11.012Z"
+#   }
+# }`,
 
       deleteBucket: `# Delete empty bucket (safe mode)
 curl -X DELETE ${API_BASE_URL}/buckets/{bucketId} \\
@@ -1195,11 +1320,33 @@ curl -X DELETE ${API_BASE_URL}/buckets/{bucketId} \\
 
 # Force delete bucket with files (use with caution!)
 curl -X DELETE "${API_BASE_URL}/buckets/{bucketId}?force=true" \\
-  -H "x-api-key: your-api-key-here"`,
+  -H "x-api-key: your-api-key-here"
+
+# Response 200:
+# {
+#   "success": true,
+#   "message": "Bucket deleted successfully",
+#   "data": null
+# }`,
 
       bucketStats: `# Get bucket statistics
 curl -X GET ${API_BASE_URL}/buckets/{bucketId}/stats \\
-  -H "x-api-key: your-api-key-here"`,
+  -H "x-api-key: your-api-key-here"
+
+# Response 200:
+# {
+#   "success": true,
+#   "message": "Success",
+#   "data": {
+#     "total_files": 12,
+#     "total_size": 73400320,
+#     "total_downloads": 48,
+#     "typeDistribution": {
+#       "image/jpeg": 8,
+#       "video/mp4": 4
+#     }
+#   }
+# }`,
 
       uploadFile: `# Upload a file
 # Note: File visibility automatically matches bucket visibility
@@ -1240,21 +1387,32 @@ curl -X POST ${API_BASE_URL}/buckets/{bucketId}/files/presigned \\
 SHA1=$(sha1sum large-video.mp4 | cut -d' ' -f1)
 
 # Step 3: Upload directly to B2 (bypasses your server - 50-70% faster!)
-curl -X POST "$UPLOAD_URL" \\
-  -H "Authorization: $UPLOAD_AUTH_TOKEN" \\
-  -H "X-Bz-File-Name: large-video.mp4" \\
-  -H "Content-Type: video/mp4" \\
-  -H "Content-Length: 104857600" \\
-  -H "X-Bz-Content-Sha1: $SHA1" \\
-  --data-binary @large-video.mp4
+B2_RESPONSE=$(curl -sS -X POST "$UPLOAD_URL" \
+  -H "Authorization: $UPLOAD_AUTH_TOKEN" \
+  -H "X-Bz-File-Name: large-video.mp4" \
+  -H "Content-Type: video/mp4" \
+  -H "Content-Length: 104857600" \
+  -H "X-Bz-Content-Sha1: $SHA1" \
+  --data-binary @large-video.mp4)
+
+# Extract the B2 fileId (requires jq)
+B2_FILE_ID=$(echo "$B2_RESPONSE" | jq -r '.fileId')
+
+if [ -z "$B2_FILE_ID" ] || [ "$B2_FILE_ID" = "null" ]; then
+  echo "B2 upload failed:" >&2
+  echo "$B2_RESPONSE" >&2
+  exit 1
+fi
 
 # Step 4: Complete the upload on your server
 curl -X POST ${API_BASE_URL}/files/file/{fileId}/complete \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
+    "b2FileId": "'"$B2_FILE_ID"'",
     "sha1": "'"$SHA1"'",
-    "finalSize": 104857600
+    "tags": ["video", "media"],
+    "metadata": {"category": "videos"}
   }'`,
 
       listFiles: `# List files in bucket
@@ -1292,7 +1450,7 @@ curl -X POST ${API_BASE_URL}/files/bulk/delete \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "fileIds": [123, 456, 789]
+    "fileIds": ["file-id-1", "file-id-2", "file-id-3"]
   }'`,
 
       bulkUpdate: `# Update multiple files at once
@@ -1301,7 +1459,7 @@ curl -X POST ${API_BASE_URL}/files/bulk/update \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "fileIds": [123, 456, 789],
+    "fileIds": ["file-id-1", "file-id-2", "file-id-3"],
     "tags": ["archived", "2024"],
     "metadata": {"processed": true}
   }'`,
@@ -1311,7 +1469,7 @@ curl -X POST ${API_BASE_URL}/files/bulk/download \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "fileIds": [123, 456, 789]
+    "fileIds": ["file-id-1", "file-id-2", "file-id-3"]
   }'`,
 
       bulkMove: `# Move multiple files to another bucket
@@ -1319,8 +1477,8 @@ curl -X POST ${API_BASE_URL}/files/bulk/move \\
   -H "x-api-key: your-api-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "fileIds": [123, 456, 789],
-    "targetBucketId": 42
+    "fileIds": ["file-id-1", "file-id-2", "file-id-3"],
+    "targetBucketId": "target-bucket-id"
   }'`,
 
       bulkUpload: `# Upload multiple files at once (up to 20 files)
@@ -1391,7 +1549,7 @@ curl -X POST ${API_BASE_URL}/buckets \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "public-assets",
-    "isPublicBucket": true
+    "visibility": "public"
   }'
 
 # Then upload files - they will automatically be public:
@@ -1660,7 +1818,7 @@ curl -X GET ${API_BASE_URL}/buckets \\
                 id="authentication"
                 title="Authentication"
                 icon={KeyIcon}
-                description="All API requests require authentication using an API key. You can create API keys in your dashboard with specific permissions."
+                description="Storage and user-profile APIs accept scoped API keys via the x-api-key header. Auth-only endpoints under /auth/* still require a user JWT bearer token. Generate scoped API keys and JWTs from the dashboard."
                 codeKey="authentication"
               />
 

@@ -169,6 +169,18 @@ export const authenticateApiKey = async (req, res, next) => {
   }
 };
 
+// Allow either JWT or API key authentication for first-party user routes
+export const authenticateUserAccess = async (req, res, next) => {
+  const hasApiKey = Boolean(req.headers['x-api-key'] || req.query.api_key);
+  const hasJwt = Boolean(req.headers.authorization && req.headers.authorization.startsWith('Bearer'));
+
+  if (hasApiKey && !hasJwt) {
+    return authenticateApiKey(req, res, next);
+  }
+
+  return authenticate(req, res, next);
+};
+
 // Check API key permissions
 export const requirePermission = (requiredPermission) => {
   return (req, res, next) => {

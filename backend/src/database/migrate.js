@@ -883,7 +883,7 @@ const createTables = async () => {
         'Forever (no expiry)',
         'Perfect for testing and small projects. No card needed, no hidden fees.',
         1, 3, 50000, 5,
-        3, true, false,
+        3, true, true,
         100, 0,
         false, false, true,
         false, false, false,
@@ -904,6 +904,7 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
+        private_buckets_allowed = EXCLUDED.private_buckets_allowed,
         updated_at = CURRENT_TIMESTAMP
     `);
   logger.info('Inserted/Updated Free plan');

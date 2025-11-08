@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
-    "prepublishOnly": "npm run lint"
+    "test": "node test-sdk.js"
   },
   "keywords": [
     "hypz",

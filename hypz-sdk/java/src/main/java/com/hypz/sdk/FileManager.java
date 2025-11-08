@@ -134,22 +134,27 @@ public class FileManager {
         if (fileId == null || fileId.isEmpty()) {
             throw new IllegalArgumentException("fileId is required");
         }
-
-        Map<String, Object> payload = new HashMap<>();
-        if (completion != null) {
-            if (completion.finalSize != null) {
-                payload.put("finalSize", completion.finalSize);
-            }
-            if (completion.sha1 != null && !completion.sha1.isEmpty()) {
-                payload.put("sha1", completion.sha1);
-            }
-            if (completion.partCount != null) {
-                payload.put("partCount", completion.partCount);
-            }
+        if (completion == null || completion.b2FileId == null || completion.b2FileId.isEmpty()) {
+            throw new IllegalArgumentException("b2FileId is required to complete presigned uploads");
         }
 
-        if (payload.isEmpty()) {
-            return client.post("/files/file/" + fileId + "/complete", Collections.emptyMap());
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("b2FileId", completion.b2FileId);
+
+        if (completion.finalSize != null) {
+            payload.put("finalSize", completion.finalSize);
+        }
+        if (completion.sha1 != null && !completion.sha1.isEmpty()) {
+            payload.put("sha1", completion.sha1);
+        }
+        if (completion.partCount != null) {
+            payload.put("partCount", completion.partCount);
+        }
+        if (completion.tags != null && !completion.tags.isEmpty()) {
+            payload.put("tags", completion.tags);
+        }
+        if (completion.metadata != null && !completion.metadata.isEmpty()) {
+            payload.put("metadata", completion.metadata);
         }
 
         return client.post("/files/file/" + fileId + "/complete", payload);
@@ -188,9 +193,17 @@ public class FileManager {
     }
 
     public static class PresignedUploadCompletion {
+        private String b2FileId;
         private Long finalSize;
         private String sha1;
         private Integer partCount;
+        private List<String> tags;
+        private Map<String, Object> metadata;
+
+        public PresignedUploadCompletion b2FileId(String b2FileId) {
+            this.b2FileId = b2FileId;
+            return this;
+        }
 
         public PresignedUploadCompletion finalSize(Long finalSize) {
             this.finalSize = finalSize;
@@ -204,6 +217,16 @@ public class FileManager {
 
         public PresignedUploadCompletion partCount(Integer partCount) {
             this.partCount = partCount;
+            return this;
+        }
+
+        public PresignedUploadCompletion tags(List<String> tags) {
+            this.tags = tags;
+            return this;
+        }
+
+        public PresignedUploadCompletion metadata(Map<String, Object> metadata) {
+            this.metadata = metadata;
             return this;
         }
     }

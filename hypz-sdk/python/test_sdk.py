@@ -28,8 +28,10 @@ def test_connection(api_key, base_url):
         
         # Test bucket creation
         print("\n[2/6] Creating test bucket...")
+        import time
+
         bucket = client.buckets.create(
-            name=f'sdk-test-bucket',
+            name=f'sdk-test-bucket-{int(time.time())}',
             description='Test bucket created by Python SDK',
             visibility='private'
         )

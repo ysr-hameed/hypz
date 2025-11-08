@@ -39,13 +39,13 @@ const authMiddleware = (req, res, next) => {
 // Validation for bulk operations
 const bulkDeleteValidation = [
   body('fileIds').isArray({ min: 1, max: 100 }).withMessage('fileIds must be an array with 1-100 items'),
-  body('fileIds.*').isInt({ min: 1 }).withMessage('Each fileId must be a positive integer'),
+  body('fileIds.*').isUUID().withMessage('Each fileId must be a valid UUID'),
   validate
 ];
 
 const bulkUpdateValidation = [
   body('fileIds').isArray({ min: 1, max: 100 }).withMessage('fileIds must be an array with 1-100 items'),
-  body('fileIds.*').isInt({ min: 1 }).withMessage('Each fileId must be a positive integer'),
+  body('fileIds.*').isUUID().withMessage('Each fileId must be a valid UUID'),
   body('tags').optional().isArray().withMessage('tags must be an array'),
   body('metadata').optional().isObject().withMessage('metadata must be an object'),
   validate
@@ -53,14 +53,14 @@ const bulkUpdateValidation = [
 
 const bulkDownloadValidation = [
   body('fileIds').isArray({ min: 1, max: 50 }).withMessage('fileIds must be an array with 1-50 items'),
-  body('fileIds.*').isInt({ min: 1 }).withMessage('Each fileId must be a positive integer'),
+  body('fileIds.*').isUUID().withMessage('Each fileId must be a valid UUID'),
   validate
 ];
 
 const bulkMoveValidation = [
   body('fileIds').isArray({ min: 1, max: 100 }).withMessage('fileIds must be an array with 1-100 items'),
-  body('fileIds.*').isInt({ min: 1 }).withMessage('Each fileId must be a positive integer'),
-  body('targetBucketId').isInt({ min: 1 }).withMessage('targetBucketId must be a positive integer'),
+  body('fileIds.*').isUUID().withMessage('Each fileId must be a valid UUID'),
+  body('targetBucketId').isUUID().withMessage('targetBucketId must be a valid UUID'),
   validate
 ];
 

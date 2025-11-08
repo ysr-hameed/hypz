@@ -245,9 +245,7 @@ class FileManager:
         try:
             # Prepare form data
             files = {'file': (filename, file_data)}
-            data = {
-                'isPublic': str(is_public).lower(),
-            }
+            data = {}
             
             if tags:
                 data['tags'] = json.dumps(tags)
@@ -436,18 +434,24 @@ class FileManager:
     def complete_presigned_upload(
         self,
         file_id: Union[int, str],
+        b2_file_id: Optional[str] = None,
         final_size: Optional[int] = None,
         sha1: Optional[str] = None,
-        part_count: Optional[int] = None
+        part_count: Optional[int] = None,
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Complete a presigned upload after the file has been uploaded to B2.
 
         Args:
             file_id: The temporary file ID received from initiate_presigned_upload
+            b2_file_id: Required Backblaze file ID returned by the upload step
             final_size: Optional final file size in bytes (recommended)
             sha1: Optional SHA1 checksum if available
             part_count: Optional number of uploaded parts for multipart uploads
+            tags: Optional list of tags to store with the file
+            metadata: Optional metadata dictionary to persist with the file
 
         Returns:
             Finalized file metadata from the Hypz API.
@@ -455,10 +459,16 @@ class FileManager:
         if not file_id:
             raise ValueError('file_id is required')
 
+        if not b2_file_id:
+            raise ValueError('b2_file_id is required to complete presigned uploads')
+
         payload: Dict[str, Any] = {
+            'b2FileId': b2_file_id,
             'finalSize': final_size,
             'sha1': sha1,
-            'partCount': part_count
+            'partCount': part_count,
+            'tags': tags,
+            'metadata': metadata
         }
 
         cleaned_payload = {k: v for k, v in payload.items() if v is not None}
