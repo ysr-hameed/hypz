@@ -12,8 +12,7 @@
   status = 200
   force = true
 
-[ [headers] ]
-  # Netlify expects the headers block as an array of tables
+  # Netlify header table (single [[headers]] block used below)
 [[headers]]
   for = "/*"
   [headers.values]
