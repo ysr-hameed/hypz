@@ -6,9 +6,15 @@ plugins {
 group = 'com.hypz'
 version = '1.0.1'
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+sourceSets {
+    main {
+        java {
+            exclude '**/examples/**'
+        }
+    }
 }
 
 repositories {
@@ -32,18 +38,16 @@ publishing {
         maven(MavenPublication) {
             from components.java
             
-            pom {
-                name = 'Hypz SDK for Java/Android'
-                description = 'Java SDK for Hypz File Storage Platform'
-                url = 'https://github.com/yourusername/hypz-sdk'
-                
-                licenses {
-                    license {
-                        name = 'MIT License'
-                        url = 'https://opensource.org/licenses/MIT'
-                    }
-                }
-            }
+            groupId 'com.hypz'
+            artifactId 'hypz-sdk'
+            version '1.0.1'
+        }
+    }
+    
+    repositories {
+        maven {
+            name = "Local"
+            url = uri("${buildDir}/repo")
         }
     }
 }

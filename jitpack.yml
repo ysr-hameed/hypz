@@ -1,0 +1,6 @@
+jdk:
+  - openjdk11
+before_install:
+  - cd hypz-sdk/java
+install:
+  - gradle build -x test

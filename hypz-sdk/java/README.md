@@ -19,23 +19,38 @@ Official Java client library for [Hypz Cloud Storage](https://hypz.io) - a power
 
 ## Installation
 
-### Gradle
+### Gradle (via JitPack)
 
 ```gradle
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
 dependencies {
-    implementation 'io.hypz:hypz-sdk:1.0.0'
+    implementation 'com.github.ysr-hameed.hypz:java:1.0.1'
 }
 ```
 
-### Maven
+### Maven (via JitPack)
 
 ```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-    <groupId>io.hypz</groupId>
-    <artifactId>hypz-sdk</artifactId>
-    <version>1.0.0</version>
+    <groupId>com.github.ysr-hameed.hypz</groupId>
+    <artifactId>java</artifactId>
+    <version>1.0.1</version>
 </dependency>
 ```
+
+### Manual JAR Download
+
+Download the latest JAR from [GitHub Releases](https://github.com/ysr-hameed/hypz/releases).
 
 ## Quick Start
 
