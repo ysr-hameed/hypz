@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   CreditCard, 
   RefreshCw, 
@@ -17,6 +18,7 @@ import apiConfig from '../../config/api';
 import { logger } from '../../utils/logger';
 
 const Billing = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [usageCost, setUsageCost] = useState(null);
@@ -24,6 +26,18 @@ const Billing = () => {
   const [pendingInvoices, setPendingInvoices] = useState([]);
   const [autoRenew, setAutoRenew] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  // Check for payment success
+  useEffect(() => {
+    if (searchParams.get('session') === 'success') {
+      toast.success('Payment successful! Your subscription is being activated.', {
+        duration: 5000,
+        icon: '🎉'
+      });
+      // Remove the query parameter
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   const api = useMemo(() => axios.create({
     baseURL: apiConfig.API_URL,

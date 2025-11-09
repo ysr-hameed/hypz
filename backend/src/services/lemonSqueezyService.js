@@ -58,7 +58,7 @@ export const createLemonSqueezyCheckout = async (variantId, customData = {}) => 
 
     const checkoutData = {
       productOptions: {
-        redirectUrl: `${config.FRONTEND_URL}/dashboard/billing?session=success`,
+        redirectUrl: `${config.FRONTEND_URL}/billing?session=success`,
       },
       checkoutData: {
         email: customData.email || undefined,
