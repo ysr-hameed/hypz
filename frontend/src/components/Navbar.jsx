@@ -1,9 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Sun, Moon, Menu, X, Zap } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { Link, useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
