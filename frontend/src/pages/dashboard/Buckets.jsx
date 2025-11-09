@@ -123,10 +123,12 @@ const Buckets = () => {
   };
 
   useEffect(() => {
+    // Only debounce when the search query changes to avoid double-fetch on mount
+    // Initial fetch is triggered by the mount effect above. When the user types a
+    // search term we wait 500ms before requesting to reduce API calls.
+    if (searchQuery === '') return;
     const delayDebounceFn = setTimeout(() => {
-      if (!loading) {
-        fetchBuckets();
-      }
+      fetchBuckets();
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
