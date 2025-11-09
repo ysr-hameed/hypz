@@ -239,21 +239,19 @@ const Api = () => {
               </p>
             </div>
 
-            <div className="border-l-4 border-purple-500 pl-4 py-2">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded">
-                  POST
-                </span>
-                <code className="text-sm font-mono text-gray-900 dark:text-white">
-                  /subscriptions/subscribe
-                </code>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Create new subscription with LemonSqueezy checkout
-              </p>
-            </div>
-
-            {/* Files */}
+                <div className="border-l-4 border-purple-500 pl-4 py-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded">
+                      POST
+                    </span>
+                    <code className="text-sm font-mono text-gray-900 dark:text-white">
+                      /subscriptions/subscribe
+                    </code>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Create new subscription with Stripe checkout
+                  </p>
+                </div>            {/* Files */}
             <div className="border-l-4 border-yellow-500 pl-4 py-2">
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-bold rounded">

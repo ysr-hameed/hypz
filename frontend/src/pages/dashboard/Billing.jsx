@@ -398,11 +398,11 @@ const Billing = () => {
                     <td className="py-3 px-4 text-sm font-semibold text-gray-900 dark:text-white">
                       {formatCurrency(payment.amount)}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                        {payment.payment_gateway === 'lemonsqueezy' ? 'Lemon Squeezy' : payment.payment_gateway || 'N/A'}
-                      </span>
-                    </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                          {payment.payment_gateway === 'stripe' ? 'Stripe' : payment.payment_gateway || 'N/A'}
+                        </span>
+                      </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         payment.status === 'completed' || payment.status === 'paid'

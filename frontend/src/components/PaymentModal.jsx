@@ -8,37 +8,37 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [error, setError] = useState(null);
   const price = plan.price_usd;
 
-  // Handle Lemon Squeezy payment
-  const handleLemonSqueezyPayment = async () => {
+  // Handle Stripe payment
+  const handleStripePayment = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Check if plan has LemonSqueezy variant ID
-      if (!plan.lemonsqueezy_variant_id) {
+      // Check if plan has Stripe price ID
+      if (!plan.stripe_price_id) {
         setError('This plan is not available for purchase yet. Please contact support or try another plan.');
         setLoading(false);
         return;
       }
 
       // Create checkout session
-      const response = await paymentAPI.createLemonSqueezyCheckout({
-        variantId: plan.lemonsqueezy_variant_id,
+      const response = await paymentAPI.createStripeCheckout({
+        priceId: plan.stripe_price_id,
         planId: plan.id
       });
 
       // Response interceptor already unwraps data
-      const { checkoutUrl } = response;
+      const { url } = response;
 
-      if (!checkoutUrl) {
+      if (!url) {
         throw new Error('No checkout URL received');
       }
 
-      // Redirect to Lemon Squeezy checkout
-      window.location.href = checkoutUrl;
+      // Redirect to Stripe checkout
+      window.location.href = url;
 
     } catch (err) {
-      logger.error('LemonSqueezy payment error:', err);
+      logger.error('Stripe payment error:', err);
       setError(err.message || err.response?.data?.message || 'Payment failed. Please try again.');
       setLoading(false);
     }
@@ -65,7 +65,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
     if (plan.type === 'free' || price === 0) {
       handleFreePlan();
     } else {
-      handleLemonSqueezyPayment();
+      handleStripePayment();
     }
   };
 
@@ -128,13 +128,13 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
               <div className="flex items-center gap-2 mb-2">
                 <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <span className="font-semibold text-blue-900 dark:text-blue-100">
-                  Payment Gateway
+                  Secure Payment
                 </span>
               </div>
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                Powered by <span className="font-semibold">Lemon Squeezy</span>
+                Powered by <span className="font-semibold">Stripe</span>
                 <br />
-                <span className="text-xs">Supports Credit/Debit Cards, PayPal & more</span>
+                <span className="text-xs">All major credit/debit cards accepted</span>
               </p>
             </div>
           )}
