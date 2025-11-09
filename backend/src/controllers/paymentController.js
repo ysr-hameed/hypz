@@ -1,13 +1,17 @@
 import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
-import { createStripeCheckoutSession } from '../services/stripeService.js';
+import { createLemonSqueezyCheckout } from '../services/lemonSqueezyService.js';
 import logger from '../utils/logger.js';
 
-// Create Stripe checkout session
-export const createStripePayment = asyncHandler(async (req, res) => {
+// Create LemonSqueezy checkout session
+export const createLemonSqueezyPayment = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { priceId, planId } = req.body;
+  const { variantId, planId } = req.body;
+
+  if (!variantId) {
+    return errorResponse(res, 'Variant ID is required', 400);
+  }
 
   // Get user details
   const userResult = await query(
@@ -17,37 +21,44 @@ export const createStripePayment = asyncHandler(async (req, res) => {
 
   const user = userResult.rows[0];
 
-  // Create checkout session
-  const session = await createStripeCheckoutSession(priceId, {
-    userId,
-    planId,
-    userEmail: user.email,
-  });
-
-  // Store payment record
-  await query(
-    `INSERT INTO payments (
-      user_id, plan_id, amount, currency, status, payment_method,
-      payment_gateway, transaction_id, metadata, invoice_url
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
+  try {
+    // Create checkout session
+    const checkoutData = await createLemonSqueezyCheckout(variantId, {
       userId,
       planId,
-      0, // Amount will be updated via webhook
-      'usd',
-      'pending',
-      'stripe',
-      'stripe',
-      session.id,
-      { sessionId: session.id, subscriptionId: session.subscription },
-      session.url
-    ]
-  );
+      email: user.email,
+      name: `${user.first_name} ${user.last_name}`.trim()
+    });
 
-  successResponse(res, {
-    sessionId: session.id,
-    url: session.url
-  });
+    // Store payment record
+    await query(
+      `INSERT INTO payments (
+        user_id, plan_id, amount, currency, status, payment_method,
+        payment_gateway, transaction_id, metadata, invoice_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        userId,
+        planId,
+        0, // Amount will be updated via webhook
+        'usd',
+        'pending',
+        'lemonsqueezy',
+        'lemonsqueezy',
+        checkoutData.id,
+        { checkoutId: checkoutData.id, variantId },
+        checkoutData.attributes.url
+      ]
+    );
+
+    successResponse(res, {
+      checkoutId: checkoutData.id,
+      url: checkoutData.attributes.url,
+      message: 'Redirect user to checkout URL'
+    });
+  } catch (error) {
+    logger.error({ err: error, userId, variantId }, 'Failed to create LemonSqueezy checkout');
+    return errorResponse(res, `Failed to create checkout: ${error.message}`, 500);
+  }
 });
 
 // Get payment history
@@ -83,6 +94,6 @@ export const getPaymentHistory = asyncHandler(async (req, res) => {
 });
 
 export default {
-  createStripePayment,
+  createLemonSqueezyPayment,
   getPaymentHistory
 };

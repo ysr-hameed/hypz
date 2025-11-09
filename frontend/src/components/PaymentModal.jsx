@@ -8,37 +8,30 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
   const [error, setError] = useState(null);
   const price = plan.price_usd;
 
-  // Handle Stripe payment
-  const handleStripePayment = async () => {
+  // Handle LemonSqueezy payment
+  const handleLemonSqueezyPayment = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Check if plan has Stripe price ID
-      if (!plan.stripe_price_id) {
-        setError('This plan is not available for purchase yet. Please contact support or try another plan.');
-        setLoading(false);
-        return;
-      }
-
-      // Create checkout session
-      const response = await paymentAPI.createStripeCheckout({
-        priceId: plan.stripe_price_id,
+      // Create checkout session - backend will handle variant ID mapping
+      const response = await paymentAPI.createCheckout({
         planId: plan.id
       });
 
-      // Response interceptor already unwraps data
-      const { url } = response;
+      // Backend returns: { success, message, data: { checkoutUrl } }
+      // Axios interceptor unwraps response.data, so we get the full response
+      const { data } = response;
 
-      if (!url) {
+      if (!data?.checkoutUrl) {
         throw new Error('No checkout URL received');
       }
 
-      // Redirect to Stripe checkout
-      window.location.href = url;
+      // Redirect to LemonSqueezy checkout
+      window.location.href = data.checkoutUrl;
 
     } catch (err) {
-      logger.error('Stripe payment error:', err);
+      logger.error('LemonSqueezy payment error:', err);
       setError(err.message || err.response?.data?.message || 'Payment failed. Please try again.');
       setLoading(false);
     }
@@ -65,7 +58,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
     if (plan.type === 'free' || price === 0) {
       handleFreePlan();
     } else {
-      handleStripePayment();
+      handleLemonSqueezyPayment();
     }
   };
 
@@ -132,7 +125,7 @@ const PaymentModal = ({ plan, onClose, onSuccess }) => {
                 </span>
               </div>
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                Powered by <span className="font-semibold">Stripe</span>
+                Powered by <span className="font-semibold">LemonSqueezy</span>
                 <br />
                 <span className="text-xs">All major credit/debit cards accepted</span>
               </p>

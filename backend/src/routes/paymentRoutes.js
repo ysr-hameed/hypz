@@ -1,22 +1,22 @@
 import express from 'express';
 import { authenticate, blockApiKeyAccess } from '../middleware/auth.js';
 import {
-  createStripePayment,
+  createLemonSqueezyPayment,
   getPaymentHistory
 } from '../controllers/paymentController.js';
-import { handleStripeWebhook } from '../controllers/stripeWebhookController.js';
+import { handleLemonSqueezyWebhook } from '../controllers/lemonSqueezyWebhookController.js';
 
 const router = express.Router();
 
 // Webhook routes (no auth - verified by signature)
-router.post('/webhook/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+router.post('/webhook/lemonsqueezy', express.json(), handleLemonSqueezyWebhook);
 
 // Authenticated routes - Block API key access (payments must be done via dashboard)
 router.use(authenticate);
 router.use(blockApiKeyAccess);
 
-// Stripe routes
-router.post('/stripe/checkout', createStripePayment);
+// LemonSqueezy routes
+router.post('/checkout', createLemonSqueezyPayment);
 
 // Get payment history
 router.get('/history', getPaymentHistory);

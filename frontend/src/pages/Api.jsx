@@ -249,7 +249,7 @@ const Api = () => {
                     </code>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Create new subscription with Stripe checkout
+                    Create new subscription with LemonSqueezy checkout
                   </p>
                 </div>            {/* Files */}
             <div className="border-l-4 border-yellow-500 pl-4 py-2">

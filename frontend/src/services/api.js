@@ -142,9 +142,7 @@ export const plansAPI = {
 };
 
 export const paymentAPI = {
-  createRazorpayOrder: (data) => api.post('/payments/razorpay/create', data),
-  verifyRazorpayPayment: (data) => api.post('/payments/razorpay/verify', data),
-  createStripeCheckout: (data) => api.post('/payments/stripe/checkout', data),
+  createCheckout: (data) => api.post('/subscriptions/subscribe', data), // LemonSqueezy checkout
   getPaymentHistory: (params) => api.get('/payments/history', { params })
 };
 

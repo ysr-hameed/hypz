@@ -2,6 +2,7 @@ import { query, transaction } from '../config/database.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import { asyncHandler } from '../middleware/validator.js';
 import { createLemonSqueezyCheckout } from '../services/lemonSqueezyService.js';
+import logger from '../utils/logger.js';
 
 /**
  * PAYMENT LOGIC - BEST PRACTICES
@@ -27,16 +28,20 @@ import { createLemonSqueezyCheckout } from '../services/lemonSqueezyService.js';
 // Create subscription (handles Free, Pro, PAYG)
 export const createSubscription = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { planId, variantId, autoRenew = true } = req.body;
+  let { planId, variantId, autoRenew = true } = req.body;
+
+  logger.info({ userId, planId, variantId, body: req.body }, 'Create subscription request received');
 
   // Get plan details
   const planResult = await query('SELECT * FROM plans WHERE id = $1', [planId]);
   
   if (planResult.rows.length === 0) {
+    logger.warn({ planId }, 'Plan not found');
     return errorResponse(res, 'Plan not found', 404);
   }
 
   const plan = planResult.rows[0];
+  logger.info({ plan }, 'Plan details retrieved');
 
   // For free plan, just activate it
   if (plan.type === 'free') {
@@ -47,28 +52,70 @@ export const createSubscription = asyncHandler(async (req, res) => {
     return successResponse(res, { message: 'Free plan activated' });
   }
 
+  // If no variantId provided, try to get it from the plan's lemonsqueezy_variant_id
+  if (!variantId && plan.lemonsqueezy_variant_id) {
+    variantId = plan.lemonsqueezy_variant_id;
+    logger.info({ variantId, source: 'database' }, 'Using variant ID from plan');
+  }
+
+  // Hard-coded variant IDs as fallback (supports both string and numeric plan IDs)
+  if (!variantId) {
+    const variantMap = {
+      // Numeric IDs
+      2: '1080591', // Pro Plan
+      3: '1080598', // PAYG Plan
+      // String IDs
+      'pro_monthly': '1080591',
+      'payg': '1080598',
+    };
+    variantId = variantMap[planId];
+    logger.info({ variantId, planId, source: 'hardcoded_map' }, 'Using hardcoded variant ID');
+  }
+
+  if (!variantId) {
+    logger.error({ planId }, 'No variant ID found for plan');
+    return errorResponse(res, 
+      'This plan is not available for purchase yet. Please contact support or try another plan.', 
+      400
+    );
+  }
+
+  // Convert variant ID to integer (LemonSqueezy requires numeric IDs)
+  const numericVariantId = parseInt(variantId, 10);
+  
+  if (isNaN(numericVariantId)) {
+    logger.error({ variantId, planId }, 'Invalid variant ID - not a number');
+    return errorResponse(res, 'Invalid plan configuration. Please contact support.', 500);
+  }
+
   // Create LemonSqueezy checkout with custom data
   try {
-    const checkoutData = await createLemonSqueezyCheckout(variantId, {
-      userId,
-      planId,
-      planType: plan.type,
-      autoRenew,
-      email: req.user.email
+    logger.info({ variantId: numericVariantId, planId, userId }, 'Creating LemonSqueezy checkout');
+    
+    // LemonSqueezy requires all custom data fields to be strings
+    const checkoutData = await createLemonSqueezyCheckout(numericVariantId, {
+      userId: String(userId),
+      planId: String(planId),
+      planType: String(plan.type),
+      autoRenew: String(autoRenew),
+      email: String(req.user.email)
     });
+
+    logger.info({ checkoutUrl: checkoutData.url }, 'Checkout created successfully');
 
     // Store pending subscription record
     await query(
       `INSERT INTO subscriptions (user_id, plan_id, status, metadata)
        VALUES ($1, $2, $3, $4)`,
-      [userId, planId, 'pending', { checkoutUrl: checkoutData.attributes.url }]
+      [userId, planId, 'pending', { checkoutUrl: checkoutData.url }]
     );
 
     successResponse(res, {
-      checkoutUrl: checkoutData.attributes.url,
+      checkoutUrl: checkoutData.url,
       message: 'Redirect to checkout to complete subscription'
     });
   } catch (error) {
+    logger.error({ err: error, planId, variantId }, 'Failed to create checkout');
     return errorResponse(res, 
       `Failed to create checkout: ${error.message}. Please verify LemonSqueezy variant ID is valid.`, 
       400
