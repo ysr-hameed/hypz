@@ -41,8 +41,10 @@ export const handleLemonSqueezyWebhook = async (req, res) => {
       return res.status(400).json({ error: 'No signature provided' });
     }
 
-    // Verify signature
-    const rawBody = JSON.stringify(req.body);
+    // req.body is raw Buffer because route uses express.raw()
+    const rawBody = req.body && typeof req.body === 'string' ? req.body : req.body?.toString?.() || '';
+
+    // Verify signature against the raw payload
     const isValid = verifyLemonSqueezyWebhook(rawBody, signature);
 
     if (!isValid) {
@@ -50,7 +52,14 @@ export const handleLemonSqueezyWebhook = async (req, res) => {
       return res.status(400).json({ error: 'Invalid signature' });
     }
 
-    const event = req.body;
+    // Parse the raw JSON payload
+    let event;
+    try {
+      event = JSON.parse(rawBody);
+    } catch (err) {
+      logger.error({ err }, 'Failed to parse LemonSqueezy webhook JSON');
+      return res.status(400).json({ error: 'Invalid JSON payload' });
+    }
     const eventId = event.meta?.event_name + '_' + event.data?.id;
 
     logger.info({ 
