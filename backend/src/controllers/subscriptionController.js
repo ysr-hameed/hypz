@@ -110,6 +110,31 @@ export const createSubscription = asyncHandler(async (req, res) => {
       [userId, planId, 'pending', { checkoutUrl: checkoutData.url }]
     );
 
+    // Also create a pending payment record so webhooks can reconcile it
+    try {
+      await query(
+        `INSERT INTO payments (
+          user_id, plan_id, amount, currency, status, payment_method,
+          payment_gateway, transaction_id, metadata, invoice_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          userId,
+          planId,
+          0, // amount will be updated by webhook
+          'usd',
+          'pending',
+          'lemonsqueezy',
+          'lemonsqueezy',
+          checkoutData.id,
+          JSON.stringify({ checkoutId: checkoutData.id, variantId }),
+          checkoutData.attributes?.url || checkoutData.url
+        ]
+      );
+    } catch (err) {
+      // Don't fail the subscription creation if payment record insert fails; log and continue
+      logger.error({ err, userId, planId, checkoutId: checkoutData.id }, 'Failed to create pending payment record');
+    }
+
     successResponse(res, {
       checkoutUrl: checkoutData.url,
       message: 'Redirect to checkout to complete subscription'

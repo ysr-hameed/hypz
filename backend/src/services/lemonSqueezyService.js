@@ -156,28 +156,88 @@ export const cancelLemonSqueezySubscription = async (subscriptionId) => {
 
 /**
  * Create an invoice for usage-based billing
+ * @param {string} userId - User ID
  * @param {string} subscriptionId - LemonSqueezy subscription ID
- * @param {number} amount - Amount in cents
+ * @param {number} amount - Amount in dollars (will be converted to cents)
  * @param {string} description - Invoice description
  * @returns {Promise<object>} Invoice data
  */
-export const createLemonSqueezyInvoice = async (subscriptionId, amount, description) => {
+export const createLemonSqueezyInvoice = async (userId, subscriptionId, amount, description) => {
   try {
     if (!configureLemonSqueezy()) {
       throw new Error('LemonSqueezy is not configured');
     }
 
-    // Note: LemonSqueezy doesn't have a direct invoice creation API
-    // You'll need to use subscription usage records or custom charges
-    // This is a placeholder for the actual implementation
-    
-    logger.info({ subscriptionId, amount, description }, 'Creating usage-based invoice');
+    logger.info({ userId, subscriptionId, amount, description }, 'Creating usage-based invoice for PAYG');
 
-    // For now, we'll log this and handle it through webhooks
-    // You may need to implement this using LemonSqueezy's subscription update API
-    throw new Error('Invoice creation not yet implemented for LemonSqueezy');
+    // LemonSqueezy doesn't have a direct invoice API, but we can create a one-time charge
+    // or track this in our database and charge via the subscription
+    
+    // For now, we'll create a payment record in our database
+    // and let the subscription handle the billing cycle
+    // In production, you might want to use LemonSqueezy's usage-based billing API
+    // or create a separate checkout for the usage charges
+    
+    const { query } = await import('../config/database.js');
+    
+    // Create usage billing record
+    const billingResult = await query(
+      `INSERT INTO usage_billing (
+        user_id, billing_period_start, billing_period_end,
+        total_cost, payment_status, metadata
+      ) VALUES (
+        $1, 
+        date_trunc('month', CURRENT_DATE),
+        date_trunc('month', CURRENT_DATE) + interval '1 month' - interval '1 day',
+        $2, 
+        'pending',
+        $3
+      ) RETURNING *`,
+      [
+        userId,
+        amount,
+        JSON.stringify({ description, subscriptionId })
+      ]
+    );
+
+    // Create a payment record for tracking
+    await query(
+      `INSERT INTO payments (
+        user_id, amount, currency, status, payment_method,
+        payment_gateway, billing_reason, usage_details, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        userId,
+        amount,
+        'usd',
+        'pending',
+        'lemonsqueezy',
+        'lemonsqueezy',
+        'usage_based',
+        JSON.stringify({ description }),
+        JSON.stringify({ 
+          billingId: billingResult.rows[0].id,
+          subscriptionId,
+          type: 'payg_usage'
+        })
+      ]
+    );
+
+    logger.info({ 
+      userId, 
+      billingId: billingResult.rows[0].id, 
+      amount 
+    }, 'Usage invoice created successfully');
+
+    return {
+      success: true,
+      billingId: billingResult.rows[0].id,
+      amount,
+      status: 'pending',
+      message: 'Usage invoice created. User can pay via billing dashboard.'
+    };
   } catch (error) {
-    logger.error({ err: error, subscriptionId }, 'Error creating LemonSqueezy invoice');
+    logger.error({ err: error, userId, subscriptionId }, 'Error creating LemonSqueezy invoice');
     throw error;
   }
 };

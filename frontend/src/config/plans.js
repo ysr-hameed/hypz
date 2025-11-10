@@ -474,15 +474,89 @@ export const mockUserData = {
 
 // Simulated API call to fetch user plan (replace with real API later)
 export const fetchUserPlan = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const plan = getPlanById(mockUserData.currentPlan.planId);
-      resolve({
-        ...mockUserData,
-        planDetails: plan
-      });
-    }, 500);
-  });
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/plans/user/current`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user plan');
+    }
+
+    const result = await response.json();
+    const data = result.data || result;
+    
+    // Map backend response to frontend expected format
+    const planData = data.plan || {};
+    const usage = data.usage || {};
+    
+    // Get plan details from PLANS_DATA
+    let planDetails = null;
+    if (planData.type === 'free') {
+      planDetails = PLANS_DATA.plans.free;
+    } else if (planData.type === 'payg') {
+      planDetails = PLANS_DATA.plans.payg;
+    } else {
+      // For other plans (pro, etc), use plan data from backend
+      planDetails = {
+        id: planData.id || planData.plan_id,
+        name: planData.name || 'Unknown Plan',
+        type: planData.type || 'free',
+        storageGB: planData.storage_gb || 0,
+        bandwidthGB: planData.bandwidth_gb || 0,
+        apiCalls: planData.api_calls || 0,
+        priceUSD: planData.price_usd || 0,
+        features: planData.features || {}
+      };
+    }
+
+    return {
+      currentPlan: {
+        planId: planData.id || planData.plan_id || 'free_global',
+        status: planData.subscription_status || 'active',
+        startDate: planData.plan_start_date,
+        renewalType: planData.auto_renew ? 'auto' : 'manual',
+        autoUpgrade: planData.auto_upgrade || false
+      },
+      planDetails,
+      usage: {
+        storage: {
+          used: usage.storage || 0,
+          limit: planDetails?.storageGB ? planDetails.storageGB * 1024 * 1024 * 1024 : 'unlimited',
+          percentage: usage.storagePercent || 0
+        },
+        bandwidth: {
+          used: usage.bandwidth || 0,
+          limit: planDetails?.bandwidthGB ? planDetails.bandwidthGB * 1024 * 1024 * 1024 : 'unlimited',
+          percentage: usage.bandwidthPercent || 0
+        },
+        apiCalls: {
+          used: usage.apiCalls || 0,
+          limit: planDetails?.apiCalls || 'unlimited',
+          percentage: usage.apiCallsPercent || 0
+        }
+      },
+      buckets: [],
+      apiKeys: [],
+      teamMembers: []
+    };
+  } catch (error) {
+    console.error('Error fetching user plan:', error);
+    // Fallback to mock data on error
+    const plan = getPlanById(mockUserData.currentPlan.planId);
+    return {
+      ...mockUserData,
+      planDetails: plan
+    };
+  }
 };
 
 // Calculate usage percentage

@@ -150,33 +150,71 @@ const handleOrderCreated = async (order, meta) => {
   try {
     const customData = meta.custom_data || {};
     const userId = customData.userId || customData.user_id;
+    const planId = customData.planId || customData.plan_id;
+
+    logger.info({ 
+      orderId: order.id, 
+      customData, 
+      userId, 
+      planId,
+      status: order.attributes.status 
+    }, 'Processing order_created webhook');
 
     if (!userId) {
-      logger.warn({ orderId: order.id }, 'No userId in order custom data');
+      logger.warn({ orderId: order.id, customData }, 'No userId in order custom data');
       return;
     }
 
     await transaction(async (client) => {
-      // Update payment record
+      // If planId exists, update user's plan
+      if (planId) {
+        await client.query(
+          `UPDATE users 
+           SET plan_id = $1, 
+               plan_start_date = CURRENT_TIMESTAMP,
+               subscription_status = 'active',
+               services_active = true,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [planId, userId]
+        );
+
+        logger.info({ userId, planId, orderId: order.id }, 'User plan activated from order');
+      }
+
+      // Create/update payment record
       await client.query(
-        `UPDATE payments 
-         SET status = $1, 
-             amount = $2,
-             transaction_id = $3,
-             metadata = $4,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $5 AND transaction_id = $6`,
-        ['completed', order.attributes.total, order.id, JSON.stringify(order), userId, order.id]
+        `INSERT INTO payments (
+          user_id, plan_id, amount, currency, status, payment_method,
+          payment_gateway, transaction_id, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (transaction_id)
+        DO UPDATE SET 
+          status = 'completed',
+          amount = $3,
+          metadata = $9,
+          updated_at = CURRENT_TIMESTAMP`,
+        [
+          userId,
+          planId,
+          order.attributes.total || 0,
+          order.attributes.currency || 'usd',
+          'completed',
+          'lemonsqueezy',
+          'lemonsqueezy',
+          order.id,
+          JSON.stringify(order)
+        ]
       );
 
       // Log activity
       await client.query(
         'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
-        [userId, 'payment_completed', JSON.stringify({ orderId: order.id, amount: order.attributes.total })]
+        [userId, 'payment_completed', JSON.stringify({ orderId: order.id, amount: order.attributes.total, planId })]
       );
     });
 
-    logger.info({ userId, orderId: order.id }, 'Order created successfully');
+    logger.info({ userId, orderId: order.id, planId }, 'Order created and processed successfully');
   } catch (error) {
     logger.error({ err: error, orderId: order.id }, 'Error handling order created');
   }
@@ -189,48 +227,98 @@ const handleSubscriptionCreated = async (subscription, meta) => {
     const userId = customData.userId || customData.user_id;
     const planId = customData.planId || customData.plan_id;
 
+    logger.info({ 
+      subscriptionId: subscription.id, 
+      customData, 
+      userId, 
+      planId,
+      status: subscription.attributes.status 
+    }, 'Processing subscription_created webhook');
+
     if (!userId || !planId) {
-      logger.warn({ subscriptionId: subscription.id }, 'Missing userId or planId in subscription custom data');
+      logger.warn({ 
+        subscriptionId: subscription.id, 
+        customData, 
+        meta 
+      }, 'Missing userId or planId in subscription custom data');
       return;
     }
 
     await transaction(async (client) => {
-      // Update user plan
+      // Update user plan and set active status
       await client.query(
         `UPDATE users 
          SET plan_id = $1, 
              plan_start_date = $2,
-             subscription_status = $3
+             subscription_status = $3,
+             services_active = true,
+             updated_at = CURRENT_TIMESTAMP
          WHERE id = $4`,
-        [planId, subscription.attributes.created_at, subscription.attributes.status, userId]
+        [planId, subscription.attributes.created_at, 'active', userId]
       );
 
-      // Create/update subscription record
+      // Create/update subscription record with active status
       await client.query(
         `INSERT INTO subscriptions (user_id, plan_id, ls_subscription_id, status, current_period_start, current_period_end, metadata)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (ls_subscription_id) 
-         DO UPDATE SET status = $4, current_period_start = $5, current_period_end = $6, metadata = $7`,
+         DO UPDATE SET 
+           status = $4, 
+           current_period_start = $5, 
+           current_period_end = $6, 
+           metadata = $7,
+           updated_at = CURRENT_TIMESTAMP`,
         [
           userId,
           planId,
           subscription.id,
-          subscription.attributes.status,
+          'active', // Force active status
           subscription.attributes.created_at,
           subscription.attributes.renews_at,
           JSON.stringify(subscription)
         ]
       );
 
-      // Update payment record
-      await client.query(
+      // Update payment record - try multiple matching strategies
+      const paymentUpdate = await client.query(
         `UPDATE payments 
          SET status = 'completed', 
              transaction_id = $1,
-             metadata = $2
-         WHERE user_id = $3 AND plan_id = $4 AND status = 'pending'`,
-        [subscription.id, JSON.stringify(subscription), userId, planId]
+             amount = $2,
+             metadata = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $4 AND plan_id = $5 AND status = 'pending'
+         RETURNING id`,
+        [
+          subscription.id, 
+          subscription.attributes.total || 0,
+          JSON.stringify(subscription), 
+          userId, 
+          planId
+        ]
       );
+
+      // If no payment was updated, create a new completed payment record
+      if (paymentUpdate.rows.length === 0) {
+        logger.info({ userId, planId, subscriptionId: subscription.id }, 'No pending payment found, creating new payment record');
+        await client.query(
+          `INSERT INTO payments (
+            user_id, plan_id, amount, currency, status, payment_method,
+            payment_gateway, transaction_id, metadata
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            userId,
+            planId,
+            subscription.attributes.total || 0,
+            subscription.attributes.currency || 'usd',
+            'completed',
+            'lemonsqueezy',
+            'lemonsqueezy',
+            subscription.id,
+            JSON.stringify(subscription)
+          ]
+        );
+      }
 
       // Log activity
       await client.query(
@@ -239,7 +327,7 @@ const handleSubscriptionCreated = async (subscription, meta) => {
       );
     });
 
-    logger.info({ userId, subscriptionId: subscription.id }, 'Subscription created successfully');
+    logger.info({ userId, subscriptionId: subscription.id, planId }, 'Subscription created and user plan activated successfully');
   } catch (error) {
     logger.error({ err: error, subscriptionId: subscription.id }, 'Error handling subscription created');
   }
@@ -258,7 +346,7 @@ const handleSubscriptionUpdated = async (subscription, meta) => {
              metadata = $4,
              updated_at = CURRENT_TIMESTAMP
          WHERE ls_subscription_id = $5
-         RETURNING user_id`,
+         RETURNING user_id, plan_id`,
         [
           subscription.attributes.status,
           subscription.attributes.created_at,
@@ -270,22 +358,32 @@ const handleSubscriptionUpdated = async (subscription, meta) => {
 
       if (result.rows.length > 0) {
         const userId = result.rows[0].user_id;
+        const planId = result.rows[0].plan_id;
 
-        // Update user subscription status
+        // Determine if subscription is in a usable state
+        const activeStatuses = ['active', 'on_trial', 'past_due'];
+        const isActive = activeStatuses.includes(subscription.attributes.status);
+
+        // Update user subscription status and ensure plan is set
         await client.query(
-          'UPDATE users SET subscription_status = $1 WHERE id = $2',
-          [subscription.attributes.status, userId]
+          `UPDATE users 
+           SET subscription_status = $1,
+               plan_id = $2,
+               services_active = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [subscription.attributes.status, planId, isActive, userId]
         );
 
         // Log activity
         await client.query(
           'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
-          [userId, 'subscription_updated', JSON.stringify({ subscriptionId: subscription.id })]
+          [userId, 'subscription_updated', JSON.stringify({ subscriptionId: subscription.id, status: subscription.attributes.status })]
         );
+
+        logger.info({ userId, subscriptionId: subscription.id, status: subscription.attributes.status }, 'Subscription updated successfully');
       }
     });
-
-    logger.info({ subscriptionId: subscription.id }, 'Subscription updated successfully');
   } catch (error) {
     logger.error({ err: error, subscriptionId: subscription.id }, 'Error handling subscription updated');
   }
@@ -374,26 +472,54 @@ const handleSubscriptionExpired = async (subscription, meta) => {
 const handleSubscriptionPaymentSuccess = async (subscription, meta) => {
   try {
     const result = await query(
-      'SELECT user_id FROM subscriptions WHERE ls_subscription_id = $1',
+      'SELECT user_id, plan_id FROM subscriptions WHERE ls_subscription_id = $1',
       [subscription.id]
     );
 
     if (result.rows.length > 0) {
       const userId = result.rows[0].user_id;
+      const planId = result.rows[0].plan_id;
 
       await transaction(async (client) => {
+        // Ensure user plan is active and services enabled
+        await client.query(
+          `UPDATE users 
+           SET plan_id = $1,
+               subscription_status = 'active',
+               services_active = true,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [planId, userId]
+        );
+
+        // Update subscription status to active
+        await client.query(
+          `UPDATE subscriptions 
+           SET status = 'active',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE ls_subscription_id = $1`,
+          [subscription.id]
+        );
+
         // Record payment
         await client.query(
-          `INSERT INTO payments (user_id, amount, currency, status, payment_method, payment_gateway, transaction_id, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO payments (user_id, plan_id, amount, currency, status, payment_method, payment_gateway, transaction_id, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (transaction_id) 
+           DO UPDATE SET 
+             status = 'completed',
+             amount = $3,
+             metadata = $9,
+             updated_at = CURRENT_TIMESTAMP`,
           [
             userId,
-            subscription.attributes.total,
-            subscription.attributes.currency,
+            planId,
+            subscription.attributes.total || 0,
+            subscription.attributes.currency || 'usd',
             'completed',
             'lemonsqueezy',
             'lemonsqueezy',
-            subscription.id,
+            subscription.id + '_' + Date.now(), // Unique transaction ID for recurring payments
             JSON.stringify(subscription)
           ]
         );
@@ -401,11 +527,13 @@ const handleSubscriptionPaymentSuccess = async (subscription, meta) => {
         // Log activity
         await client.query(
           'INSERT INTO activity_logs (user_id, action, details) VALUES ($1, $2, $3)',
-          [userId, 'payment_success', JSON.stringify({ subscriptionId: subscription.id })]
+          [userId, 'payment_success', JSON.stringify({ subscriptionId: subscription.id, amount: subscription.attributes.total })]
         );
       });
 
-      logger.info({ userId, subscriptionId: subscription.id }, 'Subscription payment succeeded');
+      logger.info({ userId, subscriptionId: subscription.id, planId }, 'Subscription payment succeeded and plan activated');
+    } else {
+      logger.warn({ subscriptionId: subscription.id }, 'Subscription not found for payment success webhook');
     }
   } catch (error) {
     logger.error({ err: error, subscriptionId: subscription.id }, 'Error handling subscription payment success');

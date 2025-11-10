@@ -31,9 +31,9 @@ export const getPlan = asyncHandler(async (req, res) => {
 export const getUserPlan = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
-  // First, check if user has a plan assigned
+  // First, check if user has a plan assigned - include subscription status
   let result = await query(
-    `SELECT u.plan_id, u.plan_start_date, p.* 
+    `SELECT u.plan_id, u.plan_start_date, u.subscription_status, u.services_active, u.auto_renew, p.* 
      FROM users u
      LEFT JOIN plans p ON u.plan_id = p.id
      WHERE u.id = $1`,
@@ -53,14 +53,14 @@ export const getUserPlan = asyncHandler(async (req, res) => {
       // Assign free plan to user
       await query(
         `UPDATE users 
-         SET plan_id = $1, plan_start_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         SET plan_id = $1, plan_start_date = CURRENT_TIMESTAMP, subscription_status = 'active', services_active = true, updated_at = CURRENT_TIMESTAMP
          WHERE id = $2`,
         [freePlan.id, userId]
       );
 
       // Re-fetch user plan
       result = await query(
-        `SELECT u.plan_id, u.plan_start_date, p.* 
+        `SELECT u.plan_id, u.plan_start_date, u.subscription_status, u.services_active, u.auto_renew, p.* 
          FROM users u
          JOIN plans p ON u.plan_id = p.id
          WHERE u.id = $1`,
@@ -96,7 +96,12 @@ export const getUserPlan = asyncHandler(async (req, res) => {
   const actualStorage = parseInt(storageResult.rows[0].total_storage);
 
   successResponse(res, {
-    plan: planData,
+    plan: {
+      ...planData,
+      subscription_status: planData.subscription_status || 'active',
+      services_active: planData.services_active !== false,
+      auto_renew: planData.auto_renew !== false
+    },
     usage: {
       storage: actualStorage,
       bandwidth: parseInt(usage.bandwidth_used),
