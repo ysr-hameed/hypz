@@ -259,9 +259,9 @@ const handleSubscriptionCreated = async (subscription, meta) => {
 
       // Create/update subscription record with active status
       await client.query(
-        `INSERT INTO subscriptions (user_id, plan_id, ls_subscription_id, status, current_period_start, current_period_end, metadata)
+        `INSERT INTO subscriptions (user_id, plan_id, lemon_subscription_id, status, current_period_start, current_period_end, metadata)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (ls_subscription_id) 
+         ON CONFLICT (lemon_subscription_id) 
          DO UPDATE SET 
            status = $4, 
            current_period_start = $5, 
@@ -345,7 +345,7 @@ const handleSubscriptionUpdated = async (subscription, meta) => {
              current_period_end = $3,
              metadata = $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE ls_subscription_id = $5
+         WHERE lemon_subscription_id = $5
          RETURNING user_id, plan_id`,
         [
           subscription.attributes.status,
@@ -399,7 +399,7 @@ const handleSubscriptionCancelled = async (subscription, meta) => {
              cancel_at_period_end = true,
              metadata = $1,
              updated_at = CURRENT_TIMESTAMP
-         WHERE ls_subscription_id = $2
+         WHERE lemon_subscription_id = $2
          RETURNING user_id`,
         [JSON.stringify(subscription), subscription.id]
       );
@@ -434,7 +434,7 @@ const handleSubscriptionExpired = async (subscription, meta) => {
          SET status = 'expired',
              metadata = $1,
              updated_at = CURRENT_TIMESTAMP
-         WHERE ls_subscription_id = $2
+         WHERE lemon_subscription_id = $2
          RETURNING user_id`,
         [JSON.stringify(subscription), subscription.id]
       );
@@ -472,7 +472,7 @@ const handleSubscriptionExpired = async (subscription, meta) => {
 const handleSubscriptionPaymentSuccess = async (subscription, meta) => {
   try {
     const result = await query(
-      'SELECT user_id, plan_id FROM subscriptions WHERE ls_subscription_id = $1',
+      'SELECT user_id, plan_id FROM subscriptions WHERE lemon_subscription_id = $1',
       [subscription.id]
     );
 
@@ -497,7 +497,7 @@ const handleSubscriptionPaymentSuccess = async (subscription, meta) => {
           `UPDATE subscriptions 
            SET status = 'active',
                updated_at = CURRENT_TIMESTAMP
-           WHERE ls_subscription_id = $1`,
+           WHERE lemon_subscription_id = $1`,
           [subscription.id]
         );
 
@@ -544,7 +544,7 @@ const handleSubscriptionPaymentSuccess = async (subscription, meta) => {
 const handleSubscriptionPaymentFailed = async (subscription, meta) => {
   try {
     const result = await query(
-      'SELECT user_id FROM subscriptions WHERE ls_subscription_id = $1',
+      'SELECT user_id FROM subscriptions WHERE lemon_subscription_id = $1',
       [subscription.id]
     );
 
@@ -567,7 +567,7 @@ const handleSubscriptionPaymentFailed = async (subscription, meta) => {
 const handleSubscriptionPaymentRecovered = async (subscription, meta) => {
   try {
     const result = await query(
-      'SELECT user_id FROM subscriptions WHERE ls_subscription_id = $1',
+      'SELECT user_id FROM subscriptions WHERE lemon_subscription_id = $1',
       [subscription.id]
     );
 

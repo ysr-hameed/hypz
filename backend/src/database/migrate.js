@@ -35,6 +35,9 @@ const createTables = async () => {
         subscription_id VARCHAR(255),
         subscription_status VARCHAR(50),
         lemon_customer_id VARCHAR(255),
+        payment_method_id VARCHAR(255),
+        card_last4 VARCHAR(4),
+        card_brand VARCHAR(50),
         billing_cycle_day INTEGER DEFAULT 1,
         next_billing_date DATE,
         services_active BOOLEAN DEFAULT true,
@@ -580,6 +583,25 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_payment_methods_default ON payment_methods(user_id, is_default);
     `);
 
+    // Webhook events table - for idempotent webhook processing
+    await query(`
+      CREATE TABLE IF NOT EXISTS webhook_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        event_id VARCHAR(255) UNIQUE NOT NULL,
+        event_type VARCHAR(100) NOT NULL,
+        processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        raw_data JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  logger.info('Created webhook_events table');
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON webhook_events(event_id);
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_type ON webhook_events(event_type);
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed_at);
+    `);
+
     // Team members table (for collaboration)
     await query(`
       CREATE TABLE IF NOT EXISTS team_members (
@@ -862,7 +884,7 @@ const createTables = async () => {
     // Insert Free plan with realistic S3 limits
     await query(`
       INSERT INTO plans (
-        id, name, type, price_usd, price_inr, billing_cycle, description,
+        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed, 
         max_file_size_mb, max_multipart_file_size_gb,
@@ -879,6 +901,7 @@ const createTables = async () => {
         'free_forever',
         'Free Forever',
         'free',
+        NULL,
         0, 0,
         'Forever (no expiry)',
         'Perfect for testing and small projects. No card needed, no hidden fees.',
@@ -904,6 +927,7 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
+        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
         private_buckets_allowed = EXCLUDED.private_buckets_allowed,
         updated_at = CURRENT_TIMESTAMP
     `);
@@ -912,7 +936,7 @@ const createTables = async () => {
     // Insert Pro plan with advanced S3 features
     await query(`
       INSERT INTO plans (
-        id, name, type, price_usd, price_inr, billing_cycle, description,
+        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
@@ -933,6 +957,7 @@ const createTables = async () => {
         'pro_monthly',
         'Pro',
         'pro',
+        '1080591',
         5, 399,
         'Monthly',
         'For creators and developers. Advanced S3-compatible features with unlimited storage.',
@@ -963,6 +988,7 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
+        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
         updated_at = CURRENT_TIMESTAMP
     `);
   logger.info('Inserted/Updated Pro plan');
@@ -970,7 +996,7 @@ const createTables = async () => {
     // Insert PAYG plan with enterprise-grade S3 features
     await query(`
       INSERT INTO plans (
-        id, name, type, price_usd, price_inr, billing_cycle, description,
+        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
@@ -989,9 +1015,10 @@ const createTables = async () => {
         support_level, sla_uptime, payment_mode, credit_card_required, popular,
         features
       ) VALUES (
-        'payg_usage',
+        'payg',
         'Pay-As-You-Go',
         'payg',
+        '1080598',
         0, 0,
         'Monthly (auto or manual)',
         'Enterprise-grade. Truly unlimited everything. Pay only for what you use.',
@@ -1026,6 +1053,7 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
+        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
         updated_at = CURRENT_TIMESTAMP
     `);
   logger.info('Inserted/Updated PAYG plan');
@@ -1081,6 +1109,65 @@ const createTables = async () => {
     // Create index for domains
     await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_user ON custom_domains(user_id)');
     await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_bucket ON custom_domains(bucket_id)');
+
+    // Add foreign key constraints for plan_id references
+    logger.info('Adding foreign key constraints for plan_id...');
+    
+    // For users table - plan_id should reference plans.id
+    await query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints 
+          WHERE constraint_name = 'fk_users_plan_id' AND table_name = 'users'
+        ) THEN
+          ALTER TABLE users 
+          ADD CONSTRAINT fk_users_plan_id 
+          FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+    
+    // For subscriptions table - plan_id should reference plans.id
+    await query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints 
+          WHERE constraint_name = 'fk_subscriptions_plan_id' AND table_name = 'subscriptions'
+        ) THEN
+          ALTER TABLE subscriptions 
+          ADD CONSTRAINT fk_subscriptions_plan_id 
+          FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+    
+    // For payments table - plan_id should reference plans.id
+    await query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints 
+          WHERE constraint_name = 'fk_payments_plan_id' AND table_name = 'payments'
+        ) THEN
+          ALTER TABLE payments 
+          ADD CONSTRAINT fk_payments_plan_id 
+          FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+    
+    logger.info('Foreign key constraints added successfully');
+
+    // Add additional indexes for better JOIN performance
+    logger.info('Adding additional indexes...');
+    await query('CREATE INDEX IF NOT EXISTS idx_users_plan_id ON users(plan_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_subscriptions_plan_id ON subscriptions(plan_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_payments_plan_id ON payments(plan_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON users(subscription_status)');
+    await query('CREATE INDEX IF NOT EXISTS idx_users_services_active ON users(services_active)');
+    logger.info('Additional indexes created successfully');
 
   logger.info('All tables created successfully');
   } catch (error) {

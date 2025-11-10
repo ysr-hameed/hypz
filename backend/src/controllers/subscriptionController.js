@@ -58,22 +58,9 @@ export const createSubscription = asyncHandler(async (req, res) => {
     logger.info({ variantId, source: 'database' }, 'Using variant ID from plan');
   }
 
-  // Hard-coded variant IDs as fallback (supports both string and numeric plan IDs)
+  // If still no variant ID, plan is not purchasable
   if (!variantId) {
-    const variantMap = {
-      // Numeric IDs
-      2: '1080591', // Pro Plan
-      3: '1080598', // PAYG Plan
-      // String IDs
-      'pro_monthly': '1080591',
-      'payg': '1080598',
-    };
-    variantId = variantMap[planId];
-    logger.info({ variantId, planId, source: 'hardcoded_map' }, 'Using hardcoded variant ID');
-  }
-
-  if (!variantId) {
-    logger.error({ planId }, 'No variant ID found for plan');
+    logger.error({ planId, plan }, 'No lemonsqueezy_variant_id found for plan');
     return errorResponse(res, 
       'This plan is not available for purchase yet. Please contact support or try another plan.', 
       400
