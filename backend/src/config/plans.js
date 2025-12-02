@@ -20,7 +20,7 @@ export const SKYDO_PLANS = {
 export const USAGE_PRICING = {
     // Pay-as-you-go rates
     PAYG: {
-        STORAGE_PER_GB: 0.1, // $0.10 per GB of storage per month
+        STORAGE_PER_GB: 0.015, // $0.10 per GB of storage per month
         BANDWIDTH_PER_GB: 0.05, // $0.05 per GB of bandwidth per month
         API_CALLS_PER_1K: 0.01, // $0.01 per 1000 API calls (optional)
         BASE_FEE: 0, // $0 base subscription
@@ -30,15 +30,15 @@ export const USAGE_PRICING = {
     // Free plan limits (no charge, enforced in app)
     FREE: {
         STORAGE_GB: 1, // 1GB storage
-        BANDWIDTH_GB: 10, // 10GB bandwidth per month
-        API_CALLS: 1000, // 1000 API calls per month
+        BANDWIDTH_GB: 3, // 10GB bandwidth per month
+        API_CALLS: 50000, // 1000 API calls per month
     },
 
     // Pro plan included usage (fixed $5/month)
     PRO: {
-        STORAGE_GB: 50, // 50GB storage
-        BANDWIDTH_GB: 500, // 500GB bandwidth per month
-        API_CALLS: 100000, // 100k API calls per month
+        STORAGE_GB: 100, // 50GB storage
+        BANDWIDTH_GB: 200, // 500GB bandwidth per month
+        API_CALLS: 2000000, // 100k API calls per month
     },
 };
 
@@ -54,7 +54,8 @@ export const PLAN_INFO = {
         interval: null,
         features: [
             "1GB Storage",
-            "10GB Bandwidth/month",
+            "3GB Bandwidth/month",
+            "50K API calls/month",
             "Basic support",
             "Community access",
         ],
@@ -68,8 +69,9 @@ export const PLAN_INFO = {
         interval: "monthly",
         planId: SKYDO_PLANS.PRO_MONTHLY,
         features: [
-            "50GB Storage",
-            "500GB Bandwidth/month",
+            "100GB Storage",
+            "200GB Bandwidth/month",
+            "2M API calls/month",
             "Priority support",
             "Custom domain",
             "API access",
@@ -86,8 +88,10 @@ export const PLAN_INFO = {
         planId: SKYDO_PLANS.PAYG_BASE,
         features: [
             "Pay only for what you use",
-            "$0.10 per GB storage",
+            "$0.015 per GB storage",
             "$0.05 per GB bandwidth",
+            "After 1GB free storage",
+            "After 3GB free bandwidth (3x multiplier)",
             "No minimum commitment",
             "Scale automatically",
             "Detailed usage analytics",

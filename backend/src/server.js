@@ -48,9 +48,14 @@ import policyRoutes from "./routes/policyRoutes.js";
 import presignedRoutes from "./routes/presignedRoutes.js";
 import batchRoutes from "./routes/batchRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
 
 // Services
 import { startBillingScheduler } from "./services/billingCron.js";
+import {
+    bootstrapServices,
+    shutdownServices,
+} from "./services/core/bootstrap.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,6 +182,7 @@ app.use(
 );
 app.use(`/api/${config.API_VERSION}/batch`, planBasedRateLimit, batchRoutes);
 app.use(`/api/${config.API_VERSION}/team`, planBasedRateLimit, teamRoutes);
+app.use(`/api/${config.API_VERSION}/services`, serviceRoutes); // Service management (admin only)
 
 // 404 handler
 app.use(notFound);
@@ -192,6 +198,10 @@ const startServer = async () => {
         // Test database connection
         await pool.query("SELECT NOW()");
         logger.info("Database connected successfully");
+
+        // Bootstrap microservices architecture
+        logger.info("Bootstrapping services...");
+        await bootstrapServices("monolith"); // Change to 'microservice' for distributed mode
 
         // Start billing scheduler
         logger.info("Initializing billing scheduler...");
@@ -255,12 +265,14 @@ process.on("uncaughtException", (err) => {
 // Graceful shutdown
 process.on("SIGTERM", async () => {
     logger.info("SIGTERM received. Shutting down gracefully...");
+    await shutdownServices();
     await pool.end();
     process.exit(0);
 });
 
 process.on("SIGINT", async () => {
     logger.info("SIGINT received. Shutting down gracefully...");
+    await shutdownServices();
     await pool.end();
     process.exit(0);
 });
