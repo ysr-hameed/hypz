@@ -183,11 +183,11 @@ const handleSubscriptionCreated = async (data, attributes, customData) => {
     // Create or update subscription record
     const subResult = await client.query(
       `INSERT INTO subscriptions (
-        user_id, plan_id, lemon_subscription_id, lemon_customer_id,
+        user_id, plan_id, skydo_subscription_id, skydo_customer_id,
         status, billing_cycle, current_period_start, current_period_end,
         metadata
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT (lemon_subscription_id) DO UPDATE SET
+      ON CONFLICT (skydo_subscription_id) DO UPDATE SET
         status = EXCLUDED.status,
         current_period_start = EXCLUDED.current_period_start,
         current_period_end = EXCLUDED.current_period_end,
@@ -212,7 +212,7 @@ const handleSubscriptionCreated = async (data, attributes, customData) => {
        plan_id = $1,
        subscription_id = $2,
        subscription_status = $3,
-       lemon_customer_id = $4,
+       skydo_customer_id = $4,
        plan_start_date = CURRENT_TIMESTAMP,
        services_active = true,
        updated_at = CURRENT_TIMESTAMP
@@ -246,7 +246,7 @@ const handleSubscriptionUpdated = async (data, attributes, customData) => {
        cancel_at_period_end = $4,
        metadata = metadata || $5::jsonb,
        updated_at = CURRENT_TIMESTAMP
-       WHERE lemon_subscription_id = $6`,
+       WHERE skydo_subscription_id = $6`,
       [
         attributes.status,
         attributes.renews_at ? new Date(attributes.renews_at).toISOString().split('T')[0] : null,
@@ -280,7 +280,7 @@ const handleSubscriptionPaymentSuccess = async (data, attributes, customData) =>
   await transaction(async (client) => {
     // Get subscription to find user
     const subResult = await client.query(
-      'SELECT user_id, plan_id FROM subscriptions WHERE lemon_subscription_id = $1',
+      'SELECT user_id, plan_id FROM subscriptions WHERE skydo_subscription_id = $1',
       [subscriptionId]
     );
 
@@ -297,7 +297,7 @@ const handleSubscriptionPaymentSuccess = async (data, attributes, customData) =>
         user_id, subscription_id, plan_id, amount, currency, status,
         payment_gateway, lemon_order_id, lemon_subscription_invoice_id,
         billing_reason, metadata
-      ) VALUES ($1, (SELECT id FROM subscriptions WHERE lemon_subscription_id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, (SELECT id FROM subscriptions WHERE skydo_subscription_id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT DO NOTHING`,
       [
         user_id,
@@ -339,7 +339,7 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
   await transaction(async (client) => {
     // Get subscription
     const subResult = await client.query(
-      'SELECT user_id FROM subscriptions WHERE lemon_subscription_id = $1',
+      'SELECT user_id FROM subscriptions WHERE skydo_subscription_id = $1',
       [subscriptionId]
     );
 
@@ -352,7 +352,7 @@ const handleSubscriptionPaymentFailed = async (data, attributes, customData) => 
 
     // Update subscription status
     await client.query(
-      `UPDATE subscriptions SET status = 'past_due' WHERE lemon_subscription_id = $1`,
+      `UPDATE subscriptions SET status = 'past_due' WHERE skydo_subscription_id = $1`,
       [subscriptionId]
     );
 
@@ -407,7 +407,7 @@ const handleSubscriptionCancelled = async (data, attributes, customData) => {
        status = 'cancelled',
        cancelled_at = CURRENT_TIMESTAMP,
        updated_at = CURRENT_TIMESTAMP
-       WHERE lemon_subscription_id = $1`,
+       WHERE skydo_subscription_id = $1`,
       [subscriptionId]
     );
 
@@ -422,7 +422,7 @@ const handleSubscriptionCancelled = async (data, attributes, customData) => {
 
     // Log activity
     const subResult = await client.query(
-      'SELECT user_id FROM subscriptions WHERE lemon_subscription_id = $1',
+      'SELECT user_id FROM subscriptions WHERE skydo_subscription_id = $1',
       [subscriptionId]
     );
 
@@ -450,7 +450,7 @@ const handleSubscriptionResumed = async (data, attributes, customData) => {
        status = 'active',
        cancel_at_period_end = false,
        updated_at = CURRENT_TIMESTAMP
-       WHERE lemon_subscription_id = $1`,
+       WHERE skydo_subscription_id = $1`,
       [subscriptionId]
     );
 
@@ -479,7 +479,7 @@ const handleSubscriptionExpired = async (data, attributes, customData) => {
       `UPDATE subscriptions SET
        status = 'expired',
        updated_at = CURRENT_TIMESTAMP
-       WHERE lemon_subscription_id = $1`,
+       WHERE skydo_subscription_id = $1`,
       [subscriptionId]
     );
 

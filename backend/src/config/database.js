@@ -14,8 +14,8 @@ const pool = new Pool({
   max: 50, // Increased for better concurrency
   min: 5, // Keep minimum connections alive
   idleTimeoutMillis: 60000, // 60 seconds before closing idle connection
-  connectionTimeoutMillis: 15000, // 15 seconds connection timeout
-  statement_timeout: 30000, // 30 second query timeout
+  connectionTimeoutMillis: 30000, // 15 seconds connection timeout
+  statement_timeout: 60000, // 30 second query timeout
   ssl: { rejectUnauthorized: false },
   // Performance optimizations
   keepAlive: true,

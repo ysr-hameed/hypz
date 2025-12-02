@@ -1,12 +1,12 @@
-import { query } from '../config/database.js';
-import logger from '../utils/logger.js';
+import { query } from "../config/database.js";
+import logger from "../utils/logger.js";
 
 const createTables = async () => {
-  try {
-  logger.info('Creating database tables...');
+    try {
+        logger.info("Creating database tables...");
 
-    // Users table - CLEANED (removed email_verification_token)
-    await query(`
+        // Users table - CLEANED (removed email_verification_token)
+        await query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) UNIQUE NOT NULL,
@@ -34,7 +34,7 @@ const createTables = async () => {
         auto_renew BOOLEAN DEFAULT true,
         subscription_id VARCHAR(255),
         subscription_status VARCHAR(50),
-        lemon_customer_id VARCHAR(255),
+        skydo_customer_id VARCHAR(255),
         payment_method_id VARCHAR(255),
         card_last4 VARCHAR(4),
         card_brand VARCHAR(50),
@@ -46,16 +46,16 @@ const createTables = async () => {
       );
     `);
 
-    // Create indexes on users table
-    await query(`
+        // Create indexes on users table
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
       CREATE INDEX IF NOT EXISTS idx_users_otp_code ON users(otp_code);
       CREATE INDEX IF NOT EXISTS idx_users_two_factor ON users(two_factor_enabled);
     `);
 
-    // Buckets table
-    await query(`
+        // Buckets table
+        await query(`
       CREATE TABLE IF NOT EXISTS buckets (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -77,13 +77,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_buckets_user ON buckets(user_id);
       CREATE INDEX IF NOT EXISTS idx_buckets_slug ON buckets(slug);
     `);
 
-    // Files table
-    await query(`
+        // Files table
+        await query(`
       CREATE TABLE IF NOT EXISTS files (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
@@ -114,7 +114,7 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_files_bucket ON files(bucket_id);
       CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id);
       CREATE INDEX IF NOT EXISTS idx_files_filename ON files(bucket_id, filename);
@@ -125,8 +125,8 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_files_upload_status ON files(upload_status) WHERE upload_status != 'completed';
     `);
 
-    // Storage Classes table
-    await query(`
+        // Storage Classes table
+        await query(`
       CREATE TABLE IF NOT EXISTS storage_classes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(50) UNIQUE NOT NULL,
@@ -140,10 +140,10 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created storage_classes table');
+        logger.info("Created storage_classes table");
 
-    // Insert default storage classes
-    await query(`
+        // Insert default storage classes
+        await query(`
       INSERT INTO storage_classes (name, display_name, description, cost_per_gb_month, retrieval_cost_per_gb, retrieval_time, minimum_storage_days)
       VALUES 
         ('STANDARD', 'Standard', 'Instant access, highest cost', 0.010, 0.000, 'Instant', 0),
@@ -153,8 +153,8 @@ const createTables = async () => {
       ON CONFLICT (name) DO NOTHING;
     `);
 
-    // Storage class transitions table
-    await query(`
+        // Storage class transitions table
+        await query(`
       CREATE TABLE IF NOT EXISTS storage_class_transitions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -164,15 +164,15 @@ const createTables = async () => {
         transitioned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created storage_class_transitions table');
+        logger.info("Created storage_class_transitions table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_transitions_file ON storage_class_transitions(file_id);
       CREATE INDEX IF NOT EXISTS idx_transitions_date ON storage_class_transitions(transitioned_at);
     `);
 
-    // Multipart uploads table
-    await query(`
+        // Multipart uploads table
+        await query(`
       CREATE TABLE IF NOT EXISTS multipart_uploads (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         upload_id VARCHAR(255) UNIQUE NOT NULL,
@@ -195,9 +195,9 @@ const createTables = async () => {
         aborted_at TIMESTAMP
       );
     `);
-  logger.info('Created multipart_uploads table');
+        logger.info("Created multipart_uploads table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_multipart_user ON multipart_uploads(user_id);
       CREATE INDEX IF NOT EXISTS idx_multipart_bucket ON multipart_uploads(bucket_id);
       CREATE INDEX IF NOT EXISTS idx_multipart_upload_id ON multipart_uploads(upload_id);
@@ -205,8 +205,8 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_multipart_expires ON multipart_uploads(expires_at);
     `);
 
-    // Upload parts table
-    await query(`
+        // Upload parts table
+        await query(`
       CREATE TABLE IF NOT EXISTS upload_parts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         multipart_upload_id UUID NOT NULL REFERENCES multipart_uploads(id) ON DELETE CASCADE,
@@ -219,15 +219,15 @@ const createTables = async () => {
         UNIQUE(multipart_upload_id, part_number)
       );
     `);
-  logger.info('Created upload_parts table');
+        logger.info("Created upload_parts table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_parts_upload ON upload_parts(multipart_upload_id);
       CREATE INDEX IF NOT EXISTS idx_parts_number ON upload_parts(multipart_upload_id, part_number);
     `);
 
-    // Lifecycle policies table
-    await query(`
+        // Lifecycle policies table
+        await query(`
       CREATE TABLE IF NOT EXISTS lifecycle_policies (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
@@ -239,15 +239,15 @@ const createTables = async () => {
         UNIQUE(bucket_id, name)
       );
     `);
-  logger.info('Created lifecycle_policies table');
+        logger.info("Created lifecycle_policies table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_lifecycle_bucket ON lifecycle_policies(bucket_id);
       CREATE INDEX IF NOT EXISTS idx_lifecycle_enabled ON lifecycle_policies(enabled);
     `);
 
-    // Webhook/Event subscriptions table
-    await query(`
+        // Webhook/Event subscriptions table
+        await query(`
       CREATE TABLE IF NOT EXISTS event_subscriptions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -262,16 +262,16 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created event_subscriptions table');
+        logger.info("Created event_subscriptions table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_event_subs_user ON event_subscriptions(user_id);
       CREATE INDEX IF NOT EXISTS idx_event_subs_bucket ON event_subscriptions(bucket_id);
       CREATE INDEX IF NOT EXISTS idx_event_subs_enabled ON event_subscriptions(enabled);
     `);
 
-    // Webhook deliveries (for tracking)
-    await query(`
+        // Webhook deliveries (for tracking)
+        await query(`
       CREATE TABLE IF NOT EXISTS webhook_deliveries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         subscription_id UUID NOT NULL REFERENCES event_subscriptions(id) ON DELETE CASCADE,
@@ -286,16 +286,16 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created webhook_deliveries table');
+        logger.info("Created webhook_deliveries table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_webhook_subscription ON webhook_deliveries(subscription_id);
       CREATE INDEX IF NOT EXISTS idx_webhook_status ON webhook_deliveries(status);
       CREATE INDEX IF NOT EXISTS idx_webhook_retry ON webhook_deliveries(next_retry_at) WHERE status = 'pending';
     `);
 
-    // CORS rules table
-    await query(`
+        // CORS rules table
+        await query(`
       CREATE TABLE IF NOT EXISTS cors_rules (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         bucket_id UUID NOT NULL REFERENCES buckets(id) ON DELETE CASCADE,
@@ -308,14 +308,14 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created cors_rules table');
+        logger.info("Created cors_rules table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_cors_bucket ON cors_rules(bucket_id);
     `);
 
-    // Bucket policies table (IAM-style)
-    await query(`
+        // Bucket policies table (IAM-style)
+        await query(`
       CREATE TABLE IF NOT EXISTS bucket_policies (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         bucket_id UUID NOT NULL UNIQUE REFERENCES buckets(id) ON DELETE CASCADE,
@@ -324,14 +324,14 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created bucket_policies table');
+        logger.info("Created bucket_policies table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_bucket_policies_bucket ON bucket_policies(bucket_id);
     `);
 
-    // Pre-signed POST policies
-    await query(`
+        // Pre-signed POST policies
+        await query(`
       CREATE TABLE IF NOT EXISTS presigned_post_policies (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -345,16 +345,16 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created presigned_post_policies table');
+        logger.info("Created presigned_post_policies table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_presigned_user ON presigned_post_policies(user_id);
       CREATE INDEX IF NOT EXISTS idx_presigned_bucket ON presigned_post_policies(bucket_id);
       CREATE INDEX IF NOT EXISTS idx_presigned_expires ON presigned_post_policies(expires_at);
     `);
 
-    // Batch operations tables
-    await query(`
+        // Batch operations tables
+        await query(`
       CREATE TABLE IF NOT EXISTS batch_jobs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -371,16 +371,16 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created batch_jobs table');
+        logger.info("Created batch_jobs table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_batch_jobs_user ON batch_jobs(user_id);
       CREATE INDEX IF NOT EXISTS idx_batch_jobs_status ON batch_jobs(status);
       CREATE INDEX IF NOT EXISTS idx_batch_jobs_priority ON batch_jobs(priority);
     `);
 
-    // Batch operations (individual operations within a job)
-    await query(`
+        // Batch operations (individual operations within a job)
+        await query(`
       CREATE TABLE IF NOT EXISTS batch_operations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         job_id UUID NOT NULL REFERENCES batch_jobs(id) ON DELETE CASCADE,
@@ -394,16 +394,16 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created batch_operations table');
+        logger.info("Created batch_operations table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_batch_ops_job ON batch_operations(job_id);
       CREATE INDEX IF NOT EXISTS idx_batch_ops_status ON batch_operations(status);
       CREATE INDEX IF NOT EXISTS idx_batch_ops_file ON batch_operations(file_id);
     `);
 
-    // API Keys table
-    await query(`
+        // API Keys table
+        await query(`
       CREATE TABLE IF NOT EXISTS api_keys (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -421,13 +421,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
       CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
     `);
 
-    // Usage tracking table
-    await query(`
+        // Usage tracking table
+        await query(`
       CREATE TABLE IF NOT EXISTS usage_records (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -447,23 +447,23 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_usage_user_date ON usage_records(user_id, date);
     `);
-    
-    await query(`
+
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id);
     `);
 
-    // Subscriptions table - tracks all subscriptions (Pro, PAYG, etc.)
-    await query(`
+        // Subscriptions table - tracks all subscriptions (Pro, PAYG, etc.)
+        await query(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         plan_id VARCHAR(50) NOT NULL,
-        lemon_subscription_id VARCHAR(255) UNIQUE,
-        lemon_customer_id VARCHAR(255),
-        lemon_order_id VARCHAR(255),
+        skydo_subscription_id VARCHAR(255) UNIQUE,
+        skydo_customer_id VARCHAR(255),
+        skydo_order_id VARCHAR(255),
         status VARCHAR(50) DEFAULT 'active',
         billing_cycle VARCHAR(20) DEFAULT 'monthly',
         current_period_start DATE,
@@ -477,17 +477,17 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created subscriptions table');
+        logger.info("Created subscriptions table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
-      CREATE INDEX IF NOT EXISTS idx_subscriptions_lemon_id ON subscriptions(lemon_subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_skydo_id ON subscriptions(skydo_subscription_id);
       CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
       CREATE INDEX IF NOT EXISTS idx_subscriptions_period_end ON subscriptions(current_period_end);
     `);
 
-    // Unified Payments table - all payment transactions
-    await query(`
+        // Unified Payments table - all payment transactions
+        await query(`
       CREATE TABLE IF NOT EXISTS payments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -497,10 +497,10 @@ const createTables = async () => {
         currency VARCHAR(3) DEFAULT 'USD',
         status VARCHAR(20) DEFAULT 'pending',
         payment_method VARCHAR(50),
-        payment_gateway VARCHAR(50) DEFAULT 'lemonsqueezy',
-        lemon_order_id VARCHAR(255),
-        lemon_subscription_invoice_id VARCHAR(255),
-        transaction_id VARCHAR(255),
+        payment_gateway VARCHAR(50) DEFAULT 'skydo',
+        skydo_order_id VARCHAR(255),
+        skydo_subscription_invoice_id VARCHAR(255),
+        transaction_id VARCHAR(255) UNIQUE,
         invoice_url TEXT,
         billing_reason VARCHAR(100),
         period_start DATE,
@@ -515,17 +515,18 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created payments table');
+        logger.info("Created payments table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
       CREATE INDEX IF NOT EXISTS idx_payments_subscription ON payments(subscription_id);
       CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
-      CREATE INDEX IF NOT EXISTS idx_payments_lemon_order ON payments(lemon_order_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_skydo_order ON payments(skydo_order_id);
+      CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments(transaction_id);
     `);
 
-    // Usage billing table - for PAYG monthly invoices
-    await query(`
+        // Usage billing table - for PAYG monthly invoices
+        await query(`
       CREATE TABLE IF NOT EXISTS usage_billing (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -540,7 +541,7 @@ const createTables = async () => {
         total_cost DECIMAL(10, 4) DEFAULT 0,
         payment_status VARCHAR(50) DEFAULT 'pending',
         payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
-        lemon_invoice_id VARCHAR(255),
+        skydo_invoice_id VARCHAR(255),
         invoice_generated BOOLEAN DEFAULT false,
         invoice_url TEXT,
         notes TEXT,
@@ -549,20 +550,20 @@ const createTables = async () => {
         UNIQUE(user_id, billing_period_start)
       );
     `);
-  logger.info('Created usage_billing table');
+        logger.info("Created usage_billing table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_usage_billing_user ON usage_billing(user_id);
       CREATE INDEX IF NOT EXISTS idx_usage_billing_period ON usage_billing(billing_period_start, billing_period_end);
       CREATE INDEX IF NOT EXISTS idx_usage_billing_status ON usage_billing(payment_status);
     `);
 
-    // Payment methods table - stores user payment methods
-    await query(`
+        // Payment methods table - stores user payment methods
+        await query(`
       CREATE TABLE IF NOT EXISTS payment_methods (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        lemon_payment_method_id VARCHAR(255),
+        skydo_payment_method_id VARCHAR(255),
         type VARCHAR(50) DEFAULT 'card',
         brand VARCHAR(50),
         last4 VARCHAR(4),
@@ -576,15 +577,15 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created payment_methods table');
+        logger.info("Created payment_methods table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_payment_methods_user ON payment_methods(user_id);
       CREATE INDEX IF NOT EXISTS idx_payment_methods_default ON payment_methods(user_id, is_default);
     `);
 
-    // Webhook events table - for idempotent webhook processing
-    await query(`
+        // Webhook events table - for idempotent webhook processing
+        await query(`
       CREATE TABLE IF NOT EXISTS webhook_events (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         event_id VARCHAR(255) UNIQUE NOT NULL,
@@ -594,16 +595,16 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-  logger.info('Created webhook_events table');
+        logger.info("Created webhook_events table");
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON webhook_events(event_id);
       CREATE INDEX IF NOT EXISTS idx_webhook_events_type ON webhook_events(event_type);
       CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed_at);
     `);
 
-    // Team members table (for collaboration)
-    await query(`
+        // Team members table (for collaboration)
+        await query(`
       CREATE TABLE IF NOT EXISTS team_members (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -621,15 +622,15 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_team_members_inviter ON team_members(inviter_id);
       CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
       CREATE INDEX IF NOT EXISTS idx_team_members_token ON team_members(invite_token);
       CREATE INDEX IF NOT EXISTS idx_team_members_status ON team_members(status);
     `);
 
-    // Activity logs table
-    await query(`
+        // Activity logs table
+        await query(`
       CREATE TABLE IF NOT EXISTS activity_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -643,13 +644,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_logs(user_id);
       CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_logs(created_at);
     `);
 
-    // Refresh tokens table
-    await query(`
+        // Refresh tokens table
+        await query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -660,13 +661,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
     `);
 
-    // Admin Settings table
-    await query(`
+        // Admin Settings table
+        await query(`
       CREATE TABLE IF NOT EXISTS admin_settings (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         key VARCHAR(100) UNIQUE NOT NULL,
@@ -679,13 +680,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_admin_settings_key ON admin_settings(key);
       CREATE INDEX IF NOT EXISTS idx_admin_settings_category ON admin_settings(category);
     `);
 
-    // Insert default admin settings
-    await query(`
+        // Insert default admin settings
+        await query(`
       INSERT INTO admin_settings (key, value, description, category, is_public)
       VALUES 
         ('force_2fa', '{"enabled": false}'::jsonb, 'Force all users to enable 2FA', 'security', false),
@@ -697,8 +698,8 @@ const createTables = async () => {
       ON CONFLICT (key) DO NOTHING;
     `);
 
-    // Trusted devices table - used for "trust this device" feature for 2FA
-    await query(`
+        // Trusted devices table - used for "trust this device" feature for 2FA
+        await query(`
       CREATE TABLE IF NOT EXISTS trusted_devices (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -713,13 +714,13 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id);
       CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at);
     `);
 
-    // Notification preferences table
-    await query(`
+        // Notification preferences table
+        await query(`
       CREATE TABLE IF NOT EXISTS notification_preferences (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -734,12 +735,12 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_preferences(user_id);
     `);
 
-    // Notifications table - for in-app notifications and announcements
-    await query(`
+        // Notifications table - for in-app notifications and announcements
+        await query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -758,15 +759,15 @@ const createTables = async () => {
       );
     `);
 
-    await query(`
+        await query(`
       CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
       CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
       CREATE INDEX IF NOT EXISTS idx_notifications_global ON notifications(is_global);
     `);
 
-    // Plans table - S3-like storage provider features
-    await query(`
+        // Plans table - S3-like storage provider features
+        await query(`
       CREATE TABLE IF NOT EXISTS plans (
         id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -777,9 +778,9 @@ const createTables = async () => {
         description TEXT,
         popular BOOLEAN DEFAULT false,
         
-        -- LemonSqueezy Integration
-        lemonsqueezy_variant_id VARCHAR(100),
-        lemonsqueezy_product_id VARCHAR(100),
+        -- Skydo Integration
+        skydo_variant_id VARCHAR(100),
+        skydo_product_id VARCHAR(100),
         
         -- Storage & Bandwidth Limits
         storage_gb INTEGER DEFAULT 0, -- 0 means unlimited
@@ -871,20 +872,20 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-  logger.info('Created plans table');
+        logger.info("Created plans table");
 
-    // Add new columns if they don't exist (for existing databases)
-    await query(`
+        // Add new columns if they don't exist (for existing databases)
+        await query(`
       ALTER TABLE plans 
       ADD COLUMN IF NOT EXISTS versioning_allowed BOOLEAN DEFAULT false,
       ADD COLUMN IF NOT EXISTS storage_classes_allowed BOOLEAN DEFAULT false,
       ADD COLUMN IF NOT EXISTS multipart_upload_allowed BOOLEAN DEFAULT false;
     `);
 
-    // Insert Free plan with realistic S3 limits
-    await query(`
+        // Insert Free plan with realistic S3 limits
+        await query(`
       INSERT INTO plans (
-        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
+        id, name, type, skydo_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed, 
         max_file_size_mb, max_multipart_file_size_gb,
@@ -927,16 +928,16 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
-        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
+        skydo_variant_id = EXCLUDED.skydo_variant_id,
         private_buckets_allowed = EXCLUDED.private_buckets_allowed,
         updated_at = CURRENT_TIMESTAMP
     `);
-  logger.info('Inserted/Updated Free plan');
+        logger.info("Inserted/Updated Free plan");
 
-    // Insert Pro plan with advanced S3 features
-    await query(`
+        // Insert Pro plan with advanced S3 features
+        await query(`
       INSERT INTO plans (
-        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
+        id, name, type, skydo_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
@@ -988,15 +989,15 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
-        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
+        skydo_variant_id = EXCLUDED.skydo_variant_id,
         updated_at = CURRENT_TIMESTAMP
     `);
-  logger.info('Inserted/Updated Pro plan');
+        logger.info("Inserted/Updated Pro plan");
 
-    // Insert PAYG plan with enterprise-grade S3 features
-    await query(`
+        // Insert PAYG plan with enterprise-grade S3 features
+        await query(`
       INSERT INTO plans (
-        id, name, type, lemonsqueezy_variant_id, price_usd, price_inr, billing_cycle, description,
+        id, name, type, skydo_variant_id, price_usd, price_inr, billing_cycle, description,
         storage_gb, bandwidth_gb, free_bandwidth_multiplier, api_calls, requests_per_second,
         max_buckets, public_buckets_allowed, private_buckets_allowed,
         max_file_size_mb, max_multipart_file_size_gb,
@@ -1053,13 +1054,13 @@ const createTables = async () => {
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,
-        lemonsqueezy_variant_id = EXCLUDED.lemonsqueezy_variant_id,
+        skydo_variant_id = EXCLUDED.skydo_variant_id,
         updated_at = CURRENT_TIMESTAMP
     `);
-  logger.info('Inserted/Updated PAYG plan');
+        logger.info("Inserted/Updated PAYG plan");
 
-    // Add backup_files table for 30-day retention
-    await query(`
+        // Add backup_files table for 30-day retention
+        await query(`
       CREATE TABLE IF NOT EXISTS backup_files (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1079,15 +1080,21 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-  logger.info('Created backup_files table');
+        logger.info("Created backup_files table");
 
-    // Create index for quick lookups
-    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_user ON backup_files(user_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_expires ON backup_files(expires_at)');
-    await query('CREATE INDEX IF NOT EXISTS idx_backup_files_deleted ON backup_files(deleted_at)');
+        // Create index for quick lookups
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_backup_files_user ON backup_files(user_id)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_backup_files_expires ON backup_files(expires_at)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_backup_files_deleted ON backup_files(deleted_at)"
+        );
 
-    // Add custom_domains table
-    await query(`
+        // Add custom_domains table
+        await query(`
       CREATE TABLE IF NOT EXISTS custom_domains (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1104,17 +1111,21 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-  logger.info('Created custom_domains table');
+        logger.info("Created custom_domains table");
 
-    // Create index for domains
-    await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_user ON custom_domains(user_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_custom_domains_bucket ON custom_domains(bucket_id)');
+        // Create index for domains
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_custom_domains_user ON custom_domains(user_id)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_custom_domains_bucket ON custom_domains(bucket_id)"
+        );
 
-    // Add foreign key constraints for plan_id references
-    logger.info('Adding foreign key constraints for plan_id...');
-    
-    // For users table - plan_id should reference plans.id
-    await query(`
+        // Add foreign key constraints for plan_id references
+        logger.info("Adding foreign key constraints for plan_id...");
+
+        // For users table - plan_id should reference plans.id
+        await query(`
       DO $$ 
       BEGIN
         IF NOT EXISTS (
@@ -1127,9 +1138,9 @@ const createTables = async () => {
         END IF;
       END $$;
     `);
-    
-    // For subscriptions table - plan_id should reference plans.id
-    await query(`
+
+        // For subscriptions table - plan_id should reference plans.id
+        await query(`
       DO $$ 
       BEGIN
         IF NOT EXISTS (
@@ -1142,9 +1153,9 @@ const createTables = async () => {
         END IF;
       END $$;
     `);
-    
-    // For payments table - plan_id should reference plans.id
-    await query(`
+
+        // For payments table - plan_id should reference plans.id
+        await query(`
       DO $$ 
       BEGIN
         IF NOT EXISTS (
@@ -1157,32 +1168,42 @@ const createTables = async () => {
         END IF;
       END $$;
     `);
-    
-    logger.info('Foreign key constraints added successfully');
 
-    // Add additional indexes for better JOIN performance
-    logger.info('Adding additional indexes...');
-    await query('CREATE INDEX IF NOT EXISTS idx_users_plan_id ON users(plan_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_subscriptions_plan_id ON subscriptions(plan_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_payments_plan_id ON payments(plan_id)');
-    await query('CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON users(subscription_status)');
-    await query('CREATE INDEX IF NOT EXISTS idx_users_services_active ON users(services_active)');
-    logger.info('Additional indexes created successfully');
+        logger.info("Foreign key constraints added successfully");
 
-  logger.info('All tables created successfully');
-  } catch (error) {
-    logger.error('❌ Error creating tables:', error);
-    throw error;
-  }
+        // Add additional indexes for better JOIN performance
+        logger.info("Adding additional indexes...");
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_users_plan_id ON users(plan_id)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_subscriptions_plan_id ON subscriptions(plan_id)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_payments_plan_id ON payments(plan_id)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON users(subscription_status)"
+        );
+        await query(
+            "CREATE INDEX IF NOT EXISTS idx_users_services_active ON users(services_active)"
+        );
+        logger.info("Additional indexes created successfully");
+
+        logger.info("All tables created successfully");
+    } catch (error) {
+        logger.error("❌ Error creating tables:", error);
+        throw error;
+    }
 };
 
 // Run migration
 createTables()
-  .then(() => {
-  logger.info('Database migration completed');
-    process.exit(0);
-  })
-  .catch((error) => {
-    logger.error('❌ Migration failed:', error);
-    process.exit(1);
-  });
+    .then(() => {
+        logger.info("Database migration completed");
+        process.exit(0);
+    })
+    .catch((error) => {
+        logger.error("❌ Migration failed:", error);
+        process.exit(1);
+    });
